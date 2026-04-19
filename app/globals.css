@@ -82,20 +82,64 @@ button {
   transform: scale(0.97);
 }
 
-/* Yokai detail card — 200ms fade + subtle scale on mount */
-.yokai-card-fade-in {
-  animation: yokai-card-fade-in 200ms ease-out;
-}
+/* ── Yokai detail card — graceful enter + exit ───────────────────────── */
+/* Staggered: backdrop fades first, card scale-fades in 40ms later.      */
+/* Exit is symmetrical but 60ms shorter so closing feels more responsive */
+/* than opening. Card scale swings 0.96 → 1 → 0.97 (asymmetric — enter   */
+/* "approaches", exit "recedes").                                        */
 
-@keyframes yokai-card-fade-in {
-  from {
+@keyframes yokaiCardEnter {
+  0% {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.96);
   }
-  to {
+  100% {
     opacity: 1;
     transform: scale(1);
   }
+}
+
+@keyframes yokaiCardExit {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+@keyframes backdropEnter {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes backdropExit {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.yokai-card-fade-in {
+  animation: backdropEnter 240ms ease-out forwards;
+}
+.yokai-card-fade-in .scroll-panel-wrapper {
+  animation: yokaiCardEnter 260ms cubic-bezier(0.16, 1, 0.3, 1) 40ms backwards;
+}
+
+.yokai-card-fade-out {
+  animation: backdropExit 200ms ease-in forwards;
+}
+.yokai-card-fade-out .scroll-panel-wrapper {
+  animation: yokaiCardExit 200ms cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
 /* Season kanji badge — fades in on season change (keyed remount) */

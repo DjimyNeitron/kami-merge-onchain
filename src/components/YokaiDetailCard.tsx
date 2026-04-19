@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getYokai } from "@/config/yokai";
+
+// Must match the duration of the .yokai-card-fade-out animation in globals.css.
+const EXIT_ANIMATION_MS = 220;
 
 type Props = {
   yokaiId: number;
@@ -28,21 +31,35 @@ export default function YokaiDetailCard({
   const nextId =
     idx >= 0 && idx < ordered.length - 1 ? ordered[idx + 1] : null;
 
+  // Two-phase close: play the exit animation, then notify the parent
+  // (which unmounts us). A guard prevents double-triggering if the user
+  // taps × / backdrop multiple times during the 220ms window.
+  const [isClosing, setIsClosing] = useState(false);
+  const handleClose = () => {
+    if (isClosing) return;
+    setIsClosing(true);
+    window.setTimeout(onClose, EXIT_ANIMATION_MS);
+  };
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (isClosing) return;
+      if (e.key === "Escape") handleClose();
       else if (e.key === "ArrowLeft" && prevId !== null) onNavigate(prevId);
       else if (e.key === "ArrowRight" && nextId !== null) onNavigate(nextId);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [prevId, nextId, onClose, onNavigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prevId, nextId, isClosing, onNavigate]);
 
   const touchStartX = useRef<number | null>(null);
   const onTouchStart = (e: React.TouchEvent) => {
+    if (isClosing) return;
     touchStartX.current = e.touches[0]?.clientX ?? null;
   };
   const onTouchEnd = (e: React.TouchEvent) => {
+    if (isClosing) return;
     const start = touchStartX.current;
     touchStartX.current = null;
     if (start === null) return;
@@ -67,7 +84,9 @@ export default function YokaiDetailCard({
   return (
     <div
       data-game-overlay
-      className="fixed inset-0 flex items-center justify-center yokai-card-fade-in"
+      className={`fixed inset-0 flex items-center justify-center ${
+        isClosing ? "yokai-card-fade-out" : "yokai-card-fade-in"
+      }`}
       style={{
         zIndex: 120,
         // Game atmosphere shows through — blurred + gently darkened, never
@@ -76,12 +95,12 @@ export default function YokaiDetailCard({
         backdropFilter: "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
       }}
-      onClick={onClose}
+      onClick={handleClose}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
       <div
-        className="relative mx-4 w-[min(400px,92%)]"
+        className="relative mx-4 w-[min(400px,92%)] scroll-panel-wrapper"
         style={{ height: 540 }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -98,12 +117,12 @@ export default function YokaiDetailCard({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onClose();
+                handleClose();
               }}
               onTouchEnd={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
-                onClose();
+                handleClose();
               }}
               type="button"
               aria-label="Close"
