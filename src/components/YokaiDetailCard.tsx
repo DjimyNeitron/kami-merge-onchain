@@ -57,12 +57,15 @@ export default function YokaiDetailCard({
   // Solid plum medallion. Sprite PNGs have heavy alpha translucency in the
   // body (Oni 25% body<255, Tanuki 13%, etc.) so a translucent pedestal
   // lets the cream parchment bleed through and wash out the colour. A solid
-  // #1a1528 core through 55% gives every translucent sprite pixel an opaque
-  // dark plum backdrop — the same visual context dark sprites have on a
-  // black game screen. Mid-gradient (55→75→92) softens the circle edge so
-  // it dissolves into parchment instead of cutting a hard disc.
+  // core gives every translucent sprite pixel an opaque plum backdrop —
+  // the same visual context dark sprites have on a black game screen.
+  //
+  // Tuned to dissolve into parchment (4-stop fade 35→60→80→95) so the
+  // medallion doesn't read as a competing disc. Colour lifted from #1a1528
+  // to #2a2140 — still protects translucent alpha, stops looking like a
+  // hole punched through the card.
   const medallionGradient =
-    "radial-gradient(circle at center, #1a1528 0%, #1a1528 55%, rgba(26,21,40,0.6) 75%, rgba(26,21,40,0) 92%)";
+    "radial-gradient(circle at center, #2a2140 0%, #2a2140 35%, rgba(42,33,64,0.55) 60%, rgba(42,33,64,0.2) 80%, rgba(42,33,64,0) 95%)";
 
   return (
     <div
