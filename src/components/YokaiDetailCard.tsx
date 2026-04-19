@@ -54,18 +54,15 @@ export default function YokaiDetailCard({
 
   if (!yokai) return null;
 
-  // Solid plum medallion. Sprite PNGs have heavy alpha translucency in the
-  // body (Oni 25% body<255, Tanuki 13%, etc.) so a translucent pedestal
-  // lets the cream parchment bleed through and wash out the colour. A solid
-  // core gives every translucent sprite pixel an opaque plum backdrop —
-  // the same visual context dark sprites have on a black game screen.
-  //
-  // Tuned to dissolve into parchment (4-stop fade 35→60→80→95) so the
-  // medallion doesn't read as a competing disc. Colour lifted from #1a1528
-  // to #2a2140 — still protects translucent alpha, stops looking like a
-  // hole punched through the card.
-  const medallionGradient =
-    "radial-gradient(circle at center, #2a2140 0%, #2a2140 35%, rgba(42,33,64,0.55) 60%, rgba(42,33,64,0.2) 80%, rgba(42,33,64,0) 95%)";
+  // Alpha-aware shadow applied directly to the sprite. Two stacked
+  // drop-shadows — one tight+dense to plug the PNG's translucent body
+  // (Oni 25% body<255, Tanuki 13%, etc.) so cream parchment can't bleed
+  // through, and one wider+softer as an ambient halo that grounds the
+  // sprite on the parchment without drawing a competing disc. Because
+  // drop-shadow follows the alpha silhouette, the shape follows Oni's
+  // horns, Tanuki's ears, Kodama's leaves — never a circle.
+  const spriteShadow =
+    "drop-shadow(0 0 10px rgba(26,21,40,0.85)) drop-shadow(0 0 18px rgba(26,21,40,0.55))";
 
   return (
     <div
@@ -124,13 +121,11 @@ export default function YokaiDetailCard({
               ×
             </button>
 
-            {/* Sprite medallion — solid plum core fades into parchment */}
+            {/* Sprite with alpha-shaped drop-shadow — no enclosing medallion disc */}
             <div
               style={{
-                width: 220,
-                height: 220,
-                borderRadius: "50%",
-                background: medallionGradient,
+                width: 200,
+                height: 200,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -145,6 +140,7 @@ export default function YokaiDetailCard({
                   width: 180,
                   height: 180,
                   objectFit: "contain",
+                  filter: spriteShadow,
                 }}
               />
             </div>
