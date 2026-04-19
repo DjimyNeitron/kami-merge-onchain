@@ -54,10 +54,15 @@ export default function YokaiDetailCard({
 
   if (!yokai) return null;
 
-  // Amaterasu (id 11) is white/gold — soften the pedestal so it doesn't
-  // overpower her palette. All other yokai use the standard opacity.
-  const pedestalOpacity = yokai.id === 11 ? 0.2 : 0.35;
-  const pedestalGradient = `radial-gradient(circle at 50% 50%, rgba(40, 30, 60, ${pedestalOpacity}) 0%, rgba(40, 30, 60, 0) 70%)`;
+  // Solid plum medallion. Sprite PNGs have heavy alpha translucency in the
+  // body (Oni 25% body<255, Tanuki 13%, etc.) so a translucent pedestal
+  // lets the cream parchment bleed through and wash out the colour. A solid
+  // #1a1528 core through 55% gives every translucent sprite pixel an opaque
+  // dark plum backdrop — the same visual context dark sprites have on a
+  // black game screen. Mid-gradient (55→75→92) softens the circle edge so
+  // it dissolves into parchment instead of cutting a hard disc.
+  const medallionGradient =
+    "radial-gradient(circle at center, #1a1528 0%, #1a1528 55%, rgba(26,21,40,0.6) 75%, rgba(26,21,40,0) 92%)";
 
   return (
     <div
@@ -116,13 +121,13 @@ export default function YokaiDetailCard({
               ×
             </button>
 
-            {/* Sprite pedestal — soft radial shadow absorbs PNG edge artifacts */}
+            {/* Sprite medallion — solid plum core fades into parchment */}
             <div
               style={{
-                width: 200,
-                height: 200,
+                width: 220,
+                height: 220,
                 borderRadius: "50%",
-                background: pedestalGradient,
+                background: medallionGradient,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
