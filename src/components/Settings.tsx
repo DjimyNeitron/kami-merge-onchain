@@ -66,100 +66,116 @@ export default function Settings({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="wooden-rod absolute -top-1 left-3 right-3 h-3 rounded-full pointer-events-none" />
-          <div className="scroll-panel kami-serif px-5 py-6 text-[#3d2510] border-x border-[#8a6f28]/40 max-h-[80vh] overflow-y-auto">
-            {/* H1 — only bold heading in the panel */}
-            <div className="text-3xl font-bold tracking-[0.08em] text-center leading-none">
-              Settings
-            </div>
-            <div className="text-base tracking-[0.2em] text-[#5c3a1e]/60 text-center mt-1">
-              設定
-            </div>
-            <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-4" />
+          {/* scroll-panel: flex-col so a sticky Close footer stays pinned
+           * while the content above it scrolls. Vertical paddings reduced
+           * roughly 25% vs previous round so content fits without scroll
+           * on desktop 1080p. */}
+          <div className="scroll-panel kami-serif text-[#3d2510] border-x border-[#8a6f28]/40 flex flex-col max-h-[90vh]">
+            {/* Scrollable content region */}
+            <div className="flex-1 overflow-y-auto px-5 pt-5 pb-2">
+              {/* H1 — only bold heading in the panel */}
+              <div className="text-3xl font-bold tracking-[0.08em] text-center leading-none">
+                Settings
+              </div>
+              <div className="text-base tracking-[0.2em] text-[#5c3a1e]/60 text-center mt-1">
+                設定
+              </div>
+              <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-3" />
 
-            <ToggleRow
-              icon={<SuzuIcon muted={!sfxEnabled} size={28} />}
-              label="Sound"
-              kanji="音"
-              enabled={sfxEnabled}
-              onToggle={onToggleSfx}
-            />
-            <ToggleRow
-              icon={<TaikoIcon muted={!bgmEnabled} size={28} />}
-              label="Music"
-              kanji="楽"
-              enabled={bgmEnabled}
-              onToggle={onToggleBgm}
-            />
+              <ToggleRow
+                icon={<SuzuIcon muted={!sfxEnabled} size={28} />}
+                label="Sound"
+                kanji="音"
+                enabled={sfxEnabled}
+                onToggle={onToggleSfx}
+              />
+              <ToggleRow
+                icon={<TaikoIcon muted={!bgmEnabled} size={28} />}
+                label="Music"
+                kanji="楽"
+                enabled={bgmEnabled}
+                onToggle={onToggleBgm}
+              />
 
-            <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-4" />
+              <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-3" />
 
-            {/* H2 — regular weight, matches Sound/Music size */}
-            <div className="text-xl uppercase tracking-[0.2em] text-[#5c3a1e]/75 text-center">
-              Yokai Collection
-            </div>
-            <div className="text-sm tracking-[0.15em] text-[#5c3a1e]/60 text-center mt-0.5 mb-3">
-              妖怪図鑑
-            </div>
-            <div className="grid grid-cols-4 gap-2 mb-1">
-              {YOKAI_CHAIN.map((y) => {
-                const isUnlocked = unlockedSet.has(y.id);
-                return (
-                  <button
-                    key={y.id}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (isUnlocked) setOpenYokaiId(y.id);
-                    }}
-                    onTouchEnd={(e) => {
-                      if (!isUnlocked) return;
-                      e.stopPropagation();
-                      e.preventDefault();
-                      setOpenYokaiId(y.id);
-                    }}
-                    disabled={!isUnlocked}
-                    className="flex flex-col items-center gap-0.5 p-1 rounded"
-                    style={{
-                      background: isUnlocked
-                        ? "rgba(200, 168, 78, 0.12)"
-                        : "transparent",
-                      border: "none",
-                      cursor: isUnlocked ? "pointer" : "default",
-                      touchAction: "manipulation",
-                    }}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={y.sprite}
-                      alt={y.name}
-                      style={{
-                        width: 40,
-                        height: 40,
-                        objectFit: "contain",
-                        opacity: isUnlocked ? 1 : 0.3,
-                        filter: isUnlocked
-                          ? "drop-shadow(0 0 3px rgba(200,168,78,0.5))"
-                          : "grayscale(1) brightness(0.7)",
+              {/* H2 — regular weight, matches Sound/Music size */}
+              <div className="text-xl uppercase tracking-[0.2em] text-[#5c3a1e]/75 text-center">
+                Yokai Collection
+              </div>
+              <div className="text-sm tracking-[0.15em] text-[#5c3a1e]/60 text-center mt-0.5 mb-2">
+                妖怪図鑑
+              </div>
+              <div className="grid grid-cols-4 gap-2 mb-1">
+                {YOKAI_CHAIN.map((y) => {
+                  const isUnlocked = unlockedSet.has(y.id);
+                  return (
+                    <button
+                      key={y.id}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isUnlocked) setOpenYokaiId(y.id);
                       }}
-                    />
-                    <div className="text-sm text-center text-[#3d2510] leading-tight">
-                      {isUnlocked ? y.name : "???"}
-                    </div>
-                    <div className="text-xs tracking-[0.15em] text-[#5c3a1e]/60 leading-none">
-                      {isUnlocked ? y.kanji : "\u00a0"}
-                    </div>
-                  </button>
-                );
-              })}
+                      onTouchEnd={(e) => {
+                        if (!isUnlocked) return;
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setOpenYokaiId(y.id);
+                      }}
+                      disabled={!isUnlocked}
+                      className="flex flex-col items-center gap-0.5 p-1 rounded"
+                      style={{
+                        background: isUnlocked
+                          ? "rgba(200, 168, 78, 0.12)"
+                          : "transparent",
+                        border: "none",
+                        cursor: isUnlocked ? "pointer" : "default",
+                        touchAction: "manipulation",
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={y.sprite}
+                        alt={y.name}
+                        style={{
+                          width: 40,
+                          height: 40,
+                          objectFit: "contain",
+                          opacity: isUnlocked ? 1 : 0.3,
+                          filter: isUnlocked
+                            ? "drop-shadow(0 0 3px rgba(200,168,78,0.5))"
+                            : "grayscale(1) brightness(0.7)",
+                        }}
+                      />
+                      <div className="text-sm text-center text-[#3d2510] leading-tight">
+                        {isUnlocked ? y.name : "???"}
+                      </div>
+                      <div className="text-xs tracking-[0.15em] text-[#5c3a1e]/60 leading-none">
+                        {isUnlocked ? y.kanji : "\u00a0"}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-3" />
+
+              <div className="text-[0.65rem] text-[#5c3a1e]/65 text-center tracking-wider">
+                Made by Kody Productions · Powered by Soneium
+              </div>
             </div>
 
-            <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-4" />
-
-            <div className="text-[0.65rem] text-[#5c3a1e]/65 text-center tracking-wider">
-              Made by Kody Productions · Powered by Soneium
-            </div>
-
-            <div className="mt-5 flex justify-center">
+            {/* Sticky footer — Close button always visible regardless of
+             * scroll position. Top border + cream-fade blends it into the
+             * parchment so it reads as an action bar, not a hard cut. */}
+            <div
+              className="shrink-0 px-5 pt-3 pb-4 flex justify-center border-t border-[#8a6f28]/25"
+              style={{
+                background:
+                  "linear-gradient(to top, rgba(229,214,176,0.95), rgba(245,230,200,0.4))",
+              }}
+            >
               <button
                 onClick={onClose}
                 onTouchEnd={(e) => {
