@@ -1,6 +1,7 @@
-// Suzu (鈴) — Shinto shrine bell, v3. Nearly spherical body with a strong
-// horizontal slit (the iconic mouth of a suzu), short cord + knot on top,
-// small clapper dot below the slit. Stroke-based, viewBox 24, 1.5 stroke,
+// Suzu (鈴) — Shinto shrine bell, v4. Spherical grapefruit-shaped body
+// (not bell/dome), dominant horizontal slit spanning most of the body,
+// small triangular clapper tongue hanging under the slit, subtle upper-
+// left highlight hint for volume. Stroke-based, viewBox 24, 1.5 stroke,
 // currentColor, round caps. `muted` adds a diagonal strike.
 
 type Props = {
@@ -27,16 +28,34 @@ export default function SuzuIcon({
       className={className}
       aria-hidden="true"
     >
-      {/* Short cord from the top of the bell */}
-      <line x1="12" y1="3" x2="12" y2="5.5" />
-      {/* Knot / fastening strip */}
-      <line x1="10.5" y1="5.5" x2="13.5" y2="5.5" />
-      {/* Nearly spherical bell body, slightly flattened at bottom */}
-      <path d="M 12 6 C 7.5 6, 5 9.5, 5 14 C 5 18, 8 20.5, 12 20.5 C 16 20.5, 19 18, 19 14 C 19 9.5, 16.5 6, 12 6 Z" />
-      {/* Characteristic horizontal slit — thicker stroke so it reads at 24px */}
-      <line x1="7.5" y1="15" x2="16.5" y2="15" strokeWidth={1.8} />
-      {/* Clapper dot under the slit */}
-      <circle cx="12" cy="17.5" r="0.6" fill="currentColor" />
+      {/* Short cord from the top */}
+      <line x1="12" y1="2.5" x2="12" y2="5" />
+      {/* Fastening knot */}
+      <path
+        d="M 10.5 5 L 13.5 5 L 13.5 6 L 10.5 6 Z"
+        fill="currentColor"
+      />
+
+      {/* Spherical body — rx 7, ry 7.5 (almost a circle, slightly taller
+       * so it reads as a cast bell rather than a perfect sphere) */}
+      <ellipse cx="12" cy="14" rx="7" ry="7.5" />
+
+      {/* Dominant horizontal slit — the key identifier, thicker stroke */}
+      <line x1="6" y1="15.5" x2="18" y2="15.5" strokeWidth={2} />
+
+      {/* Triangular clapper tongue hanging below the slit */}
+      <path
+        d="M 11 17.5 L 13 17.5 L 12 19 Z"
+        fill="currentColor"
+      />
+
+      {/* Subtle upper-left highlight — hint of a lit sphere */}
+      <path
+        d="M 7 11 Q 8 9.5, 10 9.5"
+        strokeWidth={0.8}
+        opacity={0.5}
+      />
+
       {muted && (
         <line x1="4" y1="4" x2="20" y2="20" strokeWidth={2} />
       )}
