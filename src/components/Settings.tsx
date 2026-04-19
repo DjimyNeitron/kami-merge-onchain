@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { YOKAI_CHAIN } from "@/config/yokai";
 import YokaiDetailCard from "@/components/YokaiDetailCard";
-import FurinIcon from "@/components/icons/FurinIcon";
+import HoragaiIcon from "@/components/icons/HoragaiIcon";
+import ShamisenIcon from "@/components/icons/ShamisenIcon";
 
 type Props = {
   sfxEnabled: boolean;
@@ -51,17 +52,13 @@ export default function Settings({
 
   return (
     <>
+      {/* Settings stays fully mounted + visible under the Detail Card.
+       * Layered-modal pattern: Detail Card's own backdrop (z:120) dims this
+       * panel visually without unmounting or fading it out — preserving
+       * scroll position and removing the open/close flicker. */}
       <div
         className="fixed inset-0 flex items-center justify-center bg-black/65 backdrop-blur-sm"
-        style={{
-          zIndex: 90,
-          // When the detail card is open we keep Settings mounted (preserves
-          // scroll state + avoids re-render flicker) but fade it out so the
-          // card backdrop isn't muddied by a ghost of the modal beneath.
-          opacity: openYokaiId !== null ? 0 : 1,
-          pointerEvents: openYokaiId !== null ? "none" : "auto",
-          transition: "opacity 150ms ease",
-        }}
+        style={{ zIndex: 90 }}
         onClick={onClose}
       >
         <div
@@ -69,8 +66,8 @@ export default function Settings({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="wooden-rod absolute -top-1 left-3 right-3 h-3 rounded-full pointer-events-none" />
-          <div className="scroll-panel px-5 py-6 text-[#3d2510] border-x border-[#8a6f28]/40 max-h-[80vh] overflow-y-auto">
-            <div className="kami-serif text-2xl font-bold tracking-[0.1em] text-center">
+          <div className="scroll-panel kami-serif px-5 py-6 text-[#3d2510] border-x border-[#8a6f28]/40 max-h-[80vh] overflow-y-auto">
+            <div className="text-2xl font-bold tracking-[0.1em] text-center">
               Settings
             </div>
             <div className="text-[0.65rem] tracking-[0.3em] text-[#5c3a1e]/60 text-center mt-1">
@@ -79,22 +76,27 @@ export default function Settings({
             <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-4" />
 
             <ToggleRow
-              icon={<FurinIcon enabled={sfxEnabled} size={18} />}
+              icon={<HoragaiIcon muted={!sfxEnabled} size={20} />}
               label="Sound"
+              kanji="音"
               enabled={sfxEnabled}
               onToggle={onToggleSfx}
             />
             <ToggleRow
-              icon={<span style={{ fontSize: 16 }}>🎵</span>}
+              icon={<ShamisenIcon muted={!bgmEnabled} size={20} />}
               label="Music"
+              kanji="楽"
               enabled={bgmEnabled}
               onToggle={onToggleBgm}
             />
 
             <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-4" />
 
-            <div className="kami-serif text-xs uppercase tracking-[0.25em] text-[#5c3a1e]/70 text-center mb-3">
+            <div className="text-xs uppercase tracking-[0.25em] text-[#5c3a1e]/70 text-center">
               Yokai Collection
+            </div>
+            <div className="text-[0.6rem] tracking-[0.3em] text-[#5c3a1e]/55 text-center mt-0.5 mb-3">
+              妖怪図鑑
             </div>
             <div className="grid grid-cols-4 gap-2 mb-1">
               {YOKAI_CHAIN.map((y) => {
@@ -138,7 +140,7 @@ export default function Settings({
                           : "grayscale(1) brightness(0.7)",
                       }}
                     />
-                    <div className="kami-serif text-[0.55rem] text-center text-[#3d2510] leading-tight">
+                    <div className="text-[0.55rem] text-center text-[#3d2510] leading-tight">
                       {isUnlocked ? y.name : "???"}
                     </div>
                     <div className="text-[0.55rem] text-[#5c3a1e]/60 leading-none">
@@ -151,8 +153,8 @@ export default function Settings({
 
             <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-4" />
 
-            <div className="kami-serif text-[0.65rem] text-[#5c3a1e]/65 text-center tracking-wider">
-              Made by Kody · Powered by Soneium
+            <div className="text-[0.65rem] text-[#5c3a1e]/65 text-center tracking-wider">
+              Made by Kody Productions · Powered by Soneium
             </div>
 
             <div className="mt-5 flex justify-center">
@@ -164,10 +166,13 @@ export default function Settings({
                   onClose();
                 }}
                 type="button"
-                className="wood-btn kami-serif px-6 py-2 rounded-md text-sm font-semibold tracking-wider"
+                className="wood-btn px-6 py-2 rounded-md text-sm font-semibold tracking-wider flex flex-col items-center leading-tight"
                 style={{ touchAction: "manipulation" }}
               >
-                Close
+                <span>Close</span>
+                <span className="text-[0.55rem] tracking-[0.3em] opacity-80 mt-0.5">
+                  閉じる
+                </span>
               </button>
             </div>
           </div>
@@ -190,11 +195,13 @@ export default function Settings({
 function ToggleRow({
   icon,
   label,
+  kanji,
   enabled,
   onToggle,
 }: {
   icon: React.ReactNode;
   label: string;
+  kanji: string;
   enabled: boolean;
   onToggle: () => void;
 }) {
@@ -203,13 +210,21 @@ function ToggleRow({
       <div className="flex items-center gap-3">
         <span
           className="inline-flex items-center justify-center"
-          style={{ width: 20, height: 20, color: "#c8a84e", opacity: enabled ? 1 : 0.5 }}
+          style={{
+            width: 22,
+            height: 22,
+            color: "#c8a84e",
+            opacity: enabled ? 1 : 0.5,
+          }}
         >
           {icon}
         </span>
-        <span className="kami-serif font-semibold text-[#3d2510]">
-          {label}
-        </span>
+        <div className="flex flex-col leading-tight">
+          <span className="font-semibold text-[#3d2510]">{label}</span>
+          <span className="text-[0.6rem] tracking-[0.3em] text-[#5c3a1e]/60">
+            {kanji}
+          </span>
+        </div>
       </div>
       <button
         onClick={onToggle}
