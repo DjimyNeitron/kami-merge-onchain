@@ -6,8 +6,10 @@ import { YokaiType, YOKAI_CHAIN } from "@/config/yokai";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/config/constants";
 import SplashScreen from "@/components/SplashScreen";
 import Settings from "@/components/Settings";
-import FurinIcon from "@/components/icons/FurinIcon";
+import SuzuIcon from "@/components/icons/SuzuIcon";
 import MonIcon from "@/components/icons/MonIcon";
+// FurinIcon kept in the codebase for future use (BGM / notifications);
+// the in-game mute button now uses SuzuIcon to match Settings Sound icon.
 import {
   SEASON_CONFIG,
   getCurrentSeason,
@@ -369,7 +371,7 @@ export default function GameCanvas() {
             touchAction: "manipulation",
           }}
         >
-          <FurinIcon enabled={!muted} size={18} />
+          <SuzuIcon muted={muted} size={18} />
         </button>
         <button
           onClick={openSettings}

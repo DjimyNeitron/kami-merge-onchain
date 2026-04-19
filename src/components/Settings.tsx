@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { YOKAI_CHAIN } from "@/config/yokai";
 import YokaiDetailCard from "@/components/YokaiDetailCard";
-import HoragaiIcon from "@/components/icons/HoragaiIcon";
-import ShamisenIcon from "@/components/icons/ShamisenIcon";
+import SuzuIcon from "@/components/icons/SuzuIcon";
+import TaikoIcon from "@/components/icons/TaikoIcon";
 
 type Props = {
   sfxEnabled: boolean;
@@ -67,23 +67,24 @@ export default function Settings({
         >
           <div className="wooden-rod absolute -top-1 left-3 right-3 h-3 rounded-full pointer-events-none" />
           <div className="scroll-panel kami-serif px-5 py-6 text-[#3d2510] border-x border-[#8a6f28]/40 max-h-[80vh] overflow-y-auto">
-            <div className="text-2xl font-bold tracking-[0.1em] text-center">
+            {/* H1 — only bold heading in the panel */}
+            <div className="text-3xl font-bold tracking-[0.08em] text-center leading-none">
               Settings
             </div>
-            <div className="text-[0.65rem] tracking-[0.3em] text-[#5c3a1e]/60 text-center mt-1">
+            <div className="text-base tracking-[0.2em] text-[#5c3a1e]/60 text-center mt-1">
               設定
             </div>
             <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-4" />
 
             <ToggleRow
-              icon={<HoragaiIcon muted={!sfxEnabled} size={20} />}
+              icon={<SuzuIcon muted={!sfxEnabled} size={28} />}
               label="Sound"
               kanji="音"
               enabled={sfxEnabled}
               onToggle={onToggleSfx}
             />
             <ToggleRow
-              icon={<ShamisenIcon muted={!bgmEnabled} size={20} />}
+              icon={<TaikoIcon muted={!bgmEnabled} size={28} />}
               label="Music"
               kanji="楽"
               enabled={bgmEnabled}
@@ -92,10 +93,11 @@ export default function Settings({
 
             <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-4" />
 
-            <div className="text-xs uppercase tracking-[0.25em] text-[#5c3a1e]/70 text-center">
+            {/* H2 — regular weight, matches Sound/Music size */}
+            <div className="text-xl uppercase tracking-[0.2em] text-[#5c3a1e]/75 text-center">
               Yokai Collection
             </div>
-            <div className="text-[0.6rem] tracking-[0.3em] text-[#5c3a1e]/55 text-center mt-0.5 mb-3">
+            <div className="text-sm tracking-[0.15em] text-[#5c3a1e]/60 text-center mt-0.5 mb-3">
               妖怪図鑑
             </div>
             <div className="grid grid-cols-4 gap-2 mb-1">
@@ -140,10 +142,10 @@ export default function Settings({
                           : "grayscale(1) brightness(0.7)",
                       }}
                     />
-                    <div className="text-[0.55rem] text-center text-[#3d2510] leading-tight">
+                    <div className="text-sm text-center text-[#3d2510] leading-tight">
                       {isUnlocked ? y.name : "???"}
                     </div>
-                    <div className="text-[0.55rem] text-[#5c3a1e]/60 leading-none">
+                    <div className="text-xs tracking-[0.15em] text-[#5c3a1e]/60 leading-none">
                       {isUnlocked ? y.kanji : "\u00a0"}
                     </div>
                   </button>
@@ -166,11 +168,11 @@ export default function Settings({
                   onClose();
                 }}
                 type="button"
-                className="wood-btn px-6 py-2 rounded-md text-sm font-semibold tracking-wider flex flex-col items-center leading-tight"
+                className="wood-btn px-6 py-2 rounded-md text-base tracking-wider flex flex-col items-center leading-tight"
                 style={{ touchAction: "manipulation" }}
               >
                 <span>Close</span>
-                <span className="text-[0.55rem] tracking-[0.3em] opacity-80 mt-0.5">
+                <span className="text-xs tracking-[0.15em] opacity-70 mt-0.5">
                   閉じる
                 </span>
               </button>
@@ -211,8 +213,8 @@ function ToggleRow({
         <span
           className="inline-flex items-center justify-center"
           style={{
-            width: 22,
-            height: 22,
+            width: 28,
+            height: 28,
             color: "#c8a84e",
             opacity: enabled ? 1 : 0.5,
           }}
@@ -220,8 +222,9 @@ function ToggleRow({
           {icon}
         </span>
         <div className="flex flex-col leading-tight">
-          <span className="font-semibold text-[#3d2510]">{label}</span>
-          <span className="text-[0.6rem] tracking-[0.3em] text-[#5c3a1e]/60">
+          {/* H2 — regular weight, sized to match Yokai Collection heading */}
+          <span className="text-xl text-[#3d2510]">{label}</span>
+          <span className="text-sm tracking-[0.15em] text-[#5c3a1e]/60">
             {kanji}
           </span>
         </div>
