@@ -1,7 +1,14 @@
 // Seasonal decoration system.
-// The background image never changes — only overlay tint + seasonal particles
-// swap. This module owns the current season, the 90s auto-cycle, and a
-// pub/sub for components that need to react (tint, particle spawner, badge).
+//
+// DEACTIVATED: the auto-cycle, tint overlay, and season badge were removed.
+// The module is locked to a single STATIC_SEASON (HARU) — consumers still
+// call getCurrentSeason() / subscribe() as before, but no timer fires and
+// no cycleSeason() mutation happens. MapleLeaf + Snowflake particle classes
+// remain in particles.ts but are never spawned because primaryParticle
+// stays "sakura".
+//
+// To re-enable cycling: set STATIC_SEASON = null and restore the original
+// setInterval logic in subscribe() (see commit history for the prior body).
 
 export enum Season {
   HARU = "haru", // spring
@@ -24,7 +31,10 @@ export const SEASON_CONFIG: Record<Season, SeasonConfig> = {
     primaryParticle: "sakura",
     tintColor: "#ffb3d9",
     tintOpacity: 0.08,
-    fireflyMultiplier: 0.5,
+    // Bumped from 0.5 → 2.0 so fireflies read as a full ambient layer now
+    // that HARU is the only active season. At base rate 0.3/s × 2.0 with
+    // 15-30s lifetime this settles around 13-17 fireflies on screen.
+    fireflyMultiplier: 2.0,
   },
   [Season.NATSU]: {
     primaryParticle: "firefly",
@@ -46,56 +56,34 @@ export const SEASON_CONFIG: Record<Season, SeasonConfig> = {
   },
 };
 
-const ORDER: Season[] = [Season.HARU, Season.NATSU, Season.AKI, Season.FUYU];
-
 export const CYCLE_DURATION_SEC = 90;
 export const TINT_FADE_MS = 3000;
 export const MAX_PARTICLES = 60;
 
-function realWorldSeason(): Season {
-  // JS months are 0-indexed: 0=Jan, 1=Feb, 2=Mar, ...
-  const month = new Date().getMonth();
-  if (month >= 2 && month <= 4) return Season.HARU; // Mar–May
-  if (month >= 5 && month <= 7) return Season.NATSU; // Jun–Aug
-  if (month >= 8 && month <= 10) return Season.AKI; // Sep–Nov
-  return Season.FUYU; // Dec–Feb
-}
+// Permanent season — used as a single source of truth for all consumers.
+const STATIC_SEASON: Season = Season.HARU;
 
-let currentSeason: Season = realWorldSeason();
+const currentSeason: Season = STATIC_SEASON;
 const listeners = new Set<(s: Season) => void>();
-let timerId: ReturnType<typeof setInterval> | null = null;
 
 export function getCurrentSeason(): Season {
   return currentSeason;
 }
 
-/** Advance to the next season in the HARU→NATSU→AKI→FUYU cycle. */
+/** No-op: cycling is disabled. Kept as a named export for API stability. */
 export function cycleSeason(): void {
-  const idx = ORDER.indexOf(currentSeason);
-  currentSeason = ORDER[(idx + 1) % ORDER.length];
-  listeners.forEach((cb) => {
-    try {
-      cb(currentSeason);
-    } catch (err) {
-      console.error("[Seasons] listener error", err);
-    }
-  });
+  /* deactivated */
 }
 
 /**
- * Subscribe to season changes. Returns an unsubscribe function.
- * The auto-cycle timer is refcounted — it runs while any subscriber exists.
+ * Subscribe to season changes. The API is preserved for existing consumers,
+ * but no timer is started and no subsequent callbacks are ever fired —
+ * the season never changes. Consumers should also call getCurrentSeason()
+ * for their initial value.
  */
 export function subscribe(cb: (s: Season) => void): () => void {
   listeners.add(cb);
-  if (timerId === null) {
-    timerId = setInterval(cycleSeason, CYCLE_DURATION_SEC * 1000);
-  }
   return () => {
     listeners.delete(cb);
-    if (listeners.size === 0 && timerId !== null) {
-      clearInterval(timerId);
-      timerId = null;
-    }
   };
 }

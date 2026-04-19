@@ -1,12 +1,15 @@
 import GameCanvasLoader from "@/components/GameCanvasLoader";
-import SeasonTint from "@/components/SeasonTint";
-import SeasonBadge from "@/components/SeasonBadge";
+// Seasonal UI deactivated — tint overlay + kanji badge no longer render.
+// Kept as comments so re-enabling is a two-line revert. See seasons.ts for
+// the matching cycle-timer no-op.
+// import SeasonTint from "@/components/SeasonTint";
+// import SeasonBadge from "@/components/SeasonBadge";
 
 export default function Home() {
   return (
     <main className="app-shell items-center">
-      <SeasonTint />
-      <SeasonBadge />
+      {/* <SeasonTint /> */}
+      {/* <SeasonBadge /> */}
       {/* Lantern glows sit between bg_game.jpg and the canvas (z:1 < z:10).
           Positions are in % so they follow the bg's cover-scaled layout. */}
       <div
