@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { getYokai } from "@/config/yokai";
 
 // Must match the duration of the .yokai-card-fade-out animation in globals.css.
-const EXIT_ANIMATION_MS = 220;
+// Uses the backdrop exit (300ms) — slightly longer than the card (280ms) so
+// the onClose() fires after both animations have fully finished.
+const EXIT_ANIMATION_MS = 300;
 
 type Props = {
   yokaiId: number;
