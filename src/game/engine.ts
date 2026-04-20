@@ -2,6 +2,7 @@ import Matter from "matter-js";
 import { AudioManager } from "@/game/audio";
 import { ParticleSystem } from "@/game/particles";
 import type { ParticleKind } from "@/game/seasons";
+import { isDevModeActive } from "@/hooks/useDevMode";
 import {
   YokaiType,
   YOKAI_CHAIN,
@@ -124,6 +125,7 @@ export class GameEngine {
   private score = 0;
   private highScore = 0;
   private gameOver = false;
+  private godMode = false; // Dev-only; toggled via setGodMode()
 
   private merging = new Set<number>();
   private droppedBodies = new Set<number>();
@@ -505,7 +507,10 @@ export class GameEngine {
 
         if (this.score > this.highScore) {
           this.highScore = this.score;
-          if (typeof window !== "undefined") {
+          // Dev mode: score can climb in-session but is NOT persisted to
+          // localStorage, so testing flows don't corrupt the player's
+          // real high score between real sessions.
+          if (typeof window !== "undefined" && !isDevModeActive()) {
             window.localStorage.setItem(HIGH_SCORE_KEY, String(this.highScore));
           }
         }
@@ -516,6 +521,7 @@ export class GameEngine {
 
   private checkGameOver() {
     if (this.gameOver) return;
+    if (this.godMode) return; // Dev-mode guard: red line crossed is ignored
     const now = performance.now();
     const bodies = Matter.Composite.allBodies(this.world) as TaggedBody[];
     const live = new Set<number>();
@@ -915,6 +921,49 @@ export class GameEngine {
 
   resume() {
     Matter.Runner.run(this.runner, this.engine);
+  }
+
+  // ─────────────────────────────── Dev-mode helpers ───────────────
+  // These are the only runtime API additions for the dev-testing panel.
+  // Normal gameplay never calls them. God mode is a simple flag checked
+  // at the top of checkGameOver(); the other methods reuse internal
+  // helpers (createYokaiBody, addBodyWithGrace, markUnlocked).
+
+  /** Drop a specific yokai into the field, bypassing cooldown and
+   *  next-yokai rotation. Spawns at canvas horizontal centre. */
+  spawnYokaiById(id: number) {
+    const yokai = getYokai(id);
+    if (!yokai) return;
+    const body = this.createYokaiBody(CANVAS_WIDTH / 2, SPAWN_Y, yokai);
+    this.addBodyWithGrace(body);
+    Matter.Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.05);
+  }
+
+  /** Remove every yokai body from the field without resetting score,
+   *  high score, or game-over state. Clears collision/merge bookkeeping
+   *  so freshly-spawned bodies don't collide with ghost ids. */
+  clearField() {
+    const bodies = Matter.Composite.allBodies(this.world) as TaggedBody[];
+    for (const body of bodies) {
+      if (body.yokaiId) Matter.World.remove(this.world, body);
+    }
+    this.merging.clear();
+    this.droppedBodies.clear();
+    this.dangerSince.clear();
+    this.spawnAnims.clear();
+  }
+
+  setGodMode(enabled: boolean) {
+    this.godMode = enabled;
+  }
+
+  isGodMode(): boolean {
+    return this.godMode;
+  }
+
+  /** Mark all 11 yokai as unlocked in persistent storage + notify. */
+  unlockAll() {
+    for (let id = 1; id <= 11; id++) this.markUnlocked(id);
   }
 
   destroy() {

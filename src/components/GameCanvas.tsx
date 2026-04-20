@@ -15,6 +15,18 @@ import {
   getCurrentSeason,
   subscribe as subscribeSeason,
 } from "@/game/seasons";
+import { useDevMode } from "@/hooks/useDevMode";
+import type { DevPanelProps } from "@/components/dev/DevPanel";
+
+// Dev panel is conditionally required — the `if (process.env.NODE_ENV ===
+// "development")` branch is dead-code-eliminated in prod, so webpack never
+// bundles the DevPanel module for production builds. The `type` import
+// above is a types-only import that webpack erases entirely.
+let DevPanel: React.ComponentType<DevPanelProps> | null = null;
+if (process.env.NODE_ENV === "development") {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  DevPanel = require("@/components/dev/DevPanel").default;
+}
 
 const SOUND_KEY = "kami_sound_enabled";
 const MUSIC_KEY = "kami_music_enabled";
@@ -72,8 +84,11 @@ export default function GameCanvas() {
   const [showSplash, setShowSplash] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
+  const [godMode, setGodMode] = useState(false);
+  const isDev = useDevMode();
   // Derived: umbrella muted state (both silenced) drives the emoji button
   const muted = !sfxEnabled && !bgmEnabled;
+  const allUnlocked = unlockedIds.length >= 11;
 
   useEffect(() => {
     const cell = cellRef.current;
@@ -244,6 +259,18 @@ export default function GameCanvas() {
     setGameOver(false);
     setFinalScore(0);
   };
+
+  // ── Dev handlers (thin pass-throughs to engine). Only invoked from the
+  // DevPanel, which itself only mounts when useDevMode() returns true.
+  const handleDevSpawn = (id: number) =>
+    engineRef.current?.spawnYokaiById(id);
+  const handleDevClearField = () => engineRef.current?.clearField();
+  const handleDevToggleGodMode = () => {
+    const next = !godMode;
+    setGodMode(next);
+    engineRef.current?.setGodMode(next);
+  };
+  const handleDevUnlockAll = () => engineRef.current?.unlockAll();
 
   const handleToggleAll = () => {
     const eng = engineRef.current;
@@ -530,6 +557,21 @@ export default function GameCanvas() {
         <SplashScreen
           onStart={dismissSplash}
           onOpenSettings={openSettings}
+        />
+      )}
+
+      {/* Dev-test overlay — gated by useDevMode() (NODE_ENV=development +
+       * ?dev=1) AND by conditional require at module top. In production
+       * builds DevPanel is null, the JSX short-circuits, and the module
+       * was never imported. */}
+      {isDev && DevPanel && (
+        <DevPanel
+          onSpawn={handleDevSpawn}
+          onClearField={handleDevClearField}
+          godMode={godMode}
+          onToggleGodMode={handleDevToggleGodMode}
+          onUnlockAll={handleDevUnlockAll}
+          allUnlocked={allUnlocked}
         />
       )}
     </div>
