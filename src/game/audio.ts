@@ -1,10 +1,19 @@
-// Lightweight Web Audio SFX generator + HTMLAudio-based BGM hook.
-// SFX are synthesised on the fly (no samples) for a meditative shrine
-// atmosphere: water-droplet drop, water-echo bounce, pentatonic combo
-// melody on merges, and a bonshō temple bell on game over.
-// BGM is played via a regular <audio> element — pass the track URL into
-// playBGM() when ready.
-// iOS requires the first node be started inside a user gesture (see unlock()).
+// Hybrid Web Audio SFX + HTMLAudio BGM.
+//
+// Sampled (AudioBuffer) — real instruments, decoded on first context init:
+//   - /sfx/koto_a4.mp3   plucked gayageum, A4 fundamental. Combo melody
+//                        base — pitch-shifted via playbackRate per note.
+//   - /sfx/bonsho.mp3    temple bell, ~200Hz fundamental. Game-over knell.
+//
+// Synthesised (OscillatorNode) — water drop + water-echo bounce.
+//
+// All SFX route through `sfxGain` → `ctx.destination`, so muting SFX is a
+// single gain flip that also cuts any in-flight tails instantly (important
+// on iOS, where oscillator stop() is deferred). BGM plays through a
+// separate HTMLAudio element and is NOT routed through sfxGain — the two
+// channels are fully independent.
+// iOS also requires the first node be started inside a user gesture (see
+// unlock()); sample decoding itself is fine before unlock.
 
 // Ascending C major pentatonic, C4 → A5. Every merge steps one note up.
 // After COMBO_RESET_MS of silence the index resets to 0 (C4).
@@ -15,13 +24,20 @@ const PENTATONIC_C4_A5 = [
   293.66, // D4
   329.63, // E4
   392.0,  // G4
-  440.0,  // A4
+  440.0,  // A4   ← unison with the koto sample (no pitch shift)
   523.25, // C5
   587.33, // D5
   659.25, // E5
   783.99, // G5
   880.0,  // A5
 ];
+
+// Fundamental of the recorded koto sample. playbackRate for any other
+// note in the scale = targetFreq / KOTO_BASE_FREQ.
+const KOTO_BASE_FREQ = 440.0;
+
+const KOTO_URL = "/sfx/koto_a4.mp3";
+const BONSHO_URL = "/sfx/bonsho.mp3";
 
 const SOUND_STORAGE_KEY = "kami_sound_enabled";
 const MUSIC_STORAGE_KEY = "kami_music_enabled";
@@ -37,10 +53,18 @@ function persistPref(key: string, value: boolean) {
 
 export class AudioManager {
   private ctx: AudioContext | null = null;
+  private sfxGain: GainNode | null = null;
   private unlocked = false;
   private sfxMuted = false;
   private bgmMuted = false;
   private lastBounceAt = 0;
+
+  // Sampled instruments — null until loadSamples() resolves. If decoding
+  // fails (network / codec) the methods fall back to the synth versions
+  // defined below, so the game is still fully playable without samples.
+  private kotoBuffer: AudioBuffer | null = null;
+  private bonshoBuffer: AudioBuffer | null = null;
+  private samplesRequested = false;
 
   // Pentatonic combo state — index of the next note in PENTATONIC_C4_A5.
   // Resets to 0 after COMBO_RESET_MS of silence.
@@ -71,7 +95,55 @@ export class AudioManager {
       console.warn("[Audio] AudioContext init failed", err);
       return null;
     }
+    // SFX gain bus — all synth + sampled SFX connect here, so toggling
+    // this single gain mutes everything including tails in flight.
+    this.sfxGain = this.ctx.createGain();
+    this.sfxGain.gain.value = this.sfxMuted ? 0 : 1;
+    this.sfxGain.connect(this.ctx.destination);
+    // Kick off sample decode in parallel. Non-blocking: synth fallbacks
+    // cover the short window before the buffers arrive.
+    this.loadSamples();
     return this.ctx;
+  }
+
+  /**
+   * Fetch + decode koto and bonshō samples. Idempotent — safe to call
+   * multiple times; second+ calls are no-ops. If either sample fails,
+   * the other still loads, and the affected SFX uses its synth fallback.
+   */
+  private async loadSamples() {
+    if (this.samplesRequested) return;
+    this.samplesRequested = true;
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const loadOne = async (
+      url: string,
+      assign: (b: AudioBuffer) => void
+    ) => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const arr = await res.arrayBuffer();
+        const buf = await ctx.decodeAudioData(arr);
+        assign(buf);
+      } catch (err) {
+        console.warn(`[Audio] sample load failed (${url})`, err);
+      }
+    };
+    await Promise.all([
+      loadOne(KOTO_URL, (b) => {
+        this.kotoBuffer = b;
+      }),
+      loadOne(BONSHO_URL, (b) => {
+        this.bonshoBuffer = b;
+      }),
+    ]);
+    console.log(
+      "[Audio] samples ready — koto:",
+      !!this.kotoBuffer,
+      "bonshō:",
+      !!this.bonshoBuffer
+    );
   }
 
   /** Must be called from a user gesture handler (touchstart/click). */
@@ -81,6 +153,8 @@ export class AudioManager {
     if (!ctx) return;
     try {
       if (ctx.state === "suspended") ctx.resume();
+      // Prime the pipeline with a zero-gain zero-duration oscillator so
+      // iOS Safari registers "audio has been started during a gesture".
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       gain.gain.value = 0;
@@ -90,33 +164,34 @@ export class AudioManager {
       osc.stop(t + 0.001);
       this.unlocked = true;
       console.log("[Audio] unlocked");
-      // If the user had disabled sound before the first gesture, suspend the
-      // context now that it exists so we're in the requested state.
-      if (this.sfxMuted && ctx.state === "running") {
-        ctx.suspend().catch(() => {});
-      }
+      // Mute state is already applied via sfxGain (created in ensureContext
+      // with the correct initial gain), so no extra suspend dance here.
     } catch (err) {
       console.warn("[Audio] unlock failed", err);
     }
   }
 
   /**
-   * Enable/disable SFX. Disabling suspends the AudioContext, which halts
-   * every in-flight oscillator tail immediately (critical on iOS). Music
-   * plays through a separate <audio> element and is NOT touched here —
-   * the two toggles are fully independent.
+   * Enable/disable SFX. Flips the sfxGain bus between 1 and 0, which
+   * silences every sampled source and oscillator routed through it —
+   * including tails already in flight. Uses setValueAtTime for an
+   * immediate change; no ramp, so the cut is instant and predictable.
+   *
+   * Does NOT suspend the AudioContext anymore: BGM volume is controlled
+   * by the HTMLAudio element (independent), and future SFX methods still
+   * need a running context to schedule through.
    */
   async setSoundEnabled(enabled: boolean) {
     this.sfxMuted = !enabled;
     persistPref(SOUND_STORAGE_KEY, enabled);
     const ctx = this.ctx;
-    if (!ctx) return;
+    const bus = this.sfxGain;
+    if (!ctx || !bus) return;
     try {
-      if (enabled) {
-        if (ctx.state === "suspended") await ctx.resume();
-      } else {
-        if (ctx.state === "running") await ctx.suspend();
-      }
+      bus.gain.setValueAtTime(enabled ? 1 : 0, ctx.currentTime);
+      // If the context was suspended for any prior reason (tab hide,
+      // earlier pause), bring it back so new SFX schedule correctly.
+      if (enabled && ctx.state === "suspended") await ctx.resume();
     } catch (err) {
       console.warn("[Audio] setSoundEnabled state change failed", err);
     }
@@ -225,10 +300,10 @@ export class AudioManager {
   private canPlay(): AudioContext | null {
     if (this.sfxMuted) return null;
     const ctx = this.ctx;
-    if (!ctx || !this.unlocked) return null;
+    if (!ctx || !this.unlocked || !this.sfxGain) return null;
     // Belt-and-suspenders: only schedule oscillators when the context is
     // actually running. If it's suspended for any reason (tab visibility,
-    // recent user toggle race), try to resume but skip this SFX call — the
+    // recent toggle race), try to resume but skip this SFX call — the
     // next one will find state === "running".
     if (ctx.state !== "running") {
       if (ctx.state === "suspended") ctx.resume().catch(() => {});
@@ -266,7 +341,7 @@ export class AudioManager {
     gain.gain.setValueAtTime(0.0001, t0);
     gain.gain.exponentialRampToValueAtTime(peak, t0 + safeAttack);
     gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
-    osc.connect(gain).connect(ctx.destination);
+    osc.connect(gain).connect(this.sfxGain!);
     osc.start(t0);
     osc.stop(t0 + duration + 0.05);
   }
@@ -296,7 +371,7 @@ export class AudioManager {
     filter.frequency.setValueAtTime(800, now);
     filter.Q.setValueAtTime(1, now);
 
-    osc.connect(gain).connect(filter).connect(ctx.destination);
+    osc.connect(gain).connect(filter).connect(this.sfxGain!);
 
     osc.start(now);
     osc.stop(now + 0.35);
@@ -336,7 +411,7 @@ export class AudioManager {
     filter.type = "highpass";
     filter.frequency.setValueAtTime(600, t);
 
-    osc.connect(gain).connect(filter).connect(ctx.destination);
+    osc.connect(gain).connect(filter).connect(this.sfxGain!);
 
     osc.start(t);
     osc.stop(t + 0.45);
@@ -375,7 +450,39 @@ export class AudioManager {
       PENTATONIC_C4_A5.length - 1
     );
 
-    this.playBellTone(ctx, freq);
+    // Prefer the real koto sample if decoded; fall back to synth bell
+    // for the first few hundred ms after page load (or forever if the
+    // fetch/decode failed).
+    if (this.kotoBuffer) {
+      this.playKotoNote(ctx, freq);
+    } else {
+      this.playBellTone(ctx, freq);
+    }
+  }
+
+  /**
+   * Plucked-koto note sampled from /sfx/koto_a4.mp3 and pitch-shifted
+   * via playbackRate. Lets the sample ring out naturally — the 2.5s
+   * tail blends into the next combo note for a chord-like build-up.
+   */
+  private playKotoNote(ctx: AudioContext, frequency: number) {
+    if (!this.kotoBuffer) return;
+    const t = ctx.currentTime;
+
+    const source = ctx.createBufferSource();
+    source.buffer = this.kotoBuffer;
+    source.playbackRate.setValueAtTime(
+      frequency / KOTO_BASE_FREQ,
+      t
+    );
+
+    // Small gain so stacked combo notes don't clip.
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.7, t);
+
+    source.connect(gain).connect(this.sfxGain!);
+    source.start(t);
+    // AudioBufferSourceNode stops automatically at end of buffer.
   }
 
   /**
@@ -425,7 +532,7 @@ export class AudioManager {
     osc.connect(gain).connect(filter);
     osc2.connect(gain2).connect(filter);
     osc3.connect(gain3).connect(filter);
-    filter.connect(ctx.destination);
+    filter.connect(this.sfxGain!);
 
     osc.start(now);
     osc.stop(now + 1.6);
@@ -435,15 +542,34 @@ export class AudioManager {
     osc3.stop(now + 0.8);
   }
 
-  /** Bonshō temple bell — three harmonic layers with a gentle tremolo. */
+  /**
+   * Bonshō temple bell on game over. Prefers the real /sfx/bonsho.mp3
+   * recording (6s, keisu), falls back to a three-harmonic synth bell
+   * with slow tremolo if the sample didn't decode in time.
+   */
   playGameOver() {
     const ctx = this.canPlay();
     if (!ctx) return;
+
+    if (this.bonshoBuffer) {
+      const t = ctx.currentTime;
+      const source = ctx.createBufferSource();
+      source.buffer = this.bonshoBuffer;
+      source.playbackRate.setValueAtTime(1, t);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.85, t);
+
+      source.connect(gain).connect(this.sfxGain!);
+      source.start(t);
+      return;
+    }
+
+    // Synth fallback — three harmonic layers + slow tremolo LFO.
     const t0 = ctx.currentTime;
     const longest = 2.5;
     const attack = 0.1;
 
-    // Shared tremolo LFO — slow, subtle
     const lfo = ctx.createOscillator();
     lfo.type = "sine";
     lfo.frequency.value = 3;
@@ -469,9 +595,8 @@ export class AudioManager {
         t0 + attack
       );
       gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      // Modulate the gain param with the tremolo LFO
       lfoDepth.connect(gain.gain);
-      osc.connect(gain).connect(ctx.destination);
+      osc.connect(gain).connect(this.sfxGain!);
       osc.start(t0);
       osc.stop(t0 + dur + 0.05);
     }
