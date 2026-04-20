@@ -1,15 +1,20 @@
-// Play zone — the logical gameplay area
-export const GAME_WIDTH = 390;
-export const GAME_HEIGHT = 600;
+// Play zone — the logical gameplay area.
+// Expanded +20% per-axis (390×600 → 470×720, +45% area) so advanced
+// players have breathing room: Ryujin fits 6 instead of 4, Oni fits 11.
+// Kodama now reads as ~8.5% of width (closer to the Suika ~7% benchmark
+// than the old 10%). Physics params stay exactly the same — this change
+// is purely about vertical/horizontal stacking headroom.
+export const GAME_WIDTH = 470;
+export const GAME_HEIGHT = 720;
 
 // Thick walls to prevent tunneling
 export const WALL_THICKNESS = 20;
 
 // Canvas surrounds the play zone with PADDING on all four sides so balls
-// never get clipped by canvas edges, even at the largest radius (120px).
+// never get clipped by canvas edges, even at the largest radius (138px).
 export const PADDING = 20;
-export const CANVAS_WIDTH = PADDING + GAME_WIDTH + PADDING; // 430
-export const CANVAS_HEIGHT = PADDING + GAME_HEIGHT + PADDING; // 640
+export const CANVAS_WIDTH = PADDING + GAME_WIDTH + PADDING; // 510
+export const CANVAS_HEIGHT = PADDING + GAME_HEIGHT + PADDING; // 760
 
 // Play-zone origin inside the canvas (top-left corner of the play zone)
 export const PLAY_OFFSET_X = PADDING; // 20
