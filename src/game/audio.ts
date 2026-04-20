@@ -1,30 +1,41 @@
 // Hybrid Web Audio SFX + HTMLAudio BGM.
 //
-// Sampled (AudioBuffer) — real instruments, decoded on first context init:
-//   - /sfx/koto_a4.mp3   plucked gayageum, A4 fundamental. Combo melody
-//                        base — pitch-shifted via playbackRate per note.
-//   - /sfx/bonsho.mp3    temple bell, ~200Hz fundamental. Game-over knell.
+// All SFX are now sample-based — three AudioBuffers are fetched and
+// decoded in the background during ctx init:
 //
-// Synthesised (OscillatorNode) — water drop + water-echo bounce.
+//   /sfx/koto_a4.mp3   plucked gayageum, A4 440Hz, ~2.5s
+//                      → combo melody base; pitch-shifted via
+//                        playbackRate per note in PENTATONIC_FREQS
+//   /sfx/bonsho.mp3    temple bell (keisu), ~200Hz, ~6s → game over
+//   /sfx/drop.mp3      celtic harp A3 220Hz, ~2s → yokai drop
 //
-// All SFX route through `sfxGain` → `ctx.destination`, so muting SFX is a
-// single gain flip that also cuts any in-flight tails instantly (important
-// on iOS, where oscillator stop() is deferred). BGM plays through a
-// separate HTMLAudio element and is NOT routed through sfxGain — the two
-// channels are fully independent.
-// iOS also requires the first node be started inside a user gesture (see
-// unlock()); sample decoding itself is fine before unlock.
+// Bounce/collision SFX has been intentionally removed for a meditative
+// atmosphere: drop + merge already give all the feedback the player
+// needs, and silencing collisions cuts the chatter of stacked yokai.
+//
+// Volume design — intentionally quiet so SFX never feel loud or
+// intrusive in a Mini App that may be open alongside other audio:
+//   sfxGain master : 0.25
+//   per-sample gain: 0.5–0.6 (further attenuation)
+//   → effective SFX output ≈ 0.13–0.15
+//   bgmEl.volume   : 0.35 (HTMLAudio, independent of sfxGain)
+//
+// Mute semantics — sfxGain flips 0 ⇄ 0.25 for SFX (cuts tails in
+// flight instantly), bgmEl pauses/resumes for BGM. The two channels
+// are fully independent; Settings.tsx exposes them as separate toggles.
+//
+// iOS still requires the first audio node be started inside a user
+// gesture (see unlock()). Sample decode itself runs regardless of
+// context state, so the buffers are usually ready well before the
+// first merge — but if a sample happens to be un-decoded when its
+// method is called, the method is silent (no synth fallback).
 
-// Ascending C major pentatonic, C4 → A5. Every merge steps one note up.
-// After COMBO_RESET_MS of silence the index resets to 0 (C4).
-// Index past the end caps at A5 so long combos plateau instead of going
-// into dog-whistle territory.
-const PENTATONIC_C4_A5 = [
+const PENTATONIC_FREQS = [
   261.63, // C4
   293.66, // D4
   329.63, // E4
   392.0,  // G4
-  440.0,  // A4   ← unison with the koto sample (no pitch shift)
+  440.0,  // A4   ← unison with koto sample
   523.25, // C5
   587.33, // D5
   659.25, // E5
@@ -32,12 +43,14 @@ const PENTATONIC_C4_A5 = [
   880.0,  // A5
 ];
 
-// Fundamental of the recorded koto sample. playbackRate for any other
-// note in the scale = targetFreq / KOTO_BASE_FREQ.
 const KOTO_BASE_FREQ = 440.0;
+
+const DEFAULT_SFX_VOLUME = 0.25;
+const DEFAULT_BGM_VOLUME = 0.35;
 
 const KOTO_URL = "/sfx/koto_a4.mp3";
 const BONSHO_URL = "/sfx/bonsho.mp3";
+const DROP_URL = "/sfx/drop.mp3";
 
 const SOUND_STORAGE_KEY = "kami_sound_enabled";
 const MUSIC_STORAGE_KEY = "kami_music_enabled";
@@ -57,29 +70,23 @@ export class AudioManager {
   private unlocked = false;
   private sfxMuted = false;
   private bgmMuted = false;
-  private lastBounceAt = 0;
 
-  // Sampled instruments — null until loadSamples() resolves. If decoding
-  // fails (network / codec) the methods fall back to the synth versions
-  // defined below, so the game is still fully playable without samples.
+  // Sampled instruments. Null until loadSamples() resolves; a method
+  // whose sample hasn't decoded yet simply emits silence.
   private kotoBuffer: AudioBuffer | null = null;
   private bonshoBuffer: AudioBuffer | null = null;
+  private dropBuffer: AudioBuffer | null = null;
   private samplesRequested = false;
 
-  // Pentatonic combo state — index of the next note in PENTATONIC_C4_A5.
+  // Pentatonic combo state — index of the next note in PENTATONIC_FREQS.
   // Resets to 0 after COMBO_RESET_MS of silence.
   private comboIndex = 0;
   private lastMergeAt = 0;
   private readonly COMBO_RESET_MS = 1500;
 
-  // Bounce throttle: minimum ms between bounce SFX, plus a velocity floor
-  // below which we emit nothing. Keeps crowded stacks from stuttering.
-  private readonly BOUNCE_THROTTLE_MS = 60;
-  private readonly BOUNCE_VELOCITY_THRESHOLD = 3;
-
   // HTMLAudio-based background music
   private bgmEl: HTMLAudioElement | null = null;
-  private bgmVolume = 0.15;
+  private bgmVolume = DEFAULT_BGM_VOLUME;
 
   private ensureContext(): AudioContext | null {
     if (this.ctx) return this.ctx;
@@ -95,21 +102,19 @@ export class AudioManager {
       console.warn("[Audio] AudioContext init failed", err);
       return null;
     }
-    // SFX gain bus — all synth + sampled SFX connect here, so toggling
-    // this single gain mutes everything including tails in flight.
+    // SFX gain bus — all SFX connect here, so toggling this single gain
+    // mutes everything including tails already in flight.
     this.sfxGain = this.ctx.createGain();
-    this.sfxGain.gain.value = this.sfxMuted ? 0 : 1;
+    this.sfxGain.gain.value = this.sfxMuted ? 0 : DEFAULT_SFX_VOLUME;
     this.sfxGain.connect(this.ctx.destination);
-    // Kick off sample decode in parallel. Non-blocking: synth fallbacks
-    // cover the short window before the buffers arrive.
+    // Kick off sample decode in parallel (non-blocking).
     this.loadSamples();
     return this.ctx;
   }
 
   /**
-   * Fetch + decode koto and bonshō samples. Idempotent — safe to call
-   * multiple times; second+ calls are no-ops. If either sample fails,
-   * the other still loads, and the affected SFX uses its synth fallback.
+   * Fetch + decode all three samples. Idempotent. Per-sample failures
+   * only silence the affected SFX — the others still play.
    */
   private async loadSamples() {
     if (this.samplesRequested) return;
@@ -137,12 +142,17 @@ export class AudioManager {
       loadOne(BONSHO_URL, (b) => {
         this.bonshoBuffer = b;
       }),
+      loadOne(DROP_URL, (b) => {
+        this.dropBuffer = b;
+      }),
     ]);
     console.log(
       "[Audio] samples ready — koto:",
       !!this.kotoBuffer,
       "bonshō:",
-      !!this.bonshoBuffer
+      !!this.bonshoBuffer,
+      "drop:",
+      !!this.dropBuffer
     );
   }
 
@@ -153,8 +163,8 @@ export class AudioManager {
     if (!ctx) return;
     try {
       if (ctx.state === "suspended") ctx.resume();
-      // Prime the pipeline with a zero-gain zero-duration oscillator so
-      // iOS Safari registers "audio has been started during a gesture".
+      // Prime with a zero-gain zero-duration oscillator so iOS Safari
+      // registers "audio was started inside a user gesture".
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       gain.gain.value = 0;
@@ -164,22 +174,17 @@ export class AudioManager {
       osc.stop(t + 0.001);
       this.unlocked = true;
       console.log("[Audio] unlocked");
-      // Mute state is already applied via sfxGain (created in ensureContext
-      // with the correct initial gain), so no extra suspend dance here.
     } catch (err) {
       console.warn("[Audio] unlock failed", err);
     }
   }
 
   /**
-   * Enable/disable SFX. Flips the sfxGain bus between 1 and 0, which
-   * silences every sampled source and oscillator routed through it —
-   * including tails already in flight. Uses setValueAtTime for an
-   * immediate change; no ramp, so the cut is instant and predictable.
-   *
-   * Does NOT suspend the AudioContext anymore: BGM volume is controlled
-   * by the HTMLAudio element (independent), and future SFX methods still
-   * need a running context to schedule through.
+   * Enable/disable SFX. Flips the sfxGain bus between DEFAULT_SFX_VOLUME
+   * and 0; silences every sampled source routed through it including
+   * tails in flight. Does NOT suspend the AudioContext — BGM lives on
+   * HTMLAudio (independent), and the context must stay running for any
+   * later SFX calls to schedule correctly.
    */
   async setSoundEnabled(enabled: boolean) {
     this.sfxMuted = !enabled;
@@ -188,9 +193,10 @@ export class AudioManager {
     const bus = this.sfxGain;
     if (!ctx || !bus) return;
     try {
-      bus.gain.setValueAtTime(enabled ? 1 : 0, ctx.currentTime);
-      // If the context was suspended for any prior reason (tab hide,
-      // earlier pause), bring it back so new SFX schedule correctly.
+      bus.gain.setValueAtTime(
+        enabled ? DEFAULT_SFX_VOLUME : 0,
+        ctx.currentTime
+      );
       if (enabled && ctx.state === "suspended") await ctx.resume();
     } catch (err) {
       console.warn("[Audio] setSoundEnabled state change failed", err);
@@ -199,8 +205,8 @@ export class AudioManager {
 
   /**
    * Enable/disable BGM. Pauses the <audio> element (keeps playhead so
-   * resume continues from where we left off). Never touches the
-   * AudioContext — BGM is HTMLAudio and independent of SFX routing.
+   * resume continues where we left off). Never touches the AudioContext
+   * — BGM is HTMLAudio and fully independent of the SFX bus.
    */
   async setMusicEnabled(enabled: boolean) {
     this.bgmMuted = !enabled;
@@ -256,9 +262,9 @@ export class AudioManager {
   }
 
   /**
-   * Start (or switch) the background track. Creates an HTMLAudioElement with
-   * loop=true and volume=0.15. Respects the current mute state.
-   * No-op if the same src is already playing.
+   * Start (or switch) the background track. Creates an HTMLAudioElement
+   * with loop=true and volume=DEFAULT_BGM_VOLUME. Respects the current
+   * mute state. No-op if the same src is already playing.
    */
   playBGM(src: string) {
     if (this.bgmEl) {
@@ -270,9 +276,6 @@ export class AudioManager {
     el.loop = true;
     el.volume = this.bgmVolume;
     this.bgmEl = el;
-    // Only start playback if the user has music enabled. Later toggles via
-    // Settings call setMusicEnabled(true), which resumes play() inside that
-    // click handler — still a valid user gesture on iOS, so unlock survives.
     if (this.isMusicEnabled()) {
       el.play().catch((err) =>
         console.warn("[Audio] BGM play failed:", err)
@@ -297,14 +300,16 @@ export class AudioManager {
     this.bgmEl = null;
   }
 
+  /**
+   * Shared gate for every sampled SFX method. Returns the ctx if SFX
+   * is enabled, the context is running, and the SFX bus is ready.
+   * Null return = caller emits silence (samples also need their buffer
+   * to be decoded; that check is done per-method).
+   */
   private canPlay(): AudioContext | null {
     if (this.sfxMuted) return null;
     const ctx = this.ctx;
     if (!ctx || !this.unlocked || !this.sfxGain) return null;
-    // Belt-and-suspenders: only schedule oscillators when the context is
-    // actually running. If it's suspended for any reason (tab visibility,
-    // recent toggle race), try to resume but skip this SFX call — the
-    // next one will find state === "running".
     if (ctx.state !== "running") {
       if (ctx.state === "suspended") ctx.resume().catch(() => {});
       return null;
@@ -312,118 +317,42 @@ export class AudioManager {
     return ctx;
   }
 
-  /**
-   * Single soft sine tone with a gentle attack and exponential decay.
-   * All SFX are composed of these — no harsh square/triangle, no noise.
-   */
-  private softTone(
-    ctx: AudioContext,
-    startFreq: number,
-    endFreq: number,
-    duration: number,
-    peakGain: number,
-    attack = 0.02,
-    startOffset = 0
-  ) {
-    const t0 = ctx.currentTime + startOffset;
-    const safeAttack = Math.min(Math.max(attack, 0.001), duration * 0.5);
-    const peak = Math.max(0.0001, peakGain);
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(startFreq, t0);
-    if (endFreq !== startFreq) {
-      osc.frequency.exponentialRampToValueAtTime(
-        Math.max(1, endFreq),
-        t0 + duration
-      );
-    }
-    gain.gain.setValueAtTime(0.0001, t0);
-    gain.gain.exponentialRampToValueAtTime(peak, t0 + safeAttack);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
-    osc.connect(gain).connect(this.sfxGain!);
-    osc.start(t0);
-    osc.stop(t0 + duration + 0.05);
-  }
+  // ==============================================================
+  // DROP — celtic harp sample (A3)
+  // ==============================================================
 
   /**
-   * Soft water-droplet "plink" — single sine with a sharp downward pitch
-   * bend (1200→400 Hz), short decay, and a highpass that strips any
-   * low-end thump so it reads as "droplet into still water", not a thud.
+   * Plays when a yokai leaves the spawner slot. Silent if drop.mp3
+   * hasn't finished decoding yet — the user almost certainly won't
+   * drop anything in the first ~300ms, so this is rare in practice.
    */
   playDrop() {
     const ctx = this.canPlay();
     if (!ctx) return;
-    const now = ctx.currentTime;
+    if (!this.dropBuffer) return;
 
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(1200, now);
-    osc.frequency.exponentialRampToValueAtTime(400, now + 0.15);
-
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.linearRampToValueAtTime(0.15, now + 0.005); // 5ms attack
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3); // 300ms decay
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = "highpass";
-    filter.frequency.setValueAtTime(800, now);
-    filter.Q.setValueAtTime(1, now);
-
-    osc.connect(gain).connect(filter).connect(this.sfxGain!);
-
-    osc.start(now);
-    osc.stop(now + 0.35);
-  }
-
-  /**
-   * Water-echo bounce — softer, shorter cousin of playDrop. Velocity
-   * scales volume (harder hit = louder, but capped so it never overpowers
-   * the combo bell). Throttled 60ms + velocity floor of 3 units so dense
-   * stacks of barely-moving yokai don't chatter.
-   */
-  playBounce(velocity: number = 0) {
-    if (velocity < this.BOUNCE_VELOCITY_THRESHOLD) return;
-
-    const perfNow = performance.now();
-    if (perfNow - this.lastBounceAt < this.BOUNCE_THROTTLE_MS) return;
-    this.lastBounceAt = perfNow;
-
-    const ctx = this.canPlay();
-    if (!ctx) return;
     const t = ctx.currentTime;
-
-    // Cap scale at 1.0 — a very fast impact still stays soft.
-    const volumeScale = Math.min(velocity / 15, 1.0);
-
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(800, t);
-    osc.frequency.exponentialRampToValueAtTime(300, t + 0.08);
+    const source = ctx.createBufferSource();
+    source.buffer = this.dropBuffer;
+    source.playbackRate.setValueAtTime(1, t);
 
     const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.linearRampToValueAtTime(0.06 * volumeScale, t + 0.003);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+    gain.gain.setValueAtTime(0.6, t);
 
-    const filter = ctx.createBiquadFilter();
-    filter.type = "highpass";
-    filter.frequency.setValueAtTime(600, t);
-
-    osc.connect(gain).connect(filter).connect(this.sfxGain!);
-
-    osc.start(t);
-    osc.stop(t + 0.45);
+    source.connect(gain).connect(this.sfxGain!);
+    source.start(t);
   }
+
+  // ==============================================================
+  // MERGE / COMBO — pitch-shifted koto pentatonic
+  // ==============================================================
 
   /**
    * Unified merge SFX: plays the next note of the C-major pentatonic
-   * scale. Replaces the old `playMerge(yokaiId)` + separate `playCombo`
-   * pair — every merge is now one step of an ascending melody, which
-   * gives direct audible feedback for combo streaks without a second
-   * layered sound. Resets to C4 after COMBO_RESET_MS of silence; caps
-   * at A5 so long streaks plateau instead of climbing forever.
+   * scale via the koto sample. comboIndex advances per merge, caps at
+   * A5, resets to 0 after COMBO_RESET_MS of silence. A fast streak
+   * climbs C4→D4→E4→G4→A4→C5→…; a single merge after a long pause
+   * plays C4.
    */
   playMergeWithCombo() {
     const perfNow = performance.now();
@@ -434,171 +363,64 @@ export class AudioManager {
 
     const ctx = this.canPlay();
     if (!ctx) {
-      // Advance the index even when muted so resuming mid-streak still
-      // steps forward — but honour the reset window above.
+      // Advance even when muted so a mid-streak un-mute steps forward.
       this.comboIndex = Math.min(
         this.comboIndex + 1,
-        PENTATONIC_C4_A5.length - 1
+        PENTATONIC_FREQS.length - 1
       );
       return;
     }
 
-    const idx = Math.min(this.comboIndex, PENTATONIC_C4_A5.length - 1);
-    const freq = PENTATONIC_C4_A5[idx];
+    const idx = Math.min(this.comboIndex, PENTATONIC_FREQS.length - 1);
+    const freq = PENTATONIC_FREQS[idx];
     this.comboIndex = Math.min(
       this.comboIndex + 1,
-      PENTATONIC_C4_A5.length - 1
+      PENTATONIC_FREQS.length - 1
     );
 
-    // Prefer the real koto sample if decoded; fall back to synth bell
-    // for the first few hundred ms after page load (or forever if the
-    // fetch/decode failed).
-    if (this.kotoBuffer) {
-      this.playKotoNote(ctx, freq);
-    } else {
-      this.playBellTone(ctx, freq);
-    }
+    this.playKotoNote(ctx, freq);
   }
 
-  /**
-   * Plucked-koto note sampled from /sfx/koto_a4.mp3 and pitch-shifted
-   * via playbackRate. Lets the sample ring out naturally — the 2.5s
-   * tail blends into the next combo note for a chord-like build-up.
-   */
   private playKotoNote(ctx: AudioContext, frequency: number) {
     if (!this.kotoBuffer) return;
     const t = ctx.currentTime;
 
     const source = ctx.createBufferSource();
     source.buffer = this.kotoBuffer;
-    source.playbackRate.setValueAtTime(
-      frequency / KOTO_BASE_FREQ,
-      t
-    );
+    source.playbackRate.setValueAtTime(frequency / KOTO_BASE_FREQ, t);
 
-    // Small gain so stacked combo notes don't clip.
     const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.7, t);
+    gain.gain.setValueAtTime(0.5, t);
 
     source.connect(gain).connect(this.sfxGain!);
     source.start(t);
-    // AudioBufferSourceNode stops automatically at end of buffer.
   }
 
-  /**
-   * Singing-bowl-ish bell tone — fundamental + two harmonics routed
-   * through a soft lowpass. Used by playMergeWithCombo; centralised so
-   * all combo notes have identical timbre and only the pitch changes.
-   */
-  private playBellTone(ctx: AudioContext, frequency: number) {
-    const now = ctx.currentTime;
+  // ==============================================================
+  // GAME OVER — bonshō temple bell
+  // ==============================================================
 
-    // Fundamental
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(frequency, now);
-
-    // Octave harmonic (brightness)
-    const osc2 = ctx.createOscillator();
-    osc2.type = "sine";
-    osc2.frequency.setValueAtTime(frequency * 2, now);
-
-    // Third harmonic (subtle sparkle)
-    const osc3 = ctx.createOscillator();
-    osc3.type = "sine";
-    osc3.frequency.setValueAtTime(frequency * 3, now);
-
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.linearRampToValueAtTime(0.25, now + 0.005);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.5);
-
-    const gain2 = ctx.createGain();
-    gain2.gain.setValueAtTime(0.0001, now);
-    gain2.gain.linearRampToValueAtTime(0.08, now + 0.005);
-    gain2.gain.exponentialRampToValueAtTime(0.0001, now + 1.0);
-
-    const gain3 = ctx.createGain();
-    gain3.gain.setValueAtTime(0.0001, now);
-    gain3.gain.linearRampToValueAtTime(0.03, now + 0.005);
-    gain3.gain.exponentialRampToValueAtTime(0.0001, now + 0.7);
-
-    // Soft lowpass — tames the upper harmonics, keeps the bowl character.
-    const filter = ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.setValueAtTime(4000, now);
-    filter.Q.setValueAtTime(0.5, now);
-
-    osc.connect(gain).connect(filter);
-    osc2.connect(gain2).connect(filter);
-    osc3.connect(gain3).connect(filter);
-    filter.connect(this.sfxGain!);
-
-    osc.start(now);
-    osc.stop(now + 1.6);
-    osc2.start(now);
-    osc2.stop(now + 1.1);
-    osc3.start(now);
-    osc3.stop(now + 0.8);
-  }
-
-  /**
-   * Bonshō temple bell on game over. Prefers the real /sfx/bonsho.mp3
-   * recording (6s, keisu), falls back to a three-harmonic synth bell
-   * with slow tremolo if the sample didn't decode in time.
-   */
   playGameOver() {
     const ctx = this.canPlay();
     if (!ctx) return;
+    if (!this.bonshoBuffer) return;
 
-    if (this.bonshoBuffer) {
-      const t = ctx.currentTime;
-      const source = ctx.createBufferSource();
-      source.buffer = this.bonshoBuffer;
-      source.playbackRate.setValueAtTime(1, t);
+    const t = ctx.currentTime;
+    const source = ctx.createBufferSource();
+    source.buffer = this.bonshoBuffer;
+    source.playbackRate.setValueAtTime(1, t);
 
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.85, t);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.6, t);
 
-      source.connect(gain).connect(this.sfxGain!);
-      source.start(t);
-      return;
-    }
-
-    // Synth fallback — three harmonic layers + slow tremolo LFO.
-    const t0 = ctx.currentTime;
-    const longest = 2.5;
-    const attack = 0.1;
-
-    const lfo = ctx.createOscillator();
-    lfo.type = "sine";
-    lfo.frequency.value = 3;
-    const lfoDepth = ctx.createGain();
-    lfoDepth.gain.value = 0.01;
-    lfo.connect(lfoDepth);
-    lfo.start(t0);
-    lfo.stop(t0 + longest + 0.1);
-
-    const layers: Array<[number, number, number]> = [
-      [90, 2.5, 0.15],
-      [180, 2.0, 0.08],
-      [270, 1.5, 0.04],
-    ];
-    for (const [freq, dur, peak] of layers) {
-      const osc = ctx.createOscillator();
-      osc.type = "sine";
-      osc.frequency.value = freq;
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.0001, t0);
-      gain.gain.exponentialRampToValueAtTime(
-        Math.max(0.0001, peak),
-        t0 + attack
-      );
-      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      lfoDepth.connect(gain.gain);
-      osc.connect(gain).connect(this.sfxGain!);
-      osc.start(t0);
-      osc.stop(t0 + dur + 0.05);
-    }
+    source.connect(gain).connect(this.sfxGain!);
+    source.start(t);
   }
+
+  // ==============================================================
+  // BOUNCE — removed on purpose. Collisions are silent now; drop and
+  // merge provide all the feedback. The former playBounce(velocity)
+  // method has been deleted entirely, and the engine no longer calls
+  // any bounce SFX from its collisionStart handler.
+  // ==============================================================
 }

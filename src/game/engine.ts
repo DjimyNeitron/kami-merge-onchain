@@ -445,27 +445,12 @@ export class GameEngine {
     for (const pair of event.pairs) {
       const a = pair.bodyA as TaggedBody;
       const b = pair.bodyB as TaggedBody;
-      // Relative velocity magnitude in Matter.js units — used by the
-      // bounce SFX to scale volume and apply a minimum-impact threshold
-      // so stationary yokai resting against each other stay silent.
-      const relVel = Math.hypot(
-        a.velocity.x - b.velocity.x,
-        a.velocity.y - b.velocity.y
-      );
-      // Non-merge collisions produce a soft water-echo bounce (throttled
-      // + velocity-gated inside AudioManager).
-      if (!a.yokaiId || !b.yokaiId) {
-        this.audio.playBounce(relVel);
-        continue;
-      }
-      if (a.yokaiId !== b.yokaiId) {
-        this.audio.playBounce(relVel);
-        continue;
-      }
-      if (a.yokaiId === 11) {
-        this.audio.playBounce(relVel);
-        continue;
-      }
+      // Bounce SFX was removed for a quieter, more meditative feel —
+      // the collision handler now only runs merge-detection. Non-merge
+      // branches just skip ahead silently.
+      if (!a.yokaiId || !b.yokaiId) continue;
+      if (a.yokaiId !== b.yokaiId) continue;
+      if (a.yokaiId === 11) continue;
       if (this.merging.has(a.id) || this.merging.has(b.id)) continue;
 
       this.merging.add(a.id);
