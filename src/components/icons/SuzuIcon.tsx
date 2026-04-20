@@ -1,8 +1,16 @@
-// Suzu (鈴) — Shinto shrine bell, v4. Spherical grapefruit-shaped body
-// (not bell/dome), dominant horizontal slit spanning most of the body,
-// small triangular clapper tongue hanging under the slit, subtle upper-
-// left highlight hint for volume. Stroke-based, viewBox 24, 1.5 stroke,
-// currentColor, round caps. `muted` adds a diagonal strike.
+// Bonshō (梵鐘) — large hanging Japanese temple bell. v5 rebuild.
+//
+// Previous v4 was a spherical body with a horizontal slit — read as a
+// perfume bottle / jingle-ball. Bonshō is the recognisable silhouette
+// hanging from temple eaves:
+//   - Trapezoidal body, narrow at top, wider at bottom
+//   - Ryūzu (dragon-head loop) at the top for hanging
+//   - Two horizontal decorative bands (koma-no-ma) across the waist
+//   - Flat bottom rim
+//
+// Still exported as `SuzuIcon` to avoid touching every import site — the
+// SVG class semantics (icon for "sound") are unchanged. `muted` adds
+// a diagonal strike.
 
 type Props = {
   muted?: boolean;
@@ -28,30 +36,49 @@ export default function SuzuIcon({
       className={className}
       aria-hidden="true"
     >
-      {/* Short cord from the top */}
-      <line x1="12" y1="2.5" x2="12" y2="5" />
-      {/* Fastening knot */}
+      {/* Ryūzu — small loop/horns on top for hanging */}
+      <path d="M 10 3.5 Q 10 2, 12 2 Q 14 2, 14 3.5" />
+
+      {/* Main bell body — trapezoidal, narrow top widening to flat bottom */}
       <path
-        d="M 10.5 5 L 13.5 5 L 13.5 6 L 10.5 6 Z"
-        fill="currentColor"
+        d="M 9 5
+           L 6 17.5
+           Q 6 18.5, 7 19
+           L 17 19
+           Q 18 18.5, 18 17.5
+           L 15 5
+           L 9 5 Z"
       />
 
-      {/* Spherical body — rx 7, ry 7.5 (almost a circle, slightly taller
-       * so it reads as a cast bell rather than a perfect sphere) */}
-      <ellipse cx="12" cy="14" rx="7" ry="7.5" />
+      {/* Top shoulder line — small horizontal just under the ryūzu */}
+      <line x1="9.2" y1="5.5" x2="14.8" y2="5.5" />
 
-      {/* Dominant horizontal slit — the key identifier, thicker stroke */}
-      <line x1="6" y1="15.5" x2="18" y2="15.5" strokeWidth={2} />
-
-      {/* Triangular clapper tongue hanging below the slit */}
-      <path
-        d="M 11 17.5 L 13 17.5 L 12 19 Z"
-        fill="currentColor"
+      {/* First decorative band (koma-no-ma, upper) */}
+      <line
+        x1="7.5"
+        y1="10"
+        x2="16.5"
+        y2="10"
+        strokeWidth={1}
+        opacity={0.7}
       />
 
-      {/* Subtle upper-left highlight — hint of a lit sphere */}
-      <path
-        d="M 7 11 Q 8 9.5, 10 9.5"
+      {/* Second decorative band (middle) */}
+      <line
+        x1="7"
+        y1="13.5"
+        x2="17"
+        y2="13.5"
+        strokeWidth={1}
+        opacity={0.7}
+      />
+
+      {/* Bottom rim emphasis */}
+      <line
+        x1="6.5"
+        y1="18.5"
+        x2="17.5"
+        y2="18.5"
         strokeWidth={0.8}
         opacity={0.5}
       />
