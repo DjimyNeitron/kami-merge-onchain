@@ -67,12 +67,14 @@ export default function Settings({
         >
           <div className="wooden-rod absolute -top-1 left-3 right-3 h-3 rounded-full pointer-events-none" />
           {/* scroll-panel: flex-col so a sticky Close footer stays pinned
-           * while the content above it scrolls. Vertical paddings reduced
-           * roughly 25% vs previous round so content fits without scroll
-           * on desktop 1080p. */}
+           * while the content above it scrolls. Vertical paddings trimmed
+           * a further ~20% in this pass (dividers my-3→my-2, toggle rows
+           * py-2→py-1.5, grid gap-y-2→gap-y-1, scroll region pt-5→pt-4)
+           * so full Settings fits without scroll on desktop 1080p+;
+           * sticky footer is retained as a safety net for small viewports. */}
           <div className="scroll-panel kami-serif text-[#3d2510] border-x border-[#8a6f28]/40 flex flex-col max-h-[90vh]">
             {/* Scrollable content region */}
-            <div className="flex-1 overflow-y-auto px-5 pt-5 pb-2">
+            <div className="flex-1 overflow-y-auto px-5 pt-4 pb-2">
               {/* H1 — only bold heading in the panel */}
               <div className="text-3xl font-bold tracking-[0.08em] text-center leading-none">
                 Settings
@@ -80,7 +82,7 @@ export default function Settings({
               <div className="text-base tracking-[0.2em] text-[#5c3a1e]/60 text-center mt-1">
                 設定
               </div>
-              <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-3" />
+              <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-2" />
 
               <ToggleRow
                 icon={<SuzuIcon muted={!sfxEnabled} size={28} />}
@@ -97,16 +99,16 @@ export default function Settings({
                 onToggle={onToggleBgm}
               />
 
-              <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-3" />
+              <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-2" />
 
               {/* H2 — regular weight, matches Sound/Music size */}
               <div className="text-xl uppercase tracking-[0.2em] text-[#5c3a1e]/75 text-center">
                 Yokai Collection
               </div>
-              <div className="text-sm tracking-[0.15em] text-[#5c3a1e]/60 text-center mt-0.5 mb-2">
+              <div className="text-sm tracking-[0.15em] text-[#5c3a1e]/60 text-center mt-0.5 mb-1">
                 妖怪図鑑
               </div>
-              <div className="grid grid-cols-4 gap-2 mb-1">
+              <div className="grid grid-cols-4 gap-x-2 gap-y-1 mb-1">
                 {YOKAI_CHAIN.map((y) => {
                   const isUnlocked = unlockedSet.has(y.id);
                   return (
@@ -159,7 +161,7 @@ export default function Settings({
                 })}
               </div>
 
-              <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-3" />
+              <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-2" />
 
               <div className="text-[0.65rem] text-[#5c3a1e]/65 text-center tracking-wider">
                 Made by Kody Productions · Powered by Soneium
@@ -224,7 +226,7 @@ function ToggleRow({
   onToggle: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between py-2 px-1">
+    <div className="flex items-center justify-between py-1.5 px-1">
       <div className="flex items-center gap-3">
         <span
           className="inline-flex items-center justify-center"
