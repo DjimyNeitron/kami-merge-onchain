@@ -322,25 +322,32 @@ export class AudioManager {
   // ==============================================================
 
   /**
-   * Plays when a yokai leaves the spawner slot. Silent if drop.mp3
-   * hasn't finished decoding yet — the user almost certainly won't
-   * drop anything in the first ~300ms, so this is rare in practice.
+   * Plays when a yokai leaves the spawner slot. Currently disabled
+   * via early return — we're testing the feel of combo-only audio
+   * (merges are the only audible feedback). Sample is still preloaded
+   * by loadSamples() so flipping this back on is a one-line revert.
+   *
+   * Original body preserved in the commented block below.
    */
   playDrop() {
-    const ctx = this.canPlay();
-    if (!ctx) return;
-    if (!this.dropBuffer) return;
+    // Temporarily disabled — testing combo-only audio feel.
+    return;
 
-    const t = ctx.currentTime;
-    const source = ctx.createBufferSource();
-    source.buffer = this.dropBuffer;
-    source.playbackRate.setValueAtTime(1, t);
-
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.6, t);
-
-    source.connect(gain).connect(this.sfxGain!);
-    source.start(t);
+    // --- Original implementation kept for easy re-enable ---
+    // const ctx = this.canPlay();
+    // if (!ctx) return;
+    // if (!this.dropBuffer) return;
+    //
+    // const t = ctx.currentTime;
+    // const source = ctx.createBufferSource();
+    // source.buffer = this.dropBuffer;
+    // source.playbackRate.setValueAtTime(1, t);
+    //
+    // const gain = ctx.createGain();
+    // gain.gain.setValueAtTime(0.6, t);
+    //
+    // source.connect(gain).connect(this.sfxGain!);
+    // source.start(t);
   }
 
   // ==============================================================

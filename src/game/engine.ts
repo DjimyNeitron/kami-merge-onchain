@@ -680,11 +680,17 @@ export class GameEngine {
       ctx.restore();
     }
 
-    // Game-over line
+    // Game-over line — warm gold, dashed, with a soft pulsing glow that
+    // ties into the HUD palette instead of reading as a web "warning".
+    // Opacity swings between ~0.55 and ~0.95 over a 2.2s cycle (sine),
+    // and a shadowBlur of 8 gives a halo without needing a second pass.
     ctx.save();
-    ctx.strokeStyle = "#ff3b3b";
+    const pulse = 0.75 + Math.sin(performance.now() / 350) * 0.2;
+    ctx.strokeStyle = `rgba(200, 160, 74, ${pulse})`;
     ctx.lineWidth = 2;
-    ctx.setLineDash([8, 6]);
+    ctx.setLineDash([7, 7]);
+    ctx.shadowColor = "#c8a04a";
+    ctx.shadowBlur = 8;
     ctx.beginPath();
     ctx.moveTo(PLAY_OFFSET_X, GAME_OVER_LINE_Y);
     ctx.lineTo(PLAY_OFFSET_X + GAME_WIDTH, GAME_OVER_LINE_Y);
