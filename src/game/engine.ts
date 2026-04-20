@@ -424,12 +424,14 @@ export class GameEngine {
     }
     this.lastMergeTime = now;
     if (this.comboCount >= 2) {
+      // Visual COMBO x N! text above the merge point. The audible combo
+      // feedback is handled per-merge by playMergeWithCombo() (pentatonic
+      // scale), so there's no secondary sound layer here.
       this.combo = {
         count: this.comboCount,
         life: 0,
         maxLife: COMBO_TEXT_LIFE_MS,
       };
-      this.audio.playCombo(this.comboCount);
     }
   }
 
@@ -443,18 +445,25 @@ export class GameEngine {
     for (const pair of event.pairs) {
       const a = pair.bodyA as TaggedBody;
       const b = pair.bodyB as TaggedBody;
-      // Non-merge collisions produce a soft bounce click (throttled inside
-      // AudioManager). Any of these "continue" paths counts as non-merge.
+      // Relative velocity magnitude in Matter.js units — used by the
+      // bounce SFX to scale volume and apply a minimum-impact threshold
+      // so stationary yokai resting against each other stay silent.
+      const relVel = Math.hypot(
+        a.velocity.x - b.velocity.x,
+        a.velocity.y - b.velocity.y
+      );
+      // Non-merge collisions produce a soft water-echo bounce (throttled
+      // + velocity-gated inside AudioManager).
       if (!a.yokaiId || !b.yokaiId) {
-        this.audio.playBounce();
+        this.audio.playBounce(relVel);
         continue;
       }
       if (a.yokaiId !== b.yokaiId) {
-        this.audio.playBounce();
+        this.audio.playBounce(relVel);
         continue;
       }
       if (a.yokaiId === 11) {
-        this.audio.playBounce();
+        this.audio.playBounce(relVel);
         continue;
       }
       if (this.merging.has(a.id) || this.merging.has(b.id)) continue;
@@ -492,8 +501,10 @@ export class GameEngine {
         this.spawnFlash(midX, midY);
         this.spawnMergeParticles(midX, midY);
 
-        // Merge SFX (pitch + loudness scale with yokai tier)
-        this.audio.playMerge(next.id);
+        // Merge SFX — ascending pentatonic scale keyed by combo streak
+        // (not by yokai tier). First merge in a streak is C4, each next
+        // is one note up; resets after 1.5s of silence.
+        this.audio.playMergeWithCombo();
 
         // Screen shake for heavier yokai
         if (next.id >= 9) this.triggerShake(5);

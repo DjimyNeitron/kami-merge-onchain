@@ -1,14 +1,26 @@
 // Lightweight Web Audio SFX generator + HTMLAudio-based BGM hook.
-// SFX are synthesised on the fly (no samples) in a Japanese sonic palette:
-// woodblock drop, bamboo bounce, koto merge, furin wind-chime combo, and a
-// bonshō temple bell on game over. BGM is played via a regular <audio>
-// element — pass the track URL into playBGM() when ready.
+// SFX are synthesised on the fly (no samples) for a meditative shrine
+// atmosphere: water-droplet drop, water-echo bounce, pentatonic combo
+// melody on merges, and a bonshō temple bell on game over.
+// BGM is played via a regular <audio> element — pass the track URL into
+// playBGM() when ready.
 // iOS requires the first node be started inside a user gesture (see unlock()).
 
-// Pentatonic notes mapped to yokai tiers — one note per tier (singing-bowl
-// scale: C D E G A across rising octaves)
-const PENTATONIC_NOTES = [
-  262, 294, 330, 392, 440, 524, 588, 660, 784, 880, 1048,
+// Ascending C major pentatonic, C4 → A5. Every merge steps one note up.
+// After COMBO_RESET_MS of silence the index resets to 0 (C4).
+// Index past the end caps at A5 so long combos plateau instead of going
+// into dog-whistle territory.
+const PENTATONIC_C4_A5 = [
+  261.63, // C4
+  293.66, // D4
+  329.63, // E4
+  392.0,  // G4
+  440.0,  // A4
+  523.25, // C5
+  587.33, // D5
+  659.25, // E5
+  783.99, // G5
+  880.0,  // A5
 ];
 
 const SOUND_STORAGE_KEY = "kami_sound_enabled";
@@ -29,6 +41,17 @@ export class AudioManager {
   private sfxMuted = false;
   private bgmMuted = false;
   private lastBounceAt = 0;
+
+  // Pentatonic combo state — index of the next note in PENTATONIC_C4_A5.
+  // Resets to 0 after COMBO_RESET_MS of silence.
+  private comboIndex = 0;
+  private lastMergeAt = 0;
+  private readonly COMBO_RESET_MS = 1500;
+
+  // Bounce throttle: minimum ms between bounce SFX, plus a velocity floor
+  // below which we emit nothing. Keeps crowded stacks from stuttering.
+  private readonly BOUNCE_THROTTLE_MS = 60;
+  private readonly BOUNCE_VELOCITY_THRESHOLD = 3;
 
   // HTMLAudio-based background music
   private bgmEl: HTMLAudioElement | null = null;
@@ -248,49 +271,168 @@ export class AudioManager {
     osc.stop(t0 + duration + 0.05);
   }
 
-  /** Water droplet "plink" — fundamental + airy overtone. */
+  /**
+   * Soft water-droplet "plink" — single sine with a sharp downward pitch
+   * bend (1200→400 Hz), short decay, and a highpass that strips any
+   * low-end thump so it reads as "droplet into still water", not a thud.
+   */
   playDrop() {
     const ctx = this.canPlay();
     if (!ctx) return;
-    this.softTone(ctx, 600, 300, 0.12, 0.15, 0.01);
-    this.softTone(ctx, 900, 450, 0.08, 0.04, 0.01);
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(1200, now);
+    osc.frequency.exponentialRampToValueAtTime(400, now + 0.15);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(0.15, now + 0.005); // 5ms attack
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3); // 300ms decay
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = "highpass";
+    filter.frequency.setValueAtTime(800, now);
+    filter.Q.setValueAtTime(1, now);
+
+    osc.connect(gain).connect(filter).connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.35);
   }
 
-  /** Bamboo tapping a stone — barely-there "tap". */
-  playBounce() {
-    const now = performance.now();
-    if (now - this.lastBounceAt < 150) return;
-    this.lastBounceAt = now;
+  /**
+   * Water-echo bounce — softer, shorter cousin of playDrop. Velocity
+   * scales volume (harder hit = louder, but capped so it never overpowers
+   * the combo bell). Throttled 60ms + velocity floor of 3 units so dense
+   * stacks of barely-moving yokai don't chatter.
+   */
+  playBounce(velocity: number = 0) {
+    if (velocity < this.BOUNCE_VELOCITY_THRESHOLD) return;
+
+    const perfNow = performance.now();
+    if (perfNow - this.lastBounceAt < this.BOUNCE_THROTTLE_MS) return;
+    this.lastBounceAt = perfNow;
+
     const ctx = this.canPlay();
     if (!ctx) return;
-    this.softTone(ctx, 500, 250, 0.03, 0.04, 0.005);
+    const t = ctx.currentTime;
+
+    // Cap scale at 1.0 — a very fast impact still stays soft.
+    const volumeScale = Math.min(velocity / 15, 1.0);
+
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(800, t);
+    osc.frequency.exponentialRampToValueAtTime(300, t + 0.08);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.linearRampToValueAtTime(0.06 * volumeScale, t + 0.003);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = "highpass";
+    filter.frequency.setValueAtTime(600, t);
+
+    osc.connect(gain).connect(filter).connect(ctx.destination);
+
+    osc.start(t);
+    osc.stop(t + 0.45);
   }
 
-  /** Singing bowl — pentatonic note with octave shimmer, slow decay. */
-  playMerge(yokaiId: number) {
-    const ctx = this.canPlay();
-    if (!ctx) return;
-    const idx = Math.min(
-      Math.max(yokaiId - 1, 0),
-      PENTATONIC_NOTES.length - 1
-    );
-    const base = PENTATONIC_NOTES[idx];
-    const g = Math.min(0.2, 0.08 + yokaiId * 0.01);
-    // Fundamental — gentle attack, very long tail
-    this.softTone(ctx, base, base, 0.8, g, 0.05);
-    // Octave-up shimmer overtone
-    this.softTone(ctx, base * 2, base * 2, 0.6, 0.03, 0.05);
-  }
-
-  /** Furin wind chime — 2-3 soft high sine bells with long decay. */
-  playCombo(comboCount: number) {
-    const ctx = this.canPlay();
-    if (!ctx) return;
-    const freqs = [1800, 2200, 2600];
-    const count = comboCount >= 3 ? 3 : 2;
-    for (let i = 0; i < count; i++) {
-      this.softTone(ctx, freqs[i], freqs[i], 1.2, 0.03, 0.02, i * 0.15);
+  /**
+   * Unified merge SFX: plays the next note of the C-major pentatonic
+   * scale. Replaces the old `playMerge(yokaiId)` + separate `playCombo`
+   * pair — every merge is now one step of an ascending melody, which
+   * gives direct audible feedback for combo streaks without a second
+   * layered sound. Resets to C4 after COMBO_RESET_MS of silence; caps
+   * at A5 so long streaks plateau instead of climbing forever.
+   */
+  playMergeWithCombo() {
+    const perfNow = performance.now();
+    if (perfNow - this.lastMergeAt > this.COMBO_RESET_MS) {
+      this.comboIndex = 0;
     }
+    this.lastMergeAt = perfNow;
+
+    const ctx = this.canPlay();
+    if (!ctx) {
+      // Advance the index even when muted so resuming mid-streak still
+      // steps forward — but honour the reset window above.
+      this.comboIndex = Math.min(
+        this.comboIndex + 1,
+        PENTATONIC_C4_A5.length - 1
+      );
+      return;
+    }
+
+    const idx = Math.min(this.comboIndex, PENTATONIC_C4_A5.length - 1);
+    const freq = PENTATONIC_C4_A5[idx];
+    this.comboIndex = Math.min(
+      this.comboIndex + 1,
+      PENTATONIC_C4_A5.length - 1
+    );
+
+    this.playBellTone(ctx, freq);
+  }
+
+  /**
+   * Singing-bowl-ish bell tone — fundamental + two harmonics routed
+   * through a soft lowpass. Used by playMergeWithCombo; centralised so
+   * all combo notes have identical timbre and only the pitch changes.
+   */
+  private playBellTone(ctx: AudioContext, frequency: number) {
+    const now = ctx.currentTime;
+
+    // Fundamental
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(frequency, now);
+
+    // Octave harmonic (brightness)
+    const osc2 = ctx.createOscillator();
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(frequency * 2, now);
+
+    // Third harmonic (subtle sparkle)
+    const osc3 = ctx.createOscillator();
+    osc3.type = "sine";
+    osc3.frequency.setValueAtTime(frequency * 3, now);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(0.25, now + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.5);
+
+    const gain2 = ctx.createGain();
+    gain2.gain.setValueAtTime(0.0001, now);
+    gain2.gain.linearRampToValueAtTime(0.08, now + 0.005);
+    gain2.gain.exponentialRampToValueAtTime(0.0001, now + 1.0);
+
+    const gain3 = ctx.createGain();
+    gain3.gain.setValueAtTime(0.0001, now);
+    gain3.gain.linearRampToValueAtTime(0.03, now + 0.005);
+    gain3.gain.exponentialRampToValueAtTime(0.0001, now + 0.7);
+
+    // Soft lowpass — tames the upper harmonics, keeps the bowl character.
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(4000, now);
+    filter.Q.setValueAtTime(0.5, now);
+
+    osc.connect(gain).connect(filter);
+    osc2.connect(gain2).connect(filter);
+    osc3.connect(gain3).connect(filter);
+    filter.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 1.6);
+    osc2.start(now);
+    osc2.stop(now + 1.1);
+    osc3.start(now);
+    osc3.stop(now + 0.8);
   }
 
   /** Bonshō temple bell — three harmonic layers with a gentle tremolo. */
