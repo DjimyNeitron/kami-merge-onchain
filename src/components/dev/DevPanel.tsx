@@ -13,9 +13,9 @@ export type DevPanelProps = {
 };
 
 /**
- * Red/neutral dev-test overlay. Rendered only when useDevMode() === true,
- * and imported only in `process.env.NODE_ENV === "development"` branches
- * so the component's code is absent from prod bundles.
+ * Red/neutral dev-test overlay. Rendered only when useDevMode() === true
+ * (URL contains ?dev=1). Plain import — module ships in prod bundles
+ * but never renders without the URL flag.
  *
  * Visual style deliberately diverges from the game's gold palette — red
  * tab + dark neutral body + font-mono — so it reads as "service UI" and

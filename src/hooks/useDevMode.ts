@@ -3,22 +3,22 @@
 import { useEffect, useState } from "react";
 
 /**
- * Returns true if the dev-testing UI should be active.
+ * Returns true if dev mode is active — i.e. the URL contains `?dev=1`.
  *
- * Requirements (BOTH must be met):
- *   1. process.env.NODE_ENV === "development"  — prod build never activates
- *   2. URL contains ?dev=1
+ * Earlier versions double-guarded with `process.env.NODE_ENV`, but that
+ * threw `ReferenceError: process is not defined` at browser runtime
+ * because Turbopack did not inline the expression inside the useEffect
+ * callback / helper-function body (inlining is unreliable across
+ * function boundaries + external module imports).
  *
- * Double-guard: even if someone hits ?dev=1 on a production deploy, the
- * NODE_ENV check still returns false. Paired with the conditional
- * `require` at the DevPanel import site, the entire dev UI subtree is
- * physically absent from prod bundles.
+ * URL-only check is sufficient for this personal project: if DevPanel
+ * somehow reaches a prod deploy, it is still fully gated by the URL
+ * param — you just don't type `?dev=1`.
  */
 export function useDevMode(): boolean {
   const [isDev, setIsDev] = useState(false);
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== "development") return;
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     setIsDev(params.get("dev") === "1");
@@ -28,11 +28,14 @@ export function useDevMode(): boolean {
 }
 
 /**
- * Non-React utility for modules (like the engine) that also need to know
- * if we're in dev-test mode. Same double-guard semantics.
+ * Non-React helper for use in engine.ts and other non-component modules.
+ * Safe to call from any context — checks for `window` existence first.
  */
 export function isDevModeActive(): boolean {
-  if (process.env.NODE_ENV !== "development") return false;
   if (typeof window === "undefined") return false;
-  return new URLSearchParams(window.location.search).get("dev") === "1";
+  try {
+    return new URLSearchParams(window.location.search).get("dev") === "1";
+  } catch {
+    return false;
+  }
 }

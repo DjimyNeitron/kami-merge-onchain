@@ -16,17 +16,14 @@ import {
   subscribe as subscribeSeason,
 } from "@/game/seasons";
 import { useDevMode } from "@/hooks/useDevMode";
-import type { DevPanelProps } from "@/components/dev/DevPanel";
+import DevPanel from "@/components/dev/DevPanel";
 
-// Dev panel is conditionally required — the `if (process.env.NODE_ENV ===
-// "development")` branch is dead-code-eliminated in prod, so webpack never
-// bundles the DevPanel module for production builds. The `type` import
-// above is a types-only import that webpack erases entirely.
-let DevPanel: React.ComponentType<DevPanelProps> | null = null;
-if (process.env.NODE_ENV === "development") {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  DevPanel = require("@/components/dev/DevPanel").default;
-}
+// Plain import — previous conditional `require(...)` gated by
+// `process.env.NODE_ENV` broke at browser runtime (Turbopack didn't
+// reliably inline the check). DevPanel now always bundled (~5KB extra
+// in prod) but still fully gated at runtime by `useDevMode()` / the
+// `?dev=1` URL param. For a personal project this is a reasonable
+// trade — reliability over micro tree-shake.
 
 const SOUND_KEY = "kami_sound_enabled";
 const MUSIC_KEY = "kami_music_enabled";
@@ -560,11 +557,10 @@ export default function GameCanvas() {
         />
       )}
 
-      {/* Dev-test overlay — gated by useDevMode() (NODE_ENV=development +
-       * ?dev=1) AND by conditional require at module top. In production
-       * builds DevPanel is null, the JSX short-circuits, and the module
-       * was never imported. */}
-      {isDev && DevPanel && (
+      {/* Dev-test overlay — gated at runtime by `?dev=1` URL param via
+       * useDevMode(). Plain import means the module is bundled in prod
+       * but never renders without the URL flag. */}
+      {isDev && (
         <DevPanel
           onSpawn={handleDevSpawn}
           onClearField={handleDevClearField}
