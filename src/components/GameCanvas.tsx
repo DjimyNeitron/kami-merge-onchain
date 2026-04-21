@@ -17,7 +17,8 @@ import {
 } from "@/game/seasons";
 import { useDevMode } from "@/hooks/useDevMode";
 import DevPanel from "@/components/dev/DevPanel";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { useAccountModal } from "@rainbow-me/rainbowkit";
+import { useAccount } from "wagmi";
 
 // Plain import — previous conditional `require(...)` gated by
 // `process.env.NODE_ENV` broke at browser runtime (Turbopack didn't
@@ -332,34 +333,13 @@ export default function GameCanvas() {
 
   return (
     <div className="h-full w-full flex flex-col items-center gap-1.5 px-2 min-h-0 relative z-10">
-      {/* Wallet connect — thin right-aligned strip ABOVE the score plate.
-       * Kept in its own row (not inside the score plate) because the
-       * score plate is already tight with 5 items; giving the wallet
-       * its own lane avoids cramming on mobile. Scaled 0.85 since the
-       * RainbowKit button is oversized for a HUD surface. */}
-      <div
-        className="shrink-0 w-full flex justify-end items-center"
-        style={{ maxWidth: CANVAS_WIDTH, height: 40 }}
-      >
-        <div
-          style={{
-            transform: "scale(0.85)",
-            transformOrigin: "right center",
-          }}
-        >
-          <ConnectButton
-            accountStatus={{
-              smallScreen: "avatar",
-              largeScreen: "full",
-            }}
-            chainStatus={{
-              smallScreen: "icon",
-              largeScreen: "icon",
-            }}
-            showBalance={false}
-          />
-        </div>
-      </div>
+      {/* Mid-game wallet indicator — shown only when connected. The
+       * pre-connect CTA now lives in the splash screen, so the HUD
+       * doesn't need a full ConnectButton any more. This chip acts as
+       * a reference / affordance to open the RainbowKit account modal
+       * (switch chain, copy address, disconnect). Hidden when not
+       * connected to keep the HUD clean for guest players. */}
+      <WalletChip maxWidth={CANVAS_WIDTH} />
       {/* Score plate */}
       <div
         className="score-plate shrink-0 flex items-center justify-between w-full rounded-lg px-3 py-1.5"
@@ -599,6 +579,65 @@ export default function GameCanvas() {
           allUnlocked={allUnlocked}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Small wallet address chip rendered above the score plate while the
+ * player is connected. Click opens RainbowKit's account modal
+ * (switch chain, disconnect, copy address). When disconnected (guest
+ * or pre-connect) the chip returns null so the HUD lane collapses.
+ *
+ * `openAccountModal` can momentarily be undefined — before the modal
+ * provider hydrates, or if a chain mismatch puts us into "chain modal"
+ * territory — in which case the button stays disabled.
+ */
+function WalletChip({ maxWidth }: { maxWidth: number }) {
+  const { address, isConnected } = useAccount();
+  const { openAccountModal } = useAccountModal();
+
+  if (!isConnected || !address) return null;
+
+  const short = `${address.slice(0, 6)}…${address.slice(-4)}`;
+  const ready = !!openAccountModal;
+
+  return (
+    <div
+      className="shrink-0 w-full flex justify-end items-center"
+      style={{ maxWidth, height: 28 }}
+    >
+      <button
+        type="button"
+        onClick={openAccountModal}
+        disabled={!ready}
+        title="Wallet options"
+        aria-label="Wallet options"
+        className="kami-serif px-3 py-1 rounded-full flex items-center gap-1.5 transition-colors"
+        style={{
+          fontSize: 12,
+          letterSpacing: "0.05em",
+          color: "#f5e6c8",
+          background: "rgba(10, 10, 25, 0.45)",
+          border: "1px solid rgba(200, 168, 78, 0.4)",
+          boxShadow: "0 0 6px rgba(200,168,78,0.12)",
+          cursor: ready ? "pointer" : "default",
+          touchAction: "manipulation",
+        }}
+      >
+        <span
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: "50%",
+            background: "#6fd28a",
+            boxShadow: "0 0 4px rgba(111,210,138,0.8)",
+          }}
+        />
+        <span style={{ fontFamily: "ui-monospace, Menlo, monospace" }}>
+          {short}
+        </span>
+      </button>
     </div>
   );
 }
