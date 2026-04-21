@@ -1,10 +1,16 @@
 "use client";
 
 // SECURITY NOTES:
-// - Wallet connection is REQUIRED — there is no guest / offline mode.
-//   The splash gates all gameplay behind a connected wallet, and a
-//   mid-game disconnect bounces the player back here (see the
-//   wasConnectedRef effect in GameCanvas.tsx).
+// - Wallet connection is REQUIRED for production players — there is
+//   no guest / offline mode. The splash gates all gameplay behind a
+//   connected wallet, and a mid-game disconnect bounces the player
+//   back here (see the wasConnectedRef effect in GameCanvas.tsx).
+// - There is a dev-only wallet bypass (`?dev=1` + DevPanel "Skip
+//   Wallet" toggle). The `useDevSkipWallet` hook hard-gates on the
+//   URL flag before reading any storage, so this cannot be activated
+//   in a production build. When active, the splash renders a loud
+//   orange "🛠 Dev mode (no wallet)" banner instead of a welcome
+//   line, so it can't be mistaken for a real connected state.
 // - All user-facing strings here are hard-coded English. RainbowKit's
 //   modal text is also pinned to 'en-US' in Web3Provider so the
 //   connect UX never flips to browser-detected Russian/Chinese/etc.
@@ -19,6 +25,7 @@ import { useAccount, useDisconnect } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { YOKAI_CHAIN } from "@/config/yokai";
 import MonIcon from "@/components/icons/MonIcon";
+import { useDevSkipWallet } from "@/hooks/useDevSkipWallet";
 
 type Props = {
   onStart: () => void;
@@ -32,8 +39,15 @@ function formatAddress(addr: string) {
 export default function SplashScreen({ onStart, onOpenSettings }: Props) {
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
+  // Dev-only bypass: when `?dev=1` is in the URL AND the DevPanel's
+  // "Skip Wallet" toggle is on, `devSkipWallet` is true and we treat
+  // the player as effectively connected without a real wallet. The
+  // hook internally gates on the URL flag, so this is a no-op (and
+  // always false) in production builds.
+  const devSkipWallet = useDevSkipWallet();
 
-  const connected = isConnected && !!address;
+  const walletConnected = isConnected && !!address;
+  const effectivelyConnected = walletConnected || devSkipWallet;
 
   return (
     <div
@@ -75,10 +89,13 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
           ))}
         </div>
 
-        {/* Two states only: disconnected → Connect Wallet.
-                            connected    → welcome + Tap to Start + Disconnect. */}
+        {/* Two states + one dev-only variant:
+         *   !effectivelyConnected     → Connect Wallet CTA
+         *   walletConnected           → "Welcome, 0x1234…abcd" + Tap to Start + Disconnect
+         *   devSkipWallet (no wallet) → "🛠 Dev mode (no wallet)" + Tap to Start (no Disconnect)
+         */}
         <div className="mt-8 flex flex-col items-center gap-3 min-h-[140px]">
-          {!connected && (
+          {!effectivelyConnected && (
             <div className="scale-95">
               <ConnectButton
                 label="Connect Wallet"
@@ -89,17 +106,28 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
             </div>
           )}
 
-          {connected && (
+          {effectivelyConnected && (
             <>
-              <p className="kami-serif text-[#f5e6c8]/90 text-base sm:text-lg">
-                Welcome,{" "}
-                <span
-                  className="text-[#c8a84e] font-semibold"
-                  style={{ fontFamily: "ui-monospace, Menlo, monospace" }}
+              {walletConnected ? (
+                <p className="kami-serif text-[#f5e6c8]/90 text-base sm:text-lg">
+                  Welcome,{" "}
+                  <span
+                    className="text-[#c8a84e] font-semibold"
+                    style={{ fontFamily: "ui-monospace, Menlo, monospace" }}
+                  >
+                    {formatAddress(address!)}
+                  </span>
+                </p>
+              ) : (
+                // Orange signals "you're not actually connected" — cannot
+                // be confused with a real wallet welcome line.
+                <p
+                  className="kami-serif text-base sm:text-lg font-medium"
+                  style={{ color: "#ff9800" }}
                 >
-                  {formatAddress(address!)}
-                </span>
-              </p>
+                  🛠 Dev mode (no wallet)
+                </p>
+              )}
               <button
                 type="button"
                 onClick={onStart}
@@ -115,18 +143,20 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
               >
                 ~ Tap to Start ~
               </button>
-              <button
-                type="button"
-                onClick={() => disconnect()}
-                onTouchEnd={(e) => {
-                  e.preventDefault();
-                  disconnect();
-                }}
-                className="text-white/45 hover:text-white/75 text-xs tracking-wider px-2 py-1"
-                style={{ touchAction: "manipulation" }}
-              >
-                Disconnect
-              </button>
+              {walletConnected && (
+                <button
+                  type="button"
+                  onClick={() => disconnect()}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    disconnect();
+                  }}
+                  className="text-white/45 hover:text-white/75 text-xs tracking-wider px-2 py-1"
+                  style={{ touchAction: "manipulation" }}
+                >
+                  Disconnect
+                </button>
+              )}
             </>
           )}
         </div>

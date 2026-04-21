@@ -19,6 +19,7 @@ import { useDevMode } from "@/hooks/useDevMode";
 import DevPanel from "@/components/dev/DevPanel";
 import { useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount } from "wagmi";
+import { useDevSkipWallet } from "@/hooks/useDevSkipWallet";
 
 // Plain import — previous conditional `require(...)` gated by
 // `process.env.NODE_ENV` broke at browser runtime (Turbopack didn't
@@ -93,7 +94,13 @@ export default function GameCanvas() {
   // yet" (splash already shown, no-op) from "was connected, now isn't"
   // (this is the case we need to handle). The disconnect handler
   // lives in its own effect below once handleRestart is declared.
+  //
+  // The dev-only `useDevSkipWallet` gate (via ?dev=1 + DevPanel toggle)
+  // short-circuits the watcher entirely — during bypass we don't care
+  // what the real wallet is doing. The hook returns false in prod, so
+  // this path is inert outside of dev.
   const { isConnected: walletConnected } = useAccount();
+  const devSkipWallet = useDevSkipWallet();
   const wasConnectedRef = useRef(false);
   // Derived: umbrella muted state (both silenced) drives the emoji button
   const muted = !sfxEnabled && !bgmEnabled;
@@ -270,12 +277,22 @@ export default function GameCanvas() {
   };
 
   // Disconnect watcher: when wallet transitions from connected → not,
-  // reset the engine and bounce back to splash. Depends only on
-  // walletConnected so setters (stable identity) don't need to be in
-  // the deps array. The ref update is the "was connected" memory —
-  // first mount with a cold wallet leaves it false and does nothing,
-  // matching the initial splash being shown already.
+  // reset the engine and bounce back to splash. Depends on
+  // walletConnected + devSkipWallet so setters (stable identity)
+  // don't need to be in the deps array. The ref update is the
+  // "was connected" memory — first mount with a cold wallet leaves
+  // it false and does nothing, matching the initial splash being
+  // shown already.
+  //
+  // Dev bypass short-circuits the watcher and clears the memory. We
+  // deliberately do NOT bounce when the player toggles bypass OFF —
+  // that would nuke an in-progress test session. If they want back
+  // to the splash they can refresh or use the Disconnect button.
   useEffect(() => {
+    if (devSkipWallet) {
+      wasConnectedRef.current = false;
+      return;
+    }
     if (walletConnected) {
       wasConnectedRef.current = true;
       return;
@@ -289,7 +306,7 @@ export default function GameCanvas() {
       setShowSplash(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [walletConnected]);
+  }, [walletConnected, devSkipWallet]);
 
   // ── Dev handlers (thin pass-throughs to engine). Only invoked from the
   // DevPanel, which itself only mounts when useDevMode() returns true.
@@ -628,6 +645,13 @@ export default function GameCanvas() {
 function WalletChip({ maxWidth }: { maxWidth: number }) {
   const { address, isConnected } = useAccount();
   const { openAccountModal } = useAccountModal();
+  const devSkipWallet = useDevSkipWallet();
+
+  // Dev bypass: suppress the chip even if the user happens to also
+  // have a live wallet connected — the bypass signals "pretend we're
+  // walletless" and the HUD should read that way. Prod is unaffected
+  // because the hook hard-returns false without ?dev=1.
+  if (devSkipWallet) return null;
 
   if (!isConnected || !address) return null;
 

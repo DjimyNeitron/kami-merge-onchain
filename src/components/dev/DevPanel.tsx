@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { YOKAI_CHAIN } from "@/config/yokai";
+import {
+  readDevSkipWallet,
+  writeDevSkipWallet,
+} from "@/hooks/useDevSkipWallet";
 
 export type DevPanelProps = {
   onSpawn: (yokaiId: number) => void;
@@ -30,6 +34,20 @@ export default function DevPanel({
   allUnlocked,
 }: DevPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
+
+  // Skip-wallet bypass lives entirely inside the dev layer. We read
+  // once from sessionStorage on mount (via the lazy initialiser) so
+  // the toggle survives HMR, then broadcast every flip via a
+  // CustomEvent so SplashScreen / GameCanvas / WalletChip can react
+  // without threading a prop all the way down.
+  const [skipWallet, setSkipWallet] = useState<boolean>(() =>
+    readDevSkipWallet()
+  );
+  const toggleSkipWallet = () => {
+    const next = !skipWallet;
+    setSkipWallet(next);
+    writeDevSkipWallet(next);
+  };
 
   return (
     <div
@@ -62,6 +80,18 @@ export default function DevPanel({
               }`}
             >
               God Mode: {godMode ? "ON" : "OFF"}
+            </button>
+            <button
+              onClick={toggleSkipWallet}
+              type="button"
+              title="Bypass wallet requirement on splash — dev only"
+              className={`px-2 py-1 rounded border transition-colors ${
+                skipWallet
+                  ? "bg-green-700 border-green-500 text-white"
+                  : "bg-neutral-800 border-neutral-600 hover:bg-neutral-700"
+              }`}
+            >
+              Skip Wallet: {skipWallet ? "ON" : "OFF"}
             </button>
             <button
               onClick={onClearField}
