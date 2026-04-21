@@ -17,6 +17,7 @@ import {
 } from "@/game/seasons";
 import { useDevMode } from "@/hooks/useDevMode";
 import DevPanel from "@/components/dev/DevPanel";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
 
 // Plain import — previous conditional `require(...)` gated by
 // `process.env.NODE_ENV` broke at browser runtime (Turbopack didn't
@@ -331,6 +332,34 @@ export default function GameCanvas() {
 
   return (
     <div className="h-full w-full flex flex-col items-center gap-1.5 px-2 min-h-0 relative z-10">
+      {/* Wallet connect — thin right-aligned strip ABOVE the score plate.
+       * Kept in its own row (not inside the score plate) because the
+       * score plate is already tight with 5 items; giving the wallet
+       * its own lane avoids cramming on mobile. Scaled 0.85 since the
+       * RainbowKit button is oversized for a HUD surface. */}
+      <div
+        className="shrink-0 w-full flex justify-end items-center"
+        style={{ maxWidth: CANVAS_WIDTH, height: 40 }}
+      >
+        <div
+          style={{
+            transform: "scale(0.85)",
+            transformOrigin: "right center",
+          }}
+        >
+          <ConnectButton
+            accountStatus={{
+              smallScreen: "avatar",
+              largeScreen: "full",
+            }}
+            chainStatus={{
+              smallScreen: "icon",
+              largeScreen: "icon",
+            }}
+            showBalance={false}
+          />
+        </div>
+      </div>
       {/* Score plate */}
       <div
         className="score-plate shrink-0 flex items-center justify-between w-full rounded-lg px-3 py-1.5"
