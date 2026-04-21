@@ -85,6 +85,16 @@ export default function GameCanvas() {
   const [initError, setInitError] = useState<string | null>(null);
   const [godMode, setGodMode] = useState(false);
   const isDev = useDevMode();
+
+  // Wallet state — the game requires a connected wallet. If the player
+  // disconnects at any point (wallet extension, Disconnect button in
+  // the HUD chip, RainbowKit modal), we bounce back to the splash so
+  // they can reconnect. wasConnectedRef distinguishes "never connected
+  // yet" (splash already shown, no-op) from "was connected, now isn't"
+  // (this is the case we need to handle). The disconnect handler
+  // lives in its own effect below once handleRestart is declared.
+  const { isConnected: walletConnected } = useAccount();
+  const wasConnectedRef = useRef(false);
   // Derived: umbrella muted state (both silenced) drives the emoji button
   const muted = !sfxEnabled && !bgmEnabled;
   const allUnlocked = unlockedIds.length >= 11;
@@ -258,6 +268,28 @@ export default function GameCanvas() {
     setGameOver(false);
     setFinalScore(0);
   };
+
+  // Disconnect watcher: when wallet transitions from connected → not,
+  // reset the engine and bounce back to splash. Depends only on
+  // walletConnected so setters (stable identity) don't need to be in
+  // the deps array. The ref update is the "was connected" memory —
+  // first mount with a cold wallet leaves it false and does nothing,
+  // matching the initial splash being shown already.
+  useEffect(() => {
+    if (walletConnected) {
+      wasConnectedRef.current = true;
+      return;
+    }
+    if (wasConnectedRef.current) {
+      console.log("[GameCanvas] wallet disconnected → returning to splash");
+      wasConnectedRef.current = false;
+      engineRef.current?.restart();
+      setGameOver(false);
+      setFinalScore(0);
+      setShowSplash(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [walletConnected]);
 
   // ── Dev handlers (thin pass-throughs to engine). Only invoked from the
   // DevPanel, which itself only mounts when useDevMode() returns true.

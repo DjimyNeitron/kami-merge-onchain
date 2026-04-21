@@ -48,6 +48,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider
+          locale="en-US"
           theme={darkTheme({
             accentColor: "#c8a04a", // warm gold — matches HUD + buttons
             accentColorForeground: "#1a1a2e",
@@ -55,6 +56,10 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
             fontStack: "system",
           })}
         >
+          {/* locale is pinned to en-US so the RainbowKit modal UI (labels,
+           * status messages, error text) always renders in English
+           * regardless of the browser's Accept-Language header. The rest
+           * of the app's user-facing strings are also hard-coded English. */}
           {children}
         </RainbowKitProvider>
       </QueryClientProvider>

@@ -1,22 +1,20 @@
 "use client";
 
 // SECURITY NOTES:
-// - Guest mode is fully offline: score stays in localStorage only,
-//   never leaves the device. No POST, no analytics, no phone-home.
-// - The wallet address is rendered only after `useAccount().isConnected`
-//   is true. Before that, `address` is `undefined` and we show the
-//   pre-connect state.
+// - Wallet connection is REQUIRED — there is no guest / offline mode.
+//   The splash gates all gameplay behind a connected wallet, and a
+//   mid-game disconnect bounces the player back here (see the
+//   wasConnectedRef effect in GameCanvas.tsx).
+// - All user-facing strings here are hard-coded English. RainbowKit's
+//   modal text is also pinned to 'en-US' in Web3Provider so the
+//   connect UX never flips to browser-detected Russian/Chinese/etc.
+// - The wallet address is rendered only after useAccount() reports
+//   both `isConnected` and a non-null `address`.
 // - No private key, mnemonic, or signing material ever touches this
-//   component. All wallet interaction goes through RainbowKit's
-//   ConnectButton / account modal, which are the audited entrypoints.
-// - Guest → connect switch simply resets local state; it doesn't
-//   leak any prior guest activity to the wallet flow.
-// - If the user disconnects mid-game, game play continues (engine
-//   doesn't know about wallets). At game-over time, Phase 3B will
-//   gate leaderboard submit on `isConnected` + a signed message, so
-//   a mid-game disconnect degrades gracefully to "score not saved".
+//   component. All wallet interaction is delegated to RainbowKit's
+//   ConnectButton, which is the audited entrypoint.
+// - See SECURITY_AUDIT_KAMI_MERGE.md for the full threat model.
 
-import { useState } from "react";
 import { useAccount, useDisconnect } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { YOKAI_CHAIN } from "@/config/yokai";
@@ -34,19 +32,8 @@ function formatAddress(addr: string) {
 export default function SplashScreen({ onStart, onOpenSettings }: Props) {
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
-  const [guestMode, setGuestMode] = useState(false);
 
-  // State selection — explicit so render below stays flat and easy to scan.
-  // State 1: user hasn't connected and hasn't opted into guest play.
-  // State 2: wallet connected (address available).
-  // State 3: user tapped "play as guest" (and not subsequently connected).
-  //
-  // Connected always wins over guestMode — if a wallet flips live while
-  // guestMode is set, we surface the welcome screen so the player sees
-  // their leaderboard path is back.
-  const inConnected = isConnected && !!address;
-  const inGuest = guestMode && !inConnected;
-  const inPreConnect = !inConnected && !inGuest;
+  const connected = isConnected && !!address;
 
   return (
     <div
@@ -88,40 +75,21 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
           ))}
         </div>
 
-        {/* State-dependent CTA block */}
+        {/* Two states only: disconnected → Connect Wallet.
+                            connected    → welcome + Tap to Start + Disconnect. */}
         <div className="mt-8 flex flex-col items-center gap-3 min-h-[140px]">
-          {inPreConnect && (
-            <>
-              <div className="scale-95">
-                <ConnectButton
-                  label="Connect Wallet"
-                  accountStatus="full"
-                  chainStatus="icon"
-                  showBalance={false}
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => setGuestMode(true)}
-                onTouchEnd={(e) => {
-                  e.preventDefault();
-                  setGuestMode(true);
-                }}
-                className="mt-1 flex flex-col items-center gap-0.5 px-3 py-2 rounded text-white/55 hover:text-white/85 transition-colors"
-                style={{ touchAction: "manipulation" }}
-                aria-label="Play without wallet"
-              >
-                <span className="kami-serif text-sm tracking-wider">
-                  or play as guest →
-                </span>
-                <span className="text-[0.65rem] tracking-widest opacity-70">
-                  score won&rsquo;t be saved
-                </span>
-              </button>
-            </>
+          {!connected && (
+            <div className="scale-95">
+              <ConnectButton
+                label="Connect Wallet"
+                accountStatus="full"
+                chainStatus="icon"
+                showBalance={false}
+              />
+            </div>
           )}
 
-          {inConnected && (
+          {connected && (
             <>
               <p className="kami-serif text-[#f5e6c8]/90 text-base sm:text-lg">
                 Welcome,{" "}
@@ -158,43 +126,6 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
                 style={{ touchAction: "manipulation" }}
               >
                 Disconnect
-              </button>
-            </>
-          )}
-
-          {inGuest && (
-            <>
-              <p className="kami-serif text-white/75 text-sm sm:text-base leading-relaxed max-w-[18rem]">
-                Playing as guest.
-                <br />
-                Your score won&rsquo;t be saved to the leaderboard.
-              </p>
-              <button
-                type="button"
-                onClick={onStart}
-                onTouchEnd={(e) => {
-                  e.preventDefault();
-                  onStart();
-                }}
-                className="splash-pulse kami-serif text-[#f5e6c8] text-lg sm:text-xl font-semibold tracking-wider px-8 py-3 rounded-md border border-[#c8a04a]/70 hover:bg-[#c8a04a]/10 transition-colors"
-                style={{
-                  touchAction: "manipulation",
-                  boxShadow: "0 0 14px rgba(200,160,74,0.18)",
-                }}
-              >
-                ~ Tap to Start ~
-              </button>
-              <button
-                type="button"
-                onClick={() => setGuestMode(false)}
-                onTouchEnd={(e) => {
-                  e.preventDefault();
-                  setGuestMode(false);
-                }}
-                className="text-white/45 hover:text-white/75 text-xs tracking-wider px-2 py-1"
-                style={{ touchAction: "manipulation" }}
-              >
-                ← Connect wallet instead
               </button>
             </>
           )}
