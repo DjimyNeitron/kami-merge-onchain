@@ -18,7 +18,7 @@ import {
 import { useDevMode } from "@/hooks/useDevMode";
 import DevPanel from "@/components/dev/DevPanel";
 import { useAccountModal } from "@rainbow-me/rainbowkit";
-import { useAccount, useChainId } from "wagmi";
+import { useAccount } from "wagmi";
 import { soneiumMinato } from "viem/chains";
 import { useDevSkipWallet } from "@/hooks/useDevSkipWallet";
 
@@ -100,11 +100,26 @@ export default function GameCanvas() {
   // short-circuits the watcher entirely — during bypass we don't care
   // what the real wallet or chain is doing. The hook returns false in
   // prod, so this path is inert outside of dev.
-  const { isConnected: walletConnected } = useAccount();
-  const chainId = useChainId();
+  // chainId comes from useAccount() — reflects the connector's actual
+  // reported chain, not wagmi's internal config.state fallback.
+  // See SplashScreen.tsx for the full write-up of the useChainId vs
+  // useAccount().chainId gotcha that motivated this switch.
+  const { isConnected: walletConnected, chainId } = useAccount();
   const devSkipWallet = useDevSkipWallet();
   const isValidSession = walletConnected && chainId === soneiumMinato.id;
   const wasValidRef = useRef(false);
+
+  // TEMP diagnostic — mirrors the splash's log so cross-referencing the
+  // two during testing is easy. Logs only when inputs change.
+  useEffect(() => {
+    console.log("[GameCanvas] session check", {
+      walletConnected,
+      chainId,
+      expected: soneiumMinato.id,
+      isValidSession,
+      devSkipWallet,
+    });
+  }, [walletConnected, chainId, isValidSession, devSkipWallet]);
   // Derived: umbrella muted state (both silenced) drives the emoji button
   const muted = !sfxEnabled && !bgmEnabled;
   const allUnlocked = unlockedIds.length >= 11;
@@ -646,9 +661,11 @@ export default function GameCanvas() {
  * territory — in which case the button stays disabled.
  */
 function WalletChip({ maxWidth }: { maxWidth: number }) {
-  const { address, isConnected } = useAccount();
+  // Read chainId from useAccount() not useChainId() so unsupported
+  // chains (e.g. Ethereum Mainnet) resolve to their real id and get
+  // filtered out by the `chainId !== soneiumMinato.id` guard below.
+  const { address, isConnected, chainId } = useAccount();
   const { openAccountModal } = useAccountModal();
-  const chainId = useChainId();
   const devSkipWallet = useDevSkipWallet();
 
   // Dev bypass: suppress the chip even if the user happens to also

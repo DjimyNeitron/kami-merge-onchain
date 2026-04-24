@@ -24,7 +24,8 @@
 //   ConnectButton, which is the audited entrypoint.
 // - See SECURITY_AUDIT_KAMI_MERGE.md for the full threat model.
 
-import { useAccount, useChainId, useDisconnect, useSwitchChain } from "wagmi";
+import { useEffect } from "react";
+import { useAccount, useDisconnect, useSwitchChain } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { soneiumMinato } from "viem/chains";
 import { YOKAI_CHAIN } from "@/config/yokai";
@@ -47,9 +48,16 @@ function formatAddress(addr: string) {
 }
 
 export default function SplashScreen({ onStart, onOpenSettings }: Props) {
-  const { address, isConnected } = useAccount();
+  // IMPORTANT: read chainId from useAccount(), NOT useChainId().
+  // wagmi 2.x useChainId() returns `config.state.chainId`, which stays
+  // pinned to a chain from the app's configured `chains` array — so
+  // when a wallet is on an unsupported chain (e.g. Ethereum Mainnet),
+  // useChainId() falls back to the first entry (Soneium Minato) and
+  // every `chainId === soneiumMinato.id` check silently passes.
+  // useAccount().chainId reflects the connector's actually reported
+  // chain id (can be undefined or any number outside the config).
+  const { address, chain, chainId, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
-  const chainId = useChainId();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
   // Dev-only bypass: when `?dev=1` is in the URL AND the DevPanel's
   // "Skip Wallet" toggle is on, `devSkipWallet` is true and we treat
@@ -65,6 +73,33 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
   const walletReady = walletConnected && onRequiredChain;
   const effectivelyConnected = walletReady || devSkipWallet;
   const wrongChain = walletConnected && !onRequiredChain && !devSkipWallet;
+
+  // TEMP diagnostic: kept in after verifying the useChainId→useAccount
+  // fix; will be removed once the chain-lock flow has been walked a few
+  // more times. Logs are gated behind the relevant state changes so the
+  // console isn't noisy on every re-render.
+  useEffect(() => {
+    console.log("[SplashScreen] chain debug", {
+      isConnected,
+      chainId,
+      chainName: chain?.name,
+      REQUIRED_CHAIN_ID,
+      onRequiredChain,
+      walletReady,
+      wrongChain,
+      devSkipWallet,
+      address,
+    });
+  }, [
+    isConnected,
+    chainId,
+    chain?.name,
+    onRequiredChain,
+    walletReady,
+    wrongChain,
+    devSkipWallet,
+    address,
+  ]);
 
   return (
     <div
@@ -141,7 +176,11 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
                 Kami Merge runs on{" "}
                 <strong className="text-[#c8a04a]">Soneium Minato</strong>.
                 <br />
-                Please switch networks to continue.
+                {chain
+                  ? `You're currently on ${chain.name}.`
+                  : chainId
+                  ? `Unsupported network (chain id ${chainId}).`
+                  : "Unsupported network detected."}
               </p>
               <button
                 type="button"

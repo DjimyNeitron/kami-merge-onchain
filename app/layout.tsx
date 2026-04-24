@@ -17,6 +17,15 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
   },
+  // Pair the modern standardised `mobile-web-app-capable` with the
+  // legacy `apple-mobile-web-app-capable`. Chrome / WebKit now emit a
+  // deprecation warning when only the Apple-prefixed tag is present;
+  // the new form is the spec'd replacement. Both are kept because
+  // older iOS versions still honour the Apple tag only.
+  other: {
+    "mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-capable": "yes",
+  },
 };
 
 export default function RootLayout({
@@ -32,7 +41,9 @@ export default function RootLayout({
           content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
         />
         <meta name="theme-color" content="#0f0f1e" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
+        {/* mobile-web-app-capable / apple-mobile-web-app-capable are
+         * emitted by metadata.other above so we get the modern tag
+         * plus the legacy iOS tag without duplicating them here. */}
       </head>
       <body className="min-h-full bg-[#0f0f1e] text-white">
         {/* Web3Provider is a client component nested inside this server
