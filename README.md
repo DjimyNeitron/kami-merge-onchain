@@ -46,7 +46,7 @@ Mini App).
 ### Install
 
 ```bash
-git clone https://github.com/meverik/kami-merge-onchain.git
+git clone https://github.com/DjimyNeitron/kami-merge-onchain.git
 cd kami-merge-onchain
 npm install
 ```
@@ -148,7 +148,7 @@ MIT — see [LICENSE](LICENSE).
 
 ## Credits
 
-Developed by [meverik](https://github.com/meverik).
+Developed by [DjimyNeitron](https://github.com/DjimyNeitron).
 Art direction: Japanese yokai mythology × modern painterly aesthetic.
 Audio: traditional Japanese instrument samples sourced under permissive
 licences (see individual file metadata).
