@@ -5,6 +5,18 @@ import { Web3Provider } from "@/components/Web3Provider";
 export const metadata: Metadata = {
   title: "Kami Merge 神マージ",
   description: "A Suika Game-style yokai merge puzzle.",
+  // app/favicon.ico handles the classic .ico via Next.js file-based
+  // convention. metadata.icons below adds the Apple touch icon and
+  // the two Android/PWA sizes (pulled from public/ which is served
+  // statically at the site root). All four images are Kodama the
+  // first-tier yokai — bright green, readable at 16px.
+  icons: {
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
 };
 
 export default function RootLayout({
