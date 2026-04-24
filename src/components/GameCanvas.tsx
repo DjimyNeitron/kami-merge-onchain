@@ -18,7 +18,8 @@ import {
 import { useDevMode } from "@/hooks/useDevMode";
 import DevPanel from "@/components/dev/DevPanel";
 import { useAccountModal } from "@rainbow-me/rainbowkit";
-import { useAccount } from "wagmi";
+import { useAccount, useChainId } from "wagmi";
+import { soneiumMinato } from "viem/chains";
 import { useDevSkipWallet } from "@/hooks/useDevSkipWallet";
 
 // Plain import — previous conditional `require(...)` gated by
@@ -87,21 +88,23 @@ export default function GameCanvas() {
   const [godMode, setGodMode] = useState(false);
   const isDev = useDevMode();
 
-  // Wallet state — the game requires a connected wallet. If the player
-  // disconnects at any point (wallet extension, Disconnect button in
-  // the HUD chip, RainbowKit modal), we bounce back to the splash so
-  // they can reconnect. wasConnectedRef distinguishes "never connected
-  // yet" (splash already shown, no-op) from "was connected, now isn't"
-  // (this is the case we need to handle). The disconnect handler
-  // lives in its own effect below once handleRestart is declared.
+  // Wallet state — the game requires a connected wallet on Soneium
+  // Minato. A "valid session" is the conjunction of both signals;
+  // losing either (disconnect, extension removed, chain switch away
+  // from Soneium) invalidates the session and bounces the player
+  // back to the splash. wasValidRef distinguishes "never valid yet"
+  // (splash already shown, no-op) from "was valid, now isn't", which
+  // is the only case we need to act on.
   //
   // The dev-only `useDevSkipWallet` gate (via ?dev=1 + DevPanel toggle)
   // short-circuits the watcher entirely — during bypass we don't care
-  // what the real wallet is doing. The hook returns false in prod, so
-  // this path is inert outside of dev.
+  // what the real wallet or chain is doing. The hook returns false in
+  // prod, so this path is inert outside of dev.
   const { isConnected: walletConnected } = useAccount();
+  const chainId = useChainId();
   const devSkipWallet = useDevSkipWallet();
-  const wasConnectedRef = useRef(false);
+  const isValidSession = walletConnected && chainId === soneiumMinato.id;
+  const wasValidRef = useRef(false);
   // Derived: umbrella muted state (both silenced) drives the emoji button
   const muted = !sfxEnabled && !bgmEnabled;
   const allUnlocked = unlockedIds.length >= 11;
@@ -276,13 +279,11 @@ export default function GameCanvas() {
     setFinalScore(0);
   };
 
-  // Disconnect watcher: when wallet transitions from connected → not,
-  // reset the engine and bounce back to splash. Depends on
-  // walletConnected + devSkipWallet so setters (stable identity)
-  // don't need to be in the deps array. The ref update is the
-  // "was connected" memory — first mount with a cold wallet leaves
-  // it false and does nothing, matching the initial splash being
-  // shown already.
+  // Session watcher: when (connected + correct chain) transitions to
+  // (not-both), reset the engine and bounce back to splash. The
+  // combined `isValidSession` signal catches every invalidation path
+  // we care about — wallet disconnect, extension yanked, and mid-game
+  // switch to another chain — through one deps entry.
   //
   // Dev bypass short-circuits the watcher and clears the memory. We
   // deliberately do NOT bounce when the player toggles bypass OFF —
@@ -290,23 +291,25 @@ export default function GameCanvas() {
   // to the splash they can refresh or use the Disconnect button.
   useEffect(() => {
     if (devSkipWallet) {
-      wasConnectedRef.current = false;
+      wasValidRef.current = false;
       return;
     }
-    if (walletConnected) {
-      wasConnectedRef.current = true;
+    if (isValidSession) {
+      wasValidRef.current = true;
       return;
     }
-    if (wasConnectedRef.current) {
-      console.log("[GameCanvas] wallet disconnected → returning to splash");
-      wasConnectedRef.current = false;
+    if (wasValidRef.current) {
+      console.log(
+        "[GameCanvas] session invalidated (disconnect or wrong chain) → splash"
+      );
+      wasValidRef.current = false;
       engineRef.current?.restart();
       setGameOver(false);
       setFinalScore(0);
       setShowSplash(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [walletConnected, devSkipWallet]);
+  }, [isValidSession, devSkipWallet]);
 
   // ── Dev handlers (thin pass-throughs to engine). Only invoked from the
   // DevPanel, which itself only mounts when useDevMode() returns true.
@@ -645,6 +648,7 @@ export default function GameCanvas() {
 function WalletChip({ maxWidth }: { maxWidth: number }) {
   const { address, isConnected } = useAccount();
   const { openAccountModal } = useAccountModal();
+  const chainId = useChainId();
   const devSkipWallet = useDevSkipWallet();
 
   // Dev bypass: suppress the chip even if the user happens to also
@@ -654,6 +658,12 @@ function WalletChip({ maxWidth }: { maxWidth: number }) {
   if (devSkipWallet) return null;
 
   if (!isConnected || !address) return null;
+
+  // Wrong-chain sessions never reach here in practice (the splash
+  // covers the HUD), but render defensively: a chip displaying an
+  // address while the wallet is on the wrong chain would be
+  // misleading, so we suppress it.
+  if (chainId !== soneiumMinato.id) return null;
 
   const short = `${address.slice(0, 6)}…${address.slice(-4)}`;
   const ready = !!openAccountModal;

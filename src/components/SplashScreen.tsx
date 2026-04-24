@@ -3,8 +3,11 @@
 // SECURITY NOTES:
 // - Wallet connection is REQUIRED for production players — there is
 //   no guest / offline mode. The splash gates all gameplay behind a
-//   connected wallet, and a mid-game disconnect bounces the player
-//   back here (see the wasConnectedRef effect in GameCanvas.tsx).
+//   connected wallet on the correct chain (Soneium Minato / 1946);
+//   a wrong-chain wallet is blocked with a Switch Network prompt and
+//   cannot reach the Tap-to-Start button. Mid-game disconnect OR
+//   chain-switch-away-from-Soneium both bounce the player back here
+//   (see the wasValidRef effect in GameCanvas.tsx).
 // - There is a dev-only wallet bypass (`?dev=1` + DevPanel "Skip
 //   Wallet" toggle). The `useDevSkipWallet` hook hard-gates on the
 //   URL flag before reading any storage, so this cannot be activated
@@ -21,11 +24,18 @@
 //   ConnectButton, which is the audited entrypoint.
 // - See SECURITY_AUDIT_KAMI_MERGE.md for the full threat model.
 
-import { useAccount, useDisconnect } from "wagmi";
+import { useAccount, useChainId, useDisconnect, useSwitchChain } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { soneiumMinato } from "viem/chains";
 import { YOKAI_CHAIN } from "@/config/yokai";
 import MonIcon from "@/components/icons/MonIcon";
 import { useDevSkipWallet } from "@/hooks/useDevSkipWallet";
+
+// Only chain accepted in Phase 3A/3B. Mainnet (soneium 1868) is registered
+// in wagmi so wallets that land there can prompt to switch back, but the
+// splash rejects it — players must be on testnet for leaderboard testing.
+// Phase 3C will add Base via the Farcaster Mini App SDK.
+const REQUIRED_CHAIN_ID = soneiumMinato.id; // 1946
 
 type Props = {
   onStart: () => void;
@@ -39,6 +49,8 @@ function formatAddress(addr: string) {
 export default function SplashScreen({ onStart, onOpenSettings }: Props) {
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
+  const chainId = useChainId();
+  const { switchChain, isPending: isSwitching } = useSwitchChain();
   // Dev-only bypass: when `?dev=1` is in the URL AND the DevPanel's
   // "Skip Wallet" toggle is on, `devSkipWallet` is true and we treat
   // the player as effectively connected without a real wallet. The
@@ -47,7 +59,12 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
   const devSkipWallet = useDevSkipWallet();
 
   const walletConnected = isConnected && !!address;
-  const effectivelyConnected = walletConnected || devSkipWallet;
+  const onRequiredChain = chainId === REQUIRED_CHAIN_ID;
+  // A real wallet only counts as "ready" when it's also on Soneium
+  // Minato. Wrong chain sessions get the warning state below.
+  const walletReady = walletConnected && onRequiredChain;
+  const effectivelyConnected = walletReady || devSkipWallet;
+  const wrongChain = walletConnected && !onRequiredChain && !devSkipWallet;
 
   return (
     <div
@@ -89,13 +106,15 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
           ))}
         </div>
 
-        {/* Two states + one dev-only variant:
-         *   !effectivelyConnected     → Connect Wallet CTA
-         *   walletConnected           → "Welcome, 0x1234…abcd" + Tap to Start + Disconnect
-         *   devSkipWallet (no wallet) → "🛠 Dev mode (no wallet)" + Tap to Start (no Disconnect)
+        {/* Three states + one dev-only variant:
+         *   !effectivelyConnected && !wrongChain
+         *                             → Connect Wallet CTA
+         *   wrongChain                → Wrong Network warning + Switch button
+         *   walletReady               → "Welcome, 0x1234…abcd" + Tap to Start + Disconnect
+         *   devSkipWallet (no wallet) → "🛠 Dev mode (no wallet)" + Tap to Start
          */}
         <div className="mt-8 flex flex-col items-center gap-3 min-h-[140px]">
-          {!effectivelyConnected && (
+          {!effectivelyConnected && !wrongChain && (
             <div className="scale-95">
               <ConnectButton
                 label="Connect Wallet"
@@ -106,9 +125,60 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
             </div>
           )}
 
+          {wrongChain && (
+            <div className="flex flex-col items-center gap-3 max-w-[22rem]">
+              <div
+                className="text-4xl leading-none"
+                style={{ color: "#e87d3e" }}
+                aria-hidden="true"
+              >
+                ⚠
+              </div>
+              <h2 className="kami-serif text-xl font-semibold tracking-wider text-[#c8a04a]">
+                Wrong Network
+              </h2>
+              <p className="kami-serif text-white/85 text-sm sm:text-base leading-relaxed text-center">
+                Kami Merge runs on{" "}
+                <strong className="text-[#c8a04a]">Soneium Minato</strong>.
+                <br />
+                Please switch networks to continue.
+              </p>
+              <button
+                type="button"
+                onClick={() =>
+                  switchChain({ chainId: REQUIRED_CHAIN_ID })
+                }
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  switchChain({ chainId: REQUIRED_CHAIN_ID });
+                }}
+                disabled={isSwitching}
+                className="splash-pulse kami-serif text-[#f5e6c8] text-base sm:text-lg font-semibold tracking-wider px-6 py-2.5 rounded-md border border-[#c8a04a]/70 hover:bg-[#c8a04a]/10 transition-colors disabled:opacity-60 disabled:animation-none disabled:cursor-wait"
+                style={{
+                  touchAction: "manipulation",
+                  boxShadow: "0 0 14px rgba(200,160,74,0.18)",
+                }}
+              >
+                {isSwitching ? "Switching…" : "Switch to Soneium Minato"}
+              </button>
+              <button
+                type="button"
+                onClick={() => disconnect()}
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  disconnect();
+                }}
+                className="text-white/45 hover:text-white/75 text-xs tracking-wider px-2 py-1"
+                style={{ touchAction: "manipulation" }}
+              >
+                Disconnect and try another wallet
+              </button>
+            </div>
+          )}
+
           {effectivelyConnected && (
             <>
-              {walletConnected ? (
+              {walletReady ? (
                 <p className="kami-serif text-[#f5e6c8]/90 text-base sm:text-lg">
                   Welcome,{" "}
                   <span
