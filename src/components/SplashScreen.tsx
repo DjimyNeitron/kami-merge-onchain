@@ -8,6 +8,13 @@
 //   cannot reach the Tap-to-Start button. Mid-game disconnect OR
 //   chain-switch-away-from-Soneium both bounce the player back here
 //   (see the wasValidRef effect in GameCanvas.tsx).
+// - Mini App mode: when running inside a Farcaster / Startale-App /
+//   Warpcast host (detected by useMiniAppContext), the host owns
+//   wallet + chain. We auto-connect via the Mini App connector and
+//   trust the host to present the correct chain — chain-detection
+//   branches collapse to no-ops in this path. No tap-through path
+//   bypasses host identity; if the host disconnects us, we fall
+//   straight back to walletConnected = false and the loader shows.
 // - There is a dev-only wallet bypass (`?dev=1` + DevPanel "Skip
 //   Wallet" toggle). The `useDevSkipWallet` hook hard-gates on the
 //   URL flag before reading any storage, so this cannot be activated
@@ -32,6 +39,7 @@ import { YOKAI_CHAIN } from "@/config/yokai";
 import MonIcon from "@/components/icons/MonIcon";
 import { useDevSkipWallet } from "@/hooks/useDevSkipWallet";
 import { useActualChainId } from "@/hooks/useActualChainId";
+import { useMiniAppContext } from "@/hooks/useMiniAppContext";
 
 // Only chain accepted in Phase 3A/3B. Mainnet (soneium 1868) is registered
 // in wagmi so wallets that land there can prompt to switch back, but the
@@ -63,6 +71,10 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
   const actualChainId = useActualChainId();
   const { disconnect } = useDisconnect();
   const { switchChainAsync, isPending: isSwitching } = useSwitchChain();
+  // Mini App probe — undefined while in flight, true inside a Farcaster
+  // / Startale-App / Warpcast host, false for standalone web. The hook
+  // also fires its own connect() when host is detected.
+  const { isMiniApp, isReady: miniAppReady } = useMiniAppContext();
 
   /**
    * Switch to Soneium Minato. If the wallet doesn't know about the
@@ -123,24 +135,46 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
   const walletConnected = isConnected && !!address;
   const chainKnown = actualChainId !== undefined;
   const onRequiredChain = actualChainId === REQUIRED_CHAIN_ID;
-  // Loading state: connected but the EIP-1193 round-trip hasn't landed
-  // yet. Without this gate the wrong-chain branch would briefly render
-  // (because `actualChainId !== REQUIRED` evaluates true while
-  // chainKnown is still false). Gating Welcome on chainKnown also
-  // closes a race where the connect handshake completes before
-  // chainChanged fires.
-  const chainLoading = walletConnected && !chainKnown && !devSkipWallet;
-  // A real wallet only counts as "ready" when it's connected, the
-  // chainId has actually been read, and that chain is Soneium Minato.
-  const walletReady = walletConnected && chainKnown && onRequiredChain;
+  // Mini App hosts manage chain switching themselves and only ever
+  // present the correct chain to the embedded app, so the EIP-1193
+  // chain plumbing is irrelevant in that path. Gate every chain-side
+  // check on `!isMiniApp` so:
+  //   - chainLoading        never fires inside a host (no spinner)
+  //   - wrongChain          never fires inside a host (impossible)
+  //   - walletReady         passes as soon as wagmi reports isConnected
+  //   - effectivelyConnected resolves Welcome-state quickly
+  // The standalone path (isMiniApp === false) still goes through the
+  // full 4-state flow exactly as before.
+  const inMiniApp = isMiniApp === true;
+  const chainLoading =
+    !inMiniApp && walletConnected && !chainKnown && !devSkipWallet;
+  // A real wallet only counts as "ready" when it's connected and on
+  // Soneium Minato — except in a Mini App host, where the host
+  // guarantees the correct chain. We accept any wagmi-connected state
+  // as ready in that environment.
+  const walletReady = inMiniApp
+    ? walletConnected
+    : walletConnected && chainKnown && onRequiredChain;
   const effectivelyConnected = walletReady || devSkipWallet;
   const wrongChain =
-    walletConnected && chainKnown && !onRequiredChain && !devSkipWallet;
+    !inMiniApp &&
+    walletConnected &&
+    chainKnown &&
+    !onRequiredChain &&
+    !devSkipWallet;
+  // Probing state: the SDK promise hasn't resolved yet. We don't know
+  // whether to show "Connect Wallet" (would confuse a Mini App user
+  // with no wallet UX) or skip straight to Welcome, so render a quiet
+  // loader instead.
+  const probing = isMiniApp === undefined || !miniAppReady;
 
   // TEMP diagnostic — logs only on input change. Kept in for now while
-  // the chain-lock flow stabilises; remove on a future pass.
+  // the chain-lock + Mini App flows stabilise; remove on a future pass.
   useEffect(() => {
-    console.log("[SplashScreen] chain debug", {
+    console.log("[SplashScreen] state", {
+      isMiniApp,
+      miniAppReady,
+      probing,
       isConnected,
       actualChainId,
       REQUIRED_CHAIN_ID,
@@ -152,6 +186,9 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
       address,
     });
   }, [
+    isMiniApp,
+    miniAppReady,
+    probing,
     isConnected,
     actualChainId,
     chainLoading,
@@ -202,24 +239,51 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
           ))}
         </div>
 
-        {/* Four states + one dev-only variant:
-         *   !walletConnected && !devSkipWallet → Connect Wallet CTA
-         *   chainLoading                       → "Verifying network…" interstitial
-         *   wrongChain                         → Wrong Network warning + Switch button
+        {/* Render branches (mutually exclusive):
+         *   probing                            → quiet loader (Mini App probe in flight)
+         *   inMiniApp && !walletConnected      → "Loading host wallet…" (auto-connect pending)
+         *   !inMiniApp && !walletConnected && !devSkipWallet
+         *                                      → Connect Wallet CTA (standalone web only)
+         *   chainLoading                       → "Verifying network…" interstitial (standalone)
+         *   wrongChain                         → Wrong Network warning + Switch button (standalone)
          *   walletReady                        → "Welcome, 0x1234…abcd" + Tap + Disconnect
          *   devSkipWallet (no wallet)          → "🛠 Dev mode (no wallet)" + Tap
          */}
         <div className="mt-8 flex flex-col items-center gap-3 min-h-[140px]">
-          {!walletConnected && !devSkipWallet && (
-            <div className="scale-95">
-              <ConnectButton
-                label="Connect Wallet"
-                accountStatus="full"
-                chainStatus="icon"
-                showBalance={false}
-              />
-            </div>
+          {probing && !devSkipWallet && (
+            <p
+              className="kami-serif text-white/70 text-sm tracking-wider text-center splash-pulse"
+              aria-live="polite"
+            >
+              Loading…
+            </p>
           )}
+
+          {!probing &&
+            inMiniApp &&
+            !walletConnected &&
+            !devSkipWallet && (
+              <p
+                className="kami-serif text-white/70 text-sm tracking-wider text-center splash-pulse"
+                aria-live="polite"
+              >
+                Loading host wallet…
+              </p>
+            )}
+
+          {!probing &&
+            !inMiniApp &&
+            !walletConnected &&
+            !devSkipWallet && (
+              <div className="scale-95">
+                <ConnectButton
+                  label="Connect Wallet"
+                  accountStatus="full"
+                  chainStatus="icon"
+                  showBalance={false}
+                />
+              </div>
+            )}
 
           {chainLoading && (
             <p
