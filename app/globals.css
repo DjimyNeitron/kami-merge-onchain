@@ -87,6 +87,22 @@ button {
   transform: scale(0.97);
 }
 
+/* ── Track arrow buttons — borderless icon-only chevrons in Settings ──── */
+/* No hover background or border (intentional — design decision in the     */
+/* compact track-picker strip). Hover dims to 0.6, active to 0.4. The      */
+/* `:disabled` rule lets the parent strip's opacity-0.4 wrapper carry the  */
+/* disabled visual; we just reset cursor + lock the opacity so :hover      */
+/* doesn't bring the button back to 1.0 while disabled.                    */
+.track-arrow-btn:hover:not(:disabled) {
+  opacity: 0.6;
+}
+.track-arrow-btn:active:not(:disabled) {
+  opacity: 0.4;
+}
+.track-arrow-btn:disabled {
+  cursor: not-allowed;
+}
+
 /* ── Yokai detail card — graceful enter + exit ───────────────────────── */
 /* Card rises 8px and scales 0.92 → 1 on enter (420ms after 60ms delay). */
 /* Backdrop fades first (360ms) so the scene "prepares" before the card  */

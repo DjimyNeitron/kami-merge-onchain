@@ -146,23 +146,52 @@ export default function Settings({
                     BGM_TRACKS[(safeIdx + 1) % BGM_TRACKS.length];
                   onSelectTrack(next.id);
                 };
+                // Borderless icon button — pure double-triangle in the
+                // modal's brown ink, no frame / fill. 8px padding around
+                // a 20px SVG keeps the tap target ~36x36 for mobile,
+                // matching the previous framed buttons. Hover dims to
+                // 0.6, active to 0.4; disabled inherits the 0.4 from
+                // the strip wrapper above.
                 const arrowBtnStyle: React.CSSProperties = {
-                  width: 36,
-                  height: 36,
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  borderRadius: 6,
-                  background: bgmEnabled
-                    ? "rgba(200, 168, 78, 0.10)"
-                    : "transparent",
-                  border: "1px solid rgba(138, 111, 40, 0.45)",
+                  padding: 8,
+                  background: "transparent",
+                  border: "none",
                   color: "#3d2510",
-                  fontSize: 22,
-                  lineHeight: 1,
+                  lineHeight: 0,
                   cursor: bgmEnabled ? "pointer" : "not-allowed",
                   touchAction: "manipulation",
+                  transition: "opacity 150ms",
                 };
+                // Two-triangle "rewind" mark. fill="currentColor" so
+                // the surrounding button's color drives ink colour and
+                // disabled-state dimming flows through naturally.
+                const PrevIcon = (
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path d="M11 5L4 12L11 19V5Z" />
+                    <path d="M20 5L13 12L20 19V5Z" />
+                  </svg>
+                );
+                const NextIcon = (
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path d="M13 5L20 12L13 19V5Z" />
+                    <path d="M4 5L11 12L4 19V5Z" />
+                  </svg>
+                );
                 return (
                   <div
                     className="px-1 pt-0.5 pb-1"
@@ -187,9 +216,10 @@ export default function Settings({
                         disabled={!bgmEnabled}
                         aria-label="Previous track"
                         title="Previous track"
+                        className="track-arrow-btn"
                         style={arrowBtnStyle}
                       >
-                        <span aria-hidden="true">‹</span>
+                        {PrevIcon}
                       </button>
                       <span
                         className="flex-1 text-center text-sm text-[#3d2510] leading-tight truncate"
@@ -212,9 +242,10 @@ export default function Settings({
                         disabled={!bgmEnabled}
                         aria-label="Next track"
                         title="Next track"
+                        className="track-arrow-btn"
                         style={arrowBtnStyle}
                       >
-                        <span aria-hidden="true">›</span>
+                        {NextIcon}
                       </button>
                     </div>
                   </div>
