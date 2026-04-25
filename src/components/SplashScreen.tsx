@@ -3,7 +3,7 @@
 // SECURITY NOTES:
 // - Wallet connection is REQUIRED for production players — there is
 //   no guest / offline mode. The splash gates all gameplay behind a
-//   connected wallet on the correct chain (Soneium Minato / 1946);
+//   connected wallet on the correct chain (Soneium mainnet / 1868);
 //   a wrong-chain wallet is blocked with a Switch Network prompt and
 //   cannot reach the Tap-to-Start button. Mid-game disconnect OR
 //   chain-switch-away-from-Soneium both bounce the player back here
@@ -34,18 +34,19 @@
 import { useEffect } from "react";
 import { useAccount, useDisconnect, useSwitchChain } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { soneiumMinato } from "viem/chains";
+import { soneium } from "viem/chains";
 import { YOKAI_CHAIN } from "@/config/yokai";
 import MonIcon from "@/components/icons/MonIcon";
 import { useDevSkipWallet } from "@/hooks/useDevSkipWallet";
 import { useActualChainId } from "@/hooks/useActualChainId";
 import { useMiniAppContext } from "@/hooks/useMiniAppContext";
 
-// Only chain accepted in Phase 3A/3B. Mainnet (soneium 1868) is registered
-// in wagmi so wallets that land there can prompt to switch back, but the
-// splash rejects it — players must be on testnet for leaderboard testing.
-// Phase 3C will add Base via the Farcaster Mini App SDK.
-const REQUIRED_CHAIN_ID = soneiumMinato.id; // 1946
+// Only chain accepted by the MVP. We previously targeted Soneium Minato
+// (testnet, 1946), but the Farcaster preview wallet does not support
+// it — every Mini App test session errored with "Unsupported chainId
+// 1946". Switching to Soneium mainnet (1868) for Phase 3C onwards;
+// gameplay testing uses a small dev-funded mainnet wallet.
+const REQUIRED_CHAIN_ID = soneium.id; // 1868
 
 type Props = {
   onStart: () => void;
@@ -60,9 +61,9 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
   // CRITICAL: chainId comes from useActualChainId() (EIP-1193 direct
   // read), NOT from wagmi's useChainId() / useAccount().chainId. Both
   // wagmi accessors silently return the configured default chain
-  // (Soneium Minato, 1946) when the wallet is on a chain not in
+  // (Soneium mainnet, 1868) when the wallet is on a chain not in
   // `config.chains` — e.g. MetaMask on Ethereum Mainnet still reads
-  // as 1946 in wagmi state, defeating any wrong-chain check. The
+  // as 1868 in wagmi state, defeating any wrong-chain check. The
   // hook bypasses wagmi state and asks the connector's provider
   // directly. Returns `undefined` until the first round-trip
   // resolves, which we surface as a "Verifying network…" interstitial
@@ -77,13 +78,13 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
   const { isMiniApp, isReady: miniAppReady } = useMiniAppContext();
 
   /**
-   * Switch to Soneium Minato. If the wallet doesn't know about the
+   * Switch to Soneium mainnet. If the wallet doesn't know about the
    * chain yet (MetaMask returns code 4902 / "Unrecognized chain ID"
    * when asked to switch to a chain it has never seen), we follow up
-   * with `wallet_addEthereumChain` using the full Soneium Minato
-   * parameters. After a successful add, MetaMask switches into the
-   * new chain automatically and `chainChanged` fires, so the splash
-   * advances to Welcome on the next render.
+   * with `wallet_addEthereumChain` using the full Soneium parameters.
+   * After a successful add, MetaMask switches into the new chain
+   * automatically and `chainChanged` fires, so the splash advances
+   * to Welcome on the next render.
    */
   const handleSwitchChain = async () => {
     try {
@@ -109,11 +110,11 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
           method: "wallet_addEthereumChain",
           params: [
             {
-              chainId: "0x" + REQUIRED_CHAIN_ID.toString(16), // 0x79a
-              chainName: "Soneium Minato Testnet",
+              chainId: "0x" + REQUIRED_CHAIN_ID.toString(16), // 0x74c
+              chainName: "Soneium",
               nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-              rpcUrls: ["https://rpc.minato.soneium.org"],
-              blockExplorerUrls: ["https://soneium-minato.blockscout.com"],
+              rpcUrls: ["https://rpc.soneium.org"],
+              blockExplorerUrls: ["https://soneium.blockscout.com"],
             },
           ],
         });
@@ -149,7 +150,7 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
   const chainLoading =
     !inMiniApp && walletConnected && !chainKnown && !devSkipWallet;
   // A real wallet only counts as "ready" when it's connected and on
-  // Soneium Minato — except in a Mini App host, where the host
+  // Soneium mainnet — except in a Mini App host, where the host
   // guarantees the correct chain. We accept any wagmi-connected state
   // as ready in that environment.
   const walletReady = inMiniApp
@@ -308,7 +309,7 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
               </h2>
               <p className="kami-serif text-white/85 text-sm sm:text-base leading-relaxed text-center">
                 Kami Merge runs on{" "}
-                <strong className="text-[#c8a04a]">Soneium Minato</strong>.
+                <strong className="text-[#c8a04a]">Soneium</strong>.
                 <br />
                 You&rsquo;re currently on chain ID {actualChainId}.
               </p>
@@ -326,7 +327,7 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
                   boxShadow: "0 0 14px rgba(200,160,74,0.18)",
                 }}
               >
-                {isSwitching ? "Switching…" : "Switch to Soneium Minato"}
+                {isSwitching ? "Switching…" : "Switch to Soneium"}
               </button>
               <button
                 type="button"

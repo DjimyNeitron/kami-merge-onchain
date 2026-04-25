@@ -1,9 +1,14 @@
 // wagmi / RainbowKit config for Soneium.
 //
-// Two chains registered:
-//   - soneiumMinato (testnet, id 1946)  — default / primary during Phase 3
-//   - soneium       (mainnet, id 1868)  — available so wallets that land
-//                                          there can prompt to switch back
+// One chain registered:
+//   - soneium (mainnet, id 1868) — required chain for the MVP.
+//
+// We dropped Soneium Minato (testnet, id 1946) when we discovered the
+// Farcaster preview wallet (Warpcast / Startale-App) does not support
+// it ("RpcResponse.InternalError: Unsupported chainId 1946"). Mainnet
+// is supported by every Farcaster-compatible wallet, so the Mini App
+// path works out of the box. A small dev wallet funded with mainnet
+// ETH covers our smoke-test needs.
 //
 // Wallet list is explicit (two named groups) rather than RainbowKit's
 // default "popular" auto-list. This gives a stable, curated set of
@@ -33,7 +38,7 @@ import {
   zerionWallet,
 } from "@rainbow-me/rainbowkit/wallets";
 import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
-import { soneiumMinato, soneium } from "viem/chains";
+import { soneium } from "viem/chains";
 import { createConfig, http } from "wagmi";
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
@@ -78,9 +83,8 @@ const rainbowKitConnectors = connectorsForWallets(
 // and stays dormant — RainbowKit handles the rest.
 export const wagmiConfig = createConfig({
   connectors: [farcasterMiniApp(), ...rainbowKitConnectors],
-  chains: [soneiumMinato, soneium],
+  chains: [soneium],
   transports: {
-    [soneiumMinato.id]: http("https://rpc.minato.soneium.org"),
     [soneium.id]: http("https://rpc.soneium.org"),
   },
   ssr: true,

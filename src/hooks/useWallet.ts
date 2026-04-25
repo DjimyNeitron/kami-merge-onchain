@@ -6,18 +6,18 @@
 // Phase 3C (Farcaster MiniApp SDK) may add `fid` alongside `address`.
 
 import { useAccount, useChainId, useSwitchChain } from "wagmi";
-import { soneiumMinato } from "viem/chains";
+import { soneium } from "viem/chains";
 
 export function useWallet() {
   const { address, isConnected, isConnecting } = useAccount();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
 
-  const isOnSoneium = chainId === soneiumMinato.id;
+  const isOnSoneium = chainId === soneium.id;
 
   const switchToSoneium = () => {
-    if (chainId !== soneiumMinato.id) {
-      switchChain({ chainId: soneiumMinato.id });
+    if (chainId !== soneium.id) {
+      switchChain({ chainId: soneium.id });
     }
   };
 

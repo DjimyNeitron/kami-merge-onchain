@@ -19,7 +19,7 @@ import { useDevMode } from "@/hooks/useDevMode";
 import DevPanel from "@/components/dev/DevPanel";
 import { useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount } from "wagmi";
-import { soneiumMinato } from "viem/chains";
+import { soneium } from "viem/chains";
 import { useDevSkipWallet } from "@/hooks/useDevSkipWallet";
 import { useActualChainId } from "@/hooks/useActualChainId";
 
@@ -90,7 +90,7 @@ export default function GameCanvas() {
   const isDev = useDevMode();
 
   // Wallet state — the game requires a connected wallet on Soneium
-  // Minato. A "valid session" is the conjunction of both signals;
+  // mainnet. A "valid session" is the conjunction of both signals;
   // losing either (disconnect, extension removed, chain switch away
   // from Soneium) invalidates the session and bounces the player
   // back to the splash. wasValidRef distinguishes "never valid yet"
@@ -111,7 +111,7 @@ export default function GameCanvas() {
   const actualChainId = useActualChainId();
   const devSkipWallet = useDevSkipWallet();
   const isValidSession =
-    walletConnected && actualChainId === soneiumMinato.id;
+    walletConnected && actualChainId === soneium.id;
   const wasValidRef = useRef(false);
 
   // TEMP diagnostic — mirrors the splash's log so cross-referencing the
@@ -120,7 +120,7 @@ export default function GameCanvas() {
     console.log("[GameCanvas] session check", {
       walletConnected,
       actualChainId,
-      expected: soneiumMinato.id,
+      expected: soneium.id,
       isValidSession,
       devSkipWallet,
     });
@@ -688,7 +688,7 @@ function WalletChip({ maxWidth }: { maxWidth: number }) {
   // address while the wallet is on the wrong chain would be
   // misleading, so we suppress it. Also covers the brief window
   // before the EIP-1193 round-trip lands (actualChainId undefined).
-  if (actualChainId !== soneiumMinato.id) return null;
+  if (actualChainId !== soneium.id) return null;
 
   const short = `${address.slice(0, 6)}…${address.slice(-4)}`;
   const ready = !!openAccountModal;

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useConnect } from "wagmi";
 import { sdk } from "@farcaster/miniapp-sdk";
 import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
-import { soneiumMinato } from "viem/chains";
+import { soneium } from "viem/chains";
 
 /**
  * Detects whether the app is running inside a Farcaster Mini App host
@@ -14,7 +14,7 @@ import { soneiumMinato } from "viem/chains";
  * The detection is the @farcaster/miniapp-sdk's `sdk.context` promise:
  *   - Resolves with a non-null context object when running inside a
  *     Mini App host. We mark `isMiniApp = true`, fire `connect()` with
- *     the Farcaster connector pre-targeted at Soneium Minato, then
+ *     the Farcaster connector pre-targeted at Soneium mainnet, then
  *     hand off to the host with `sdk.actions.ready()` so it can hide
  *     its splash screen.
  *   - Resolves with `null` (or rejects) when running standalone. We
@@ -52,11 +52,13 @@ export function useMiniAppContext() {
           console.log("[useMiniAppContext] Mini App detected", ctx);
           setIsMiniApp(true);
           // Auto-connect through the host wallet, pre-targeting
-          // Soneium Minato so wagmi's chainId state lines up with
-          // gameplay expectations from the first render.
+          // Soneium mainnet so wagmi's chainId state lines up with
+          // gameplay expectations from the first render. (Mainnet
+          // because the Farcaster preview wallet does not currently
+          // support Soneium Minato.)
           connect({
             connector: farcasterMiniApp(),
-            chainId: soneiumMinato.id,
+            chainId: soneium.id,
           });
           // ready() tells the host to hide its own splash. We don't
           // gate on connect() resolving because ready() is purely a

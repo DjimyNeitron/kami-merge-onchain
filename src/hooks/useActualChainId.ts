@@ -13,8 +13,8 @@ import { useAccount } from "wagmi";
  * the configured chains. When a wallet is connected on an unsupported
  * chain (e.g. MetaMask on Ethereum Mainnet while the app only
  * registers Soneium), wagmi keeps returning the *configured* default
- * chain (1946 in our case) instead of the wallet's real chain (1).
- * That makes a `chainId === soneiumMinato.id` check silently lie. This
+ * chain (1868 in our case) instead of the wallet's real chain (1).
+ * That makes a `chainId === soneium.id` check silently lie. This
  * hook bypasses wagmi state and asks the connector's EIP-1193 provider
  * directly via `eth_chainId`, then keeps the value in sync with the
  * `chainChanged` event.
