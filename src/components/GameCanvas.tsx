@@ -638,10 +638,16 @@ export default function GameCanvas() {
         />
       )}
 
-      {/* Dev-test overlay — gated at runtime by `?dev=1` URL param via
-       * useDevMode(). Plain import means the module is bundled in prod
-       * but never renders without the URL flag. */}
-      {isDev && (
+      {/* Dev-test overlay — double-gated:
+       *   1. `process.env.NODE_ENV === 'development'` is statically
+       *      replaced by Next.js / Turbopack at build time, so prod
+       *      bundles dead-code-eliminate this whole branch and the
+       *      DEV chip is unreachable even if a URL gets shared with
+       *      `?dev=1` appended.
+       *   2. `isDev` (?dev=1 URL flag via useDevMode) keeps local dev
+       *      opt-in: the panel is hidden by default during everyday
+       *      dev work and surfaces only when explicitly requested. */}
+      {process.env.NODE_ENV === "development" && isDev && (
         <DevPanel
           onSpawn={handleDevSpawn}
           onClearField={handleDevClearField}
