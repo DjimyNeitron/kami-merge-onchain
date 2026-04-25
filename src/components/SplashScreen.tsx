@@ -31,6 +31,7 @@ import { soneiumMinato } from "viem/chains";
 import { YOKAI_CHAIN } from "@/config/yokai";
 import MonIcon from "@/components/icons/MonIcon";
 import { useDevSkipWallet } from "@/hooks/useDevSkipWallet";
+import { useActualChainId } from "@/hooks/useActualChainId";
 
 // Only chain accepted in Phase 3A/3B. Mainnet (soneium 1868) is registered
 // in wagmi so wallets that land there can prompt to switch back, but the
@@ -48,15 +49,18 @@ function formatAddress(addr: string) {
 }
 
 export default function SplashScreen({ onStart, onOpenSettings }: Props) {
-  // IMPORTANT: read chainId from useAccount(), NOT useChainId().
-  // wagmi 2.x useChainId() returns `config.state.chainId`, which stays
-  // pinned to a chain from the app's configured `chains` array — so
-  // when a wallet is on an unsupported chain (e.g. Ethereum Mainnet),
-  // useChainId() falls back to the first entry (Soneium Minato) and
-  // every `chainId === soneiumMinato.id` check silently passes.
-  // useAccount().chainId reflects the connector's actually reported
-  // chain id (can be undefined or any number outside the config).
-  const { address, chain, chainId, isConnected } = useAccount();
+  // CRITICAL: chainId comes from useActualChainId() (EIP-1193 direct
+  // read), NOT from wagmi's useChainId() / useAccount().chainId. Both
+  // wagmi accessors silently return the configured default chain
+  // (Soneium Minato, 1946) when the wallet is on a chain not in
+  // `config.chains` — e.g. MetaMask on Ethereum Mainnet still reads
+  // as 1946 in wagmi state, defeating any wrong-chain check. The
+  // hook bypasses wagmi state and asks the connector's provider
+  // directly. Returns `undefined` until the first round-trip
+  // resolves, which we surface as a "Verifying network…" interstitial
+  // so the player never sees a flash of "Welcome" before the check.
+  const { address, isConnected } = useAccount();
+  const actualChainId = useActualChainId();
   const { disconnect } = useDisconnect();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
   // Dev-only bypass: when `?dev=1` is in the URL AND the DevPanel's
@@ -67,23 +71,30 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
   const devSkipWallet = useDevSkipWallet();
 
   const walletConnected = isConnected && !!address;
-  const onRequiredChain = chainId === REQUIRED_CHAIN_ID;
-  // A real wallet only counts as "ready" when it's also on Soneium
-  // Minato. Wrong chain sessions get the warning state below.
-  const walletReady = walletConnected && onRequiredChain;
+  const chainKnown = actualChainId !== undefined;
+  const onRequiredChain = actualChainId === REQUIRED_CHAIN_ID;
+  // Loading state: connected but the EIP-1193 round-trip hasn't landed
+  // yet. Without this gate the wrong-chain branch would briefly render
+  // (because `actualChainId !== REQUIRED` evaluates true while
+  // chainKnown is still false). Gating Welcome on chainKnown also
+  // closes a race where the connect handshake completes before
+  // chainChanged fires.
+  const chainLoading = walletConnected && !chainKnown && !devSkipWallet;
+  // A real wallet only counts as "ready" when it's connected, the
+  // chainId has actually been read, and that chain is Soneium Minato.
+  const walletReady = walletConnected && chainKnown && onRequiredChain;
   const effectivelyConnected = walletReady || devSkipWallet;
-  const wrongChain = walletConnected && !onRequiredChain && !devSkipWallet;
+  const wrongChain =
+    walletConnected && chainKnown && !onRequiredChain && !devSkipWallet;
 
-  // TEMP diagnostic: kept in after verifying the useChainId→useAccount
-  // fix; will be removed once the chain-lock flow has been walked a few
-  // more times. Logs are gated behind the relevant state changes so the
-  // console isn't noisy on every re-render.
+  // TEMP diagnostic — logs only on input change. Kept in for now while
+  // the chain-lock flow stabilises; remove on a future pass.
   useEffect(() => {
     console.log("[SplashScreen] chain debug", {
       isConnected,
-      chainId,
-      chainName: chain?.name,
+      actualChainId,
       REQUIRED_CHAIN_ID,
+      chainLoading,
       onRequiredChain,
       walletReady,
       wrongChain,
@@ -92,8 +103,8 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
     });
   }, [
     isConnected,
-    chainId,
-    chain?.name,
+    actualChainId,
+    chainLoading,
     onRequiredChain,
     walletReady,
     wrongChain,
@@ -141,15 +152,15 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
           ))}
         </div>
 
-        {/* Three states + one dev-only variant:
-         *   !effectivelyConnected && !wrongChain
-         *                             → Connect Wallet CTA
-         *   wrongChain                → Wrong Network warning + Switch button
-         *   walletReady               → "Welcome, 0x1234…abcd" + Tap to Start + Disconnect
-         *   devSkipWallet (no wallet) → "🛠 Dev mode (no wallet)" + Tap to Start
+        {/* Four states + one dev-only variant:
+         *   !walletConnected && !devSkipWallet → Connect Wallet CTA
+         *   chainLoading                       → "Verifying network…" interstitial
+         *   wrongChain                         → Wrong Network warning + Switch button
+         *   walletReady                        → "Welcome, 0x1234…abcd" + Tap + Disconnect
+         *   devSkipWallet (no wallet)          → "🛠 Dev mode (no wallet)" + Tap
          */}
         <div className="mt-8 flex flex-col items-center gap-3 min-h-[140px]">
-          {!effectivelyConnected && !wrongChain && (
+          {!walletConnected && !devSkipWallet && (
             <div className="scale-95">
               <ConnectButton
                 label="Connect Wallet"
@@ -158,6 +169,15 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
                 showBalance={false}
               />
             </div>
+          )}
+
+          {chainLoading && (
+            <p
+              className="kami-serif text-white/70 text-sm tracking-wider text-center splash-pulse"
+              aria-live="polite"
+            >
+              Verifying network…
+            </p>
           )}
 
           {wrongChain && (
@@ -176,11 +196,7 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
                 Kami Merge runs on{" "}
                 <strong className="text-[#c8a04a]">Soneium Minato</strong>.
                 <br />
-                {chain
-                  ? `You're currently on ${chain.name}.`
-                  : chainId
-                  ? `Unsupported network (chain id ${chainId}).`
-                  : "Unsupported network detected."}
+                You&rsquo;re currently on chain ID {actualChainId}.
               </p>
               <button
                 type="button"

@@ -21,6 +21,7 @@ import { useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount } from "wagmi";
 import { soneiumMinato } from "viem/chains";
 import { useDevSkipWallet } from "@/hooks/useDevSkipWallet";
+import { useActualChainId } from "@/hooks/useActualChainId";
 
 // Plain import — previous conditional `require(...)` gated by
 // `process.env.NODE_ENV` broke at browser runtime (Turbopack didn't
@@ -100,13 +101,17 @@ export default function GameCanvas() {
   // short-circuits the watcher entirely — during bypass we don't care
   // what the real wallet or chain is doing. The hook returns false in
   // prod, so this path is inert outside of dev.
-  // chainId comes from useAccount() — reflects the connector's actual
-  // reported chain, not wagmi's internal config.state fallback.
-  // See SplashScreen.tsx for the full write-up of the useChainId vs
-  // useAccount().chainId gotcha that motivated this switch.
-  const { isConnected: walletConnected, chainId } = useAccount();
+  // chainId comes from useActualChainId() (EIP-1193 direct read), NOT
+  // from wagmi's useChainId() / useAccount().chainId. Both wagmi
+  // accessors silently return the configured default chain when the
+  // wallet is on a chain not in `config.chains`, defeating the
+  // wrong-chain detection. See src/hooks/useActualChainId.ts and the
+  // matching write-up in SplashScreen.tsx for the full story.
+  const { isConnected: walletConnected } = useAccount();
+  const actualChainId = useActualChainId();
   const devSkipWallet = useDevSkipWallet();
-  const isValidSession = walletConnected && chainId === soneiumMinato.id;
+  const isValidSession =
+    walletConnected && actualChainId === soneiumMinato.id;
   const wasValidRef = useRef(false);
 
   // TEMP diagnostic — mirrors the splash's log so cross-referencing the
@@ -114,12 +119,12 @@ export default function GameCanvas() {
   useEffect(() => {
     console.log("[GameCanvas] session check", {
       walletConnected,
-      chainId,
+      actualChainId,
       expected: soneiumMinato.id,
       isValidSession,
       devSkipWallet,
     });
-  }, [walletConnected, chainId, isValidSession, devSkipWallet]);
+  }, [walletConnected, actualChainId, isValidSession, devSkipWallet]);
   // Derived: umbrella muted state (both silenced) drives the emoji button
   const muted = !sfxEnabled && !bgmEnabled;
   const allUnlocked = unlockedIds.length >= 11;
@@ -661,10 +666,12 @@ export default function GameCanvas() {
  * territory — in which case the button stays disabled.
  */
 function WalletChip({ maxWidth }: { maxWidth: number }) {
-  // Read chainId from useAccount() not useChainId() so unsupported
-  // chains (e.g. Ethereum Mainnet) resolve to their real id and get
-  // filtered out by the `chainId !== soneiumMinato.id` guard below.
-  const { address, isConnected, chainId } = useAccount();
+  // Read chainId via useActualChainId() (EIP-1193 direct), not from
+  // wagmi state — see SplashScreen.tsx for the full write-up. The
+  // chip should hide on wrong-chain sessions even if wagmi state has
+  // pinned itself to a configured chain.
+  const { address, isConnected } = useAccount();
+  const actualChainId = useActualChainId();
   const { openAccountModal } = useAccountModal();
   const devSkipWallet = useDevSkipWallet();
 
@@ -679,8 +686,9 @@ function WalletChip({ maxWidth }: { maxWidth: number }) {
   // Wrong-chain sessions never reach here in practice (the splash
   // covers the HUD), but render defensively: a chip displaying an
   // address while the wallet is on the wrong chain would be
-  // misleading, so we suppress it.
-  if (chainId !== soneiumMinato.id) return null;
+  // misleading, so we suppress it. Also covers the brief window
+  // before the EIP-1193 round-trip lands (actualChainId undefined).
+  if (actualChainId !== soneiumMinato.id) return null;
 
   const short = `${address.slice(0, 6)}…${address.slice(-4)}`;
   const ready = !!openAccountModal;
