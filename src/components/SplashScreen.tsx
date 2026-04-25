@@ -48,6 +48,25 @@ import { useMiniAppContext } from "@/hooks/useMiniAppContext";
 // gameplay testing uses a small dev-funded mainnet wallet.
 const REQUIRED_CHAIN_ID = soneium.id; // 1868
 
+// Friendly names for the most common EVM chains a user might land on
+// when they first hit the splash. Anything outside this map falls back
+// to the numeric chain ID, which still tells a developer-savvy user
+// where they are without us having to enumerate every L2.
+const CHAIN_NAMES: Record<number, string> = {
+  1: "Ethereum",
+  10: "Optimism",
+  56: "BNB Chain",
+  137: "Polygon",
+  324: "zkSync Era",
+  8453: "Base",
+  42161: "Arbitrum",
+  43114: "Avalanche",
+  59144: "Linea",
+  534352: "Scroll",
+  1868: "Soneium",
+  1946: "Soneium Minato",
+};
+
 type Props = {
   onStart: () => void;
   onOpenSettings: () => void;
@@ -311,7 +330,12 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
                 Kami Merge runs on{" "}
                 <strong className="text-[#c8a04a]">Soneium</strong>.
                 <br />
-                You&rsquo;re currently on chain ID {actualChainId}.
+                You&rsquo;re currently on{" "}
+                {actualChainId !== undefined &&
+                CHAIN_NAMES[actualChainId] !== undefined
+                  ? CHAIN_NAMES[actualChainId]
+                  : `chain ID ${actualChainId}`}
+                .
               </p>
               <button
                 type="button"
