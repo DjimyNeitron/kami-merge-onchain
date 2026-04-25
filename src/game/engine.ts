@@ -4,6 +4,11 @@ import { ParticleSystem } from "@/game/particles";
 import type { ParticleKind } from "@/game/seasons";
 import { isDevModeActive } from "@/hooks/useDevMode";
 import {
+  loadStoredTrack,
+  pickRandomTrack,
+  type BgmTrackId,
+} from "@/game/bgmTracks";
+import {
   YokaiType,
   YOKAI_CHAIN,
   getYokai,
@@ -873,8 +878,22 @@ export class GameEngine {
     this.audio.unlock();
     if (!wasUnlocked) {
       this.bgmStarted = true;
-      this.audio.playBGM("/bgm.mp3");
+      // First BGM start: respect the user's last-selected track from
+      // localStorage; on a fresh visit (or a corrupted/stale entry)
+      // pick a random one. setBgmTrack handles fade-in from 0 → bgmVolume,
+      // so the start is gentle.
+      this.audio.setBgmTrack(loadStoredTrack() ?? pickRandomTrack());
     }
+  }
+
+  /** Switch the active BGM track (fade-out → swap → fade-in). */
+  setBgmTrack(id: BgmTrackId): Promise<void> {
+    return this.audio.setBgmTrack(id);
+  }
+
+  /** The track id currently loaded into the BGM element, or null. */
+  getBgmTrack(): BgmTrackId | null {
+    return this.audio.getBgmTrack();
   }
 
   setMuted(muted: boolean) {

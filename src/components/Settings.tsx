@@ -5,11 +5,14 @@ import { YOKAI_CHAIN } from "@/config/yokai";
 import YokaiDetailCard from "@/components/YokaiDetailCard";
 import SuzuIcon from "@/components/icons/SuzuIcon";
 import TaikoIcon from "@/components/icons/TaikoIcon";
+import { BGM_TRACKS, type BgmTrackId } from "@/game/bgmTracks";
 
 type Props = {
   sfxEnabled: boolean;
   bgmEnabled: boolean;
   unlockedIds: number[];
+  currentTrack: BgmTrackId | null;
+  onSelectTrack: (id: BgmTrackId) => void;
   onToggleSfx: () => void;
   onToggleBgm: () => void;
   onClose: () => void;
@@ -21,6 +24,8 @@ export default function Settings({
   sfxEnabled,
   bgmEnabled,
   unlockedIds,
+  currentTrack,
+  onSelectTrack,
   onToggleSfx,
   onToggleBgm,
   onClose,
@@ -102,6 +107,91 @@ export default function Settings({
                 enabled={bgmEnabled}
                 onToggle={onToggleBgm}
               />
+
+              {/* Track picker — radio-style buttons under the Music
+               * toggle. Disabled when Music is off (master mute);
+               * the current track is still rendered as "selected"
+               * in that state so the user can see what would resume
+               * when they re-enable. Selecting a row when enabled
+               * triggers a fade-swap-fade in AudioManager. */}
+              <div className="px-1 pt-0.5 pb-1">
+                <div
+                  className={`text-xs uppercase tracking-[0.2em] text-center mb-1 ${
+                    bgmEnabled ? "text-[#5c3a1e]/65" : "text-[#5c3a1e]/35"
+                  }`}
+                >
+                  Track
+                </div>
+                <div className="flex flex-col gap-1">
+                  {BGM_TRACKS.map((t) => {
+                    const selected = currentTrack === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!bgmEnabled) return;
+                          if (!selected) onSelectTrack(t.id);
+                        }}
+                        onTouchEnd={(e) => {
+                          if (!bgmEnabled) return;
+                          e.stopPropagation();
+                          e.preventDefault();
+                          if (!selected) onSelectTrack(t.id);
+                        }}
+                        disabled={!bgmEnabled}
+                        aria-pressed={selected}
+                        className="flex items-center gap-2 text-left px-2 py-1 rounded transition-colors"
+                        style={{
+                          background: selected
+                            ? "rgba(200, 168, 78, 0.18)"
+                            : "transparent",
+                          border: "1px solid",
+                          borderColor: selected
+                            ? "rgba(138, 111, 40, 0.55)"
+                            : "rgba(138, 111, 40, 0.18)",
+                          opacity: bgmEnabled ? 1 : 0.45,
+                          cursor: bgmEnabled ? "pointer" : "default",
+                          touchAction: "manipulation",
+                        }}
+                      >
+                        {/* Radio dot — outline when unselected, filled
+                         * when selected. CSS-only; no input element
+                         * because the surrounding button already
+                         * carries the click + a11y semantics. */}
+                        <span
+                          aria-hidden="true"
+                          className="inline-flex shrink-0 items-center justify-center"
+                          style={{
+                            width: 14,
+                            height: 14,
+                            borderRadius: "50%",
+                            border: "1.5px solid rgba(138, 111, 40, 0.7)",
+                            background: selected
+                              ? "transparent"
+                              : "transparent",
+                          }}
+                        >
+                          {selected && (
+                            <span
+                              style={{
+                                width: 7,
+                                height: 7,
+                                borderRadius: "50%",
+                                background: "#8a6f28",
+                              }}
+                            />
+                          )}
+                        </span>
+                        <span className="text-sm text-[#3d2510] leading-tight">
+                          {t.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
               <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-2" />
 

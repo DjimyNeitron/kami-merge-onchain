@@ -30,6 +30,9 @@
 // first merge — but if a sample happens to be un-decoded when its
 // method is called, the method is silent (no synth fallback).
 
+import type { BgmTrackId } from "@/game/bgmTracks";
+import { getBgmTrack as lookupBgmTrack } from "@/game/bgmTracks";
+
 const PENTATONIC_FREQS = [
   261.63, // C4
   293.66, // D4
@@ -54,6 +57,12 @@ const DROP_URL = "/sfx/drop.mp3";
 
 const SOUND_STORAGE_KEY = "kami_sound_enabled";
 const MUSIC_STORAGE_KEY = "kami_music_enabled";
+
+// BGM track switching transition envelope: fade out current → swap src
+// → fade in new. ~250ms each phase keeps the transition perceptually
+// smooth without feeling sluggish (~half a second total). Single
+// HTMLAudioElement throughout — no parallel crossfade layer.
+const BGM_FADE_MS = 250;
 
 function persistPref(key: string, value: boolean) {
   if (typeof window === "undefined") return;
@@ -87,6 +96,14 @@ export class AudioManager {
   // HTMLAudio-based background music
   private bgmEl: HTMLAudioElement | null = null;
   private bgmVolume = DEFAULT_BGM_VOLUME;
+  // Track identity is owned here so the engine + GameCanvas don't have
+  // to re-derive it from el.src parsing. `null` means "never set yet".
+  private currentTrackId: BgmTrackId | null = null;
+  // Generation counter for fadeTo(). Each fade increments it; ticks
+  // bail when their captured generation goes stale, so a rapid sequence
+  // of setBgmTrack() calls cancels in-flight fades cleanly without
+  // stacking volume animations on top of each other.
+  private bgmFadeGen = 0;
 
   private ensureContext(): AudioContext | null {
     if (this.ctx) return this.ctx;
@@ -214,6 +231,11 @@ export class AudioManager {
     const el = this.bgmEl;
     if (!el) return;
     if (enabled) {
+      // Cancel any in-flight fade and restore the canonical BGM volume —
+      // a stale 0 from an interrupted fade would otherwise resume into
+      // silence even though the toggle is back on.
+      this.bgmFadeGen += 1;
+      el.volume = this.bgmVolume;
       if (el.paused) {
         try {
           await el.play();
@@ -298,6 +320,126 @@ export class AudioManager {
       /* ignore */
     }
     this.bgmEl = null;
+    this.currentTrackId = null;
+    this.bgmFadeGen += 1; // cancel any fade pinned to the dead element
+  }
+
+  /**
+   * The current BGM API. Plays the track identified by `id`, switching
+   * from the existing one with a fade-out → src swap → fade-in (~250ms
+   * each phase, single HTMLAudioElement throughout).
+   *
+   * Behaviour:
+   *   - First call: creates the audio element with `preload="none"` so
+   *     no bytes are fetched until play() actually fires (lazy load),
+   *     starts at volume 0 and fades up to bgmVolume.
+   *   - Same id as currently playing: no-op, returns immediately.
+   *   - Music is currently muted (setMusicEnabled(false)): the new id
+   *     is recorded and the element's src is updated, but playback
+   *     stays paused. Re-enabling music will resume into the new
+   *     track.
+   *   - A second setBgmTrack arriving mid-transition cancels the
+   *     stale fade (via bgmFadeGen) and bails the in-flight call out
+   *     of its remaining steps.
+   */
+  async setBgmTrack(id: BgmTrackId): Promise<void> {
+    const track = lookupBgmTrack(id);
+    if (!track) {
+      console.warn("[Audio] unknown BGM track id:", id);
+      return;
+    }
+    if (id === this.currentTrackId && this.bgmEl) return;
+
+    this.currentTrackId = id;
+
+    // First-time mount: build the element, no fade-out, just fade-in.
+    if (!this.bgmEl) {
+      const el = new Audio();
+      el.loop = true;
+      el.preload = "none";
+      el.volume = 0;
+      el.src = track.src;
+      this.bgmEl = el;
+      if (this.bgmMuted) return; // recorded; resume later via setMusicEnabled
+      try {
+        await el.play();
+        if (this.currentTrackId !== id) return; // superseded
+        await this.fadeBgmTo(this.bgmVolume, BGM_FADE_MS);
+      } catch (err) {
+        console.warn("[Audio] BGM play failed:", err);
+      }
+      return;
+    }
+
+    // Subsequent switch: fade out → swap src → fade in.
+    const el = this.bgmEl;
+    const wasAudible = !el.paused && !this.bgmMuted;
+    if (wasAudible) {
+      await this.fadeBgmTo(0, BGM_FADE_MS);
+      if (this.currentTrackId !== id) return; // superseded mid-fade
+    }
+    try {
+      el.pause();
+      el.src = track.src;
+      el.preload = "none";
+      el.load();
+    } catch {
+      /* ignore — failed src swap will surface on play() below */
+    }
+    if (this.bgmMuted) {
+      el.volume = this.bgmVolume; // primed for the next unmute
+      return;
+    }
+    try {
+      el.volume = 0;
+      await el.play();
+      if (this.currentTrackId !== id) return; // superseded
+      await this.fadeBgmTo(this.bgmVolume, BGM_FADE_MS);
+    } catch (err) {
+      console.warn("[Audio] BGM play failed (after swap):", err);
+    }
+  }
+
+  getBgmTrack(): BgmTrackId | null {
+    return this.currentTrackId;
+  }
+
+  /**
+   * Linearly fade the BGM element's volume to `target` over `durationMs`.
+   * Cancellation via `bgmFadeGen`: each invocation captures a generation,
+   * and ticks abort once `bgmFadeGen` advances. Concurrent / overlapping
+   * fades thus cancel cleanly without volume jitter.
+   */
+  private fadeBgmTo(target: number, durationMs: number): Promise<void> {
+    const el = this.bgmEl;
+    if (!el) return Promise.resolve();
+    const myGen = ++this.bgmFadeGen;
+    const start = el.volume;
+    const clampedTarget = Math.min(1, Math.max(0, target));
+    const dur = Math.max(durationMs, 1);
+    const startTime = performance.now();
+    return new Promise((resolve) => {
+      const tick = () => {
+        if (myGen !== this.bgmFadeGen || !this.bgmEl) {
+          resolve();
+          return;
+        }
+        const t = Math.min((performance.now() - startTime) / dur, 1);
+        try {
+          this.bgmEl.volume = start + (clampedTarget - start) * t;
+        } catch {
+          /* element gone, bail */
+          resolve();
+          return;
+        }
+        if (t < 1) {
+          requestAnimationFrame(tick);
+        } else {
+          resolve();
+        }
+      };
+      requestAnimationFrame(tick);
+    });
   }
 
   /**

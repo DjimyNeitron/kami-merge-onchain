@@ -22,6 +22,7 @@ import { useAccount } from "wagmi";
 import { soneium } from "viem/chains";
 import { useDevSkipWallet } from "@/hooks/useDevSkipWallet";
 import { useActualChainId } from "@/hooks/useActualChainId";
+import { saveTrack, type BgmTrackId } from "@/game/bgmTracks";
 
 // Plain import — previous conditional `require(...)` gated by
 // `process.env.NODE_ENV` broke at browser runtime (Turbopack didn't
@@ -83,6 +84,12 @@ export default function GameCanvas() {
   const [bgmEnabled, setBgmEnabled] = useState(() =>
     readBool(MUSIC_KEY, true)
   );
+  // BGM track currently loaded into the engine's audio element. Starts
+  // null until the engine boots and we read its pick back via
+  // engineRef.current?.getBgmTrack(). The engine itself does the
+  // loadStoredTrack() ?? pickRandomTrack() resolve at unlockAudio()
+  // time so a single source of truth wins.
+  const [currentTrack, setCurrentTrack] = useState<BgmTrackId | null>(null);
   const [showSplash, setShowSplash] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
@@ -388,8 +395,23 @@ export default function GameCanvas() {
   };
 
   const dismissSplash = () => {
-    engineRef.current?.unlockAudio();
+    const eng = engineRef.current;
+    eng?.unlockAudio();
+    // After unlockAudio the engine has resolved its starting BGM track
+    // (loadStoredTrack ?? pickRandomTrack). Mirror its pick into UI
+    // state so the Settings track picker reflects what's actually
+    // playing on first open. Subsequent picks flow GameCanvas →
+    // engine via handleSelectTrack.
+    const track = eng?.getBgmTrack();
+    if (track) setCurrentTrack(track);
     setShowSplash(false);
+  };
+
+  /** Settings track-radio handler — persists, then drives the audio. */
+  const handleSelectTrack = (id: BgmTrackId) => {
+    setCurrentTrack(id);
+    saveTrack(id);
+    engineRef.current?.setBgmTrack(id);
   };
 
   if (initError) {
@@ -625,6 +647,8 @@ export default function GameCanvas() {
           sfxEnabled={sfxEnabled}
           bgmEnabled={bgmEnabled}
           unlockedIds={unlockedIds}
+          currentTrack={currentTrack}
+          onSelectTrack={handleSelectTrack}
           onToggleSfx={handleToggleSfx}
           onToggleBgm={handleToggleBgm}
           onClose={closeSettings}
