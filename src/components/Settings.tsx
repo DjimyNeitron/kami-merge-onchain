@@ -108,90 +108,118 @@ export default function Settings({
                 onToggle={onToggleBgm}
               />
 
-              {/* Track picker — radio-style buttons under the Music
-               * toggle. Disabled when Music is off (master mute);
-               * the current track is still rendered as "selected"
-               * in that state so the user can see what would resume
-               * when they re-enable. Selecting a row when enabled
-               * triggers a fade-swap-fade in AudioManager. */}
-              <div className="px-1 pt-0.5 pb-1">
-                <div
-                  className={`text-xs uppercase tracking-[0.2em] text-center mb-1 ${
-                    bgmEnabled ? "text-[#5c3a1e]/65" : "text-[#5c3a1e]/35"
-                  }`}
-                >
-                  Track
-                </div>
-                <div className="flex flex-col gap-1">
-                  {BGM_TRACKS.map((t) => {
-                    const selected = currentTrack === t.id;
-                    return (
+              {/* Track picker — compact prev / name / next strip.
+               *
+               * The earlier radio-list version cost ~140px of vertical
+               * room (4 rows × ~32px + label + gaps) which pushed the
+               * Yokai Collection grid below the fold on Mini App
+               * viewports. This single ~50px row gives the same
+               * functionality (any of 4 tracks, see what's playing,
+               * cyclic navigation) with ~3× less height.
+               *
+               * Disabled when Music is the master mute is off — the
+               * track name still renders so the user sees what will
+               * resume on re-enable; the prev/next buttons go inert.
+               * Click triggers fade-swap-fade in AudioManager via the
+               * unchanged onSelectTrack callback (no UI-side audio
+               * logic). Wraps cyclically; if currentTrack is null
+               * (engine hasn't booted yet) prev/next still pick the
+               * first track. */}
+              {(() => {
+                const idx = BGM_TRACKS.findIndex(
+                  (t) => t.id === currentTrack
+                );
+                const safeIdx = idx >= 0 ? idx : 0;
+                const trackLabel =
+                  BGM_TRACKS[safeIdx]?.name ?? "—";
+                const goPrev = () => {
+                  if (!bgmEnabled) return;
+                  const prev =
+                    BGM_TRACKS[
+                      (safeIdx - 1 + BGM_TRACKS.length) % BGM_TRACKS.length
+                    ];
+                  onSelectTrack(prev.id);
+                };
+                const goNext = () => {
+                  if (!bgmEnabled) return;
+                  const next =
+                    BGM_TRACKS[(safeIdx + 1) % BGM_TRACKS.length];
+                  onSelectTrack(next.id);
+                };
+                const arrowBtnStyle: React.CSSProperties = {
+                  width: 36,
+                  height: 36,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 6,
+                  background: bgmEnabled
+                    ? "rgba(200, 168, 78, 0.10)"
+                    : "transparent",
+                  border: "1px solid rgba(138, 111, 40, 0.45)",
+                  color: "#3d2510",
+                  fontSize: 22,
+                  lineHeight: 1,
+                  cursor: bgmEnabled ? "pointer" : "not-allowed",
+                  touchAction: "manipulation",
+                };
+                return (
+                  <div
+                    className="px-1 pt-0.5 pb-1"
+                    style={{ opacity: bgmEnabled ? 1 : 0.4 }}
+                  >
+                    <div className="text-xs uppercase tracking-[0.2em] text-[#5c3a1e]/65 text-center mb-1">
+                      Track
+                    </div>
+                    <div className="flex items-center gap-2">
                       <button
-                        key={t.id}
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (!bgmEnabled) return;
-                          if (!selected) onSelectTrack(t.id);
+                          goPrev();
                         }}
                         onTouchEnd={(e) => {
                           if (!bgmEnabled) return;
                           e.stopPropagation();
                           e.preventDefault();
-                          if (!selected) onSelectTrack(t.id);
+                          goPrev();
                         }}
                         disabled={!bgmEnabled}
-                        aria-pressed={selected}
-                        className="flex items-center gap-2 text-left px-2 py-1 rounded transition-colors"
-                        style={{
-                          background: selected
-                            ? "rgba(200, 168, 78, 0.18)"
-                            : "transparent",
-                          border: "1px solid",
-                          borderColor: selected
-                            ? "rgba(138, 111, 40, 0.55)"
-                            : "rgba(138, 111, 40, 0.18)",
-                          opacity: bgmEnabled ? 1 : 0.45,
-                          cursor: bgmEnabled ? "pointer" : "default",
-                          touchAction: "manipulation",
-                        }}
+                        aria-label="Previous track"
+                        title="Previous track"
+                        style={arrowBtnStyle}
                       >
-                        {/* Radio dot — outline when unselected, filled
-                         * when selected. CSS-only; no input element
-                         * because the surrounding button already
-                         * carries the click + a11y semantics. */}
-                        <span
-                          aria-hidden="true"
-                          className="inline-flex shrink-0 items-center justify-center"
-                          style={{
-                            width: 14,
-                            height: 14,
-                            borderRadius: "50%",
-                            border: "1.5px solid rgba(138, 111, 40, 0.7)",
-                            background: selected
-                              ? "transparent"
-                              : "transparent",
-                          }}
-                        >
-                          {selected && (
-                            <span
-                              style={{
-                                width: 7,
-                                height: 7,
-                                borderRadius: "50%",
-                                background: "#8a6f28",
-                              }}
-                            />
-                          )}
-                        </span>
-                        <span className="text-sm text-[#3d2510] leading-tight">
-                          {t.name}
-                        </span>
+                        <span aria-hidden="true">‹</span>
                       </button>
-                    );
-                  })}
-                </div>
-              </div>
+                      <span
+                        className="flex-1 text-center text-sm text-[#3d2510] leading-tight truncate"
+                        title={trackLabel}
+                      >
+                        {trackLabel}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          goNext();
+                        }}
+                        onTouchEnd={(e) => {
+                          if (!bgmEnabled) return;
+                          e.stopPropagation();
+                          e.preventDefault();
+                          goNext();
+                        }}
+                        disabled={!bgmEnabled}
+                        aria-label="Next track"
+                        title="Next track"
+                        style={arrowBtnStyle}
+                      >
+                        <span aria-hidden="true">›</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-2" />
 
