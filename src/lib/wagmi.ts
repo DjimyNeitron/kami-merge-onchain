@@ -32,6 +32,7 @@ import {
   walletConnectWallet,
   zerionWallet,
 } from "@rainbow-me/rainbowkit/wallets";
+import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
 import { soneiumMinato, soneium } from "viem/chains";
 import { createConfig, http } from "wagmi";
 
@@ -46,7 +47,12 @@ if (!projectId && typeof window !== "undefined") {
   );
 }
 
-const connectors = connectorsForWallets(
+// RainbowKit-backed wallets for the standalone web flow. The modal
+// renders these in two named groups; the Farcaster Mini App connector
+// (added below) is intentionally NOT in this list — it's only ever
+// invoked via explicit `connect({ connector: ... })` from
+// useMiniAppContext when the host environment is detected.
+const rainbowKitConnectors = connectorsForWallets(
   [
     {
       groupName: "Popular",
@@ -65,8 +71,13 @@ const connectors = connectorsForWallets(
   }
 );
 
+// Order matters for wagmi's auto-connect heuristic: the Farcaster Mini
+// App connector goes first so when we're inside a Farcaster / Startale
+// host, wagmi prefers it over any cached injected connector. In the
+// standalone browser path the connector simply fails to find a host
+// and stays dormant — RainbowKit handles the rest.
 export const wagmiConfig = createConfig({
-  connectors,
+  connectors: [farcasterMiniApp(), ...rainbowKitConnectors],
   chains: [soneiumMinato, soneium],
   transports: {
     [soneiumMinato.id]: http("https://rpc.minato.soneium.org"),
