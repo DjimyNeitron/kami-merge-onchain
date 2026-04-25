@@ -59,10 +59,60 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
   // directly. Returns `undefined` until the first round-trip
   // resolves, which we surface as a "Verifying network…" interstitial
   // so the player never sees a flash of "Welcome" before the check.
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, connector } = useAccount();
   const actualChainId = useActualChainId();
   const { disconnect } = useDisconnect();
-  const { switchChain, isPending: isSwitching } = useSwitchChain();
+  const { switchChainAsync, isPending: isSwitching } = useSwitchChain();
+
+  /**
+   * Switch to Soneium Minato. If the wallet doesn't know about the
+   * chain yet (MetaMask returns code 4902 / "Unrecognized chain ID"
+   * when asked to switch to a chain it has never seen), we follow up
+   * with `wallet_addEthereumChain` using the full Soneium Minato
+   * parameters. After a successful add, MetaMask switches into the
+   * new chain automatically and `chainChanged` fires, so the splash
+   * advances to Welcome on the next render.
+   */
+  const handleSwitchChain = async () => {
+    try {
+      await switchChainAsync({ chainId: REQUIRED_CHAIN_ID });
+    } catch (err: unknown) {
+      console.error("[SplashScreen] switch failed:", err);
+      const e = err as { code?: number; message?: string } | null;
+      const isUnrecognised =
+        e?.code === 4902 ||
+        (typeof e?.message === "string" &&
+          (e.message.includes("Unrecognized chain ID") ||
+            e.message.includes("not been added") ||
+            e.message.includes("Try adding the chain")));
+      if (!isUnrecognised) return;
+
+      try {
+        const provider = (await connector?.getProvider()) as
+          | { request: (args: { method: string; params: unknown[] }) => Promise<unknown> }
+          | undefined;
+        if (!provider) throw new Error("No provider available for add-chain");
+
+        await provider.request({
+          method: "wallet_addEthereumChain",
+          params: [
+            {
+              chainId: "0x" + REQUIRED_CHAIN_ID.toString(16), // 0x79a
+              chainName: "Soneium Minato Testnet",
+              nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+              rpcUrls: ["https://rpc.minato.soneium.org"],
+              blockExplorerUrls: ["https://soneium-minato.blockscout.com"],
+            },
+          ],
+        });
+        // wallet_addEthereumChain auto-switches in MetaMask after the
+        // user approves. chainChanged should fire next; useActualChainId
+        // picks it up and the splash advances on its own.
+      } catch (addErr) {
+        console.error("[SplashScreen] add chain failed:", addErr);
+      }
+    }
+  };
   // Dev-only bypass: when `?dev=1` is in the URL AND the DevPanel's
   // "Skip Wallet" toggle is on, `devSkipWallet` is true and we treat
   // the player as effectively connected without a real wallet. The
@@ -200,12 +250,10 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
               </p>
               <button
                 type="button"
-                onClick={() =>
-                  switchChain({ chainId: REQUIRED_CHAIN_ID })
-                }
+                onClick={handleSwitchChain}
                 onTouchEnd={(e) => {
                   e.preventDefault();
-                  switchChain({ chainId: REQUIRED_CHAIN_ID });
+                  handleSwitchChain();
                 }}
                 disabled={isSwitching}
                 className="splash-pulse kami-serif text-[#f5e6c8] text-base sm:text-lg font-semibold tracking-wider px-6 py-2.5 rounded-md border border-[#c8a04a]/70 hover:bg-[#c8a04a]/10 transition-colors disabled:opacity-60 disabled:animation-none disabled:cursor-wait"
