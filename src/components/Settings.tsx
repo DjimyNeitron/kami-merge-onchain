@@ -67,14 +67,18 @@ export default function Settings({
         >
           <div className="wooden-rod absolute -top-1 left-3 right-3 h-3 rounded-full pointer-events-none" />
           {/* scroll-panel: flex-col so a sticky Close footer stays pinned
-           * while the content above it scrolls. Vertical paddings trimmed
-           * a further ~20% in this pass (dividers my-3→my-2, toggle rows
-           * py-2→py-1.5, grid gap-y-2→gap-y-1, scroll region pt-5→pt-4)
-           * so full Settings fits without scroll on desktop 1080p+;
-           * sticky footer is retained as a safety net for small viewports. */}
-          <div className="scroll-panel kami-serif text-[#3d2510] border-x border-[#8a6f28]/40 flex flex-col max-h-[90vh]">
+           * while the content above it scrolls. Height capped at
+           * min(90vh, 800px) so the modal stays readable on every
+           * surface — on a 600-700px Farcaster Mini App iframe 90vh
+           * dominates and content scrolls cleanly; on a 1080p+ desktop
+           * the 800px cap prevents the panel from ballooning. The
+           * `min-h-0` on the scroll region is required: flex children
+           * default to `min-height: auto`, which prevents shrinking
+           * below intrinsic content size and defeats `overflow-y-auto`
+           * on tight viewports. */}
+          <div className="scroll-panel kami-serif text-[#3d2510] border-x border-[#8a6f28]/40 flex flex-col max-h-[min(90vh,800px)]">
             {/* Scrollable content region */}
-            <div className="flex-1 overflow-y-auto px-5 pt-4 pb-2">
+            <div className="flex-1 min-h-0 overflow-y-auto px-5 pt-4 pb-2">
               {/* H1 — only bold heading in the panel */}
               <div className="text-3xl font-bold tracking-[0.08em] text-center leading-none">
                 Settings
