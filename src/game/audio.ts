@@ -1,12 +1,14 @@
 // Hybrid Web Audio SFX + HTMLAudio BGM.
 //
-// All SFX are now sample-based — three AudioBuffers are fetched and
-// decoded in the background during ctx init:
+// SFX are sample-based: six AudioBuffers are fetched and decoded in
+// the background during ctx init.
 //
-//   /sfx/koto_a4.mp3   plucked gayageum, A4 440Hz, ~2.5s
-//                      → combo melody base; pitch-shifted via
-//                        playbackRate per note in PENTATONIC_FREQS
-//   /sfx/bonsho.mp3    temple bell (keisu), ~200Hz, ~6s → game over
+//   /sfx/merge_1.mp3 … merge_5.mp3
+//                      pre-tuned marimba pentatonic (C5 D5 E5 G5 A5).
+//                      Played directly per-merge — no playbackRate
+//                      retuning. comboIndex picks the buffer.
+//                      Also reused by playGameOver as a 3-note
+//                      descending cadence (A5 → G5 → E5).
 //   /sfx/drop.mp3      celtic harp A3 220Hz, ~2s → yokai drop
 //
 // Bounce/collision SFX has been intentionally removed for a meditative
@@ -31,29 +33,24 @@
 // method is called, the method is silent (no synth fallback).
 
 import type { BgmTrackId } from "@/game/bgmTracks";
-import { getBgmTrack as lookupBgmTrack } from "@/game/bgmTracks";
+import { BGM_TRACKS, getBgmTrack as lookupBgmTrack } from "@/game/bgmTracks";
 
-const PENTATONIC_FREQS = [
-  261.63, // C4
-  293.66, // D4
-  329.63, // E4
-  392.0,  // G4
-  440.0,  // A4   ← unison with koto sample
-  523.25, // C5
-  587.33, // D5
-  659.25, // E5
-  783.99, // G5
-  880.0,  // A5
+// Pre-tuned marimba pentatonic — one buffer per note in ascending
+// order (C5, D5, E5, G5, A5). comboIndex maps directly into this
+// array; once it caps at length-1 the streak plateaus on A5.
+const MERGE_URLS = [
+  "/sfx/merge_1.mp3",
+  "/sfx/merge_2.mp3",
+  "/sfx/merge_3.mp3",
+  "/sfx/merge_4.mp3",
+  "/sfx/merge_5.mp3",
 ];
 
-const KOTO_BASE_FREQ = 440.0;
-
-const DEFAULT_SFX_VOLUME = 0.25;
+const DEFAULT_SFX_VOLUME = 0.15;
 const DEFAULT_BGM_VOLUME = 0.35;
 
-const KOTO_URL = "/sfx/koto_a4.mp3";
-const BONSHO_URL = "/sfx/bonsho.mp3";
 const DROP_URL = "/sfx/drop.mp3";
+const GAMEOVER_URL = "/sfx/gameover.mp3";
 
 const SOUND_STORAGE_KEY = "kami_sound_enabled";
 const MUSIC_STORAGE_KEY = "kami_music_enabled";
@@ -80,14 +77,15 @@ export class AudioManager {
   private sfxMuted = false;
   private bgmMuted = false;
 
-  // Sampled instruments. Null until loadSamples() resolves; a method
-  // whose sample hasn't decoded yet simply emits silence.
-  private kotoBuffer: AudioBuffer | null = null;
-  private bonshoBuffer: AudioBuffer | null = null;
+  // Sampled instruments. mergeBuffers stays empty until loadSamples()
+  // resolves the parallel decode of the five marimba notes; a method
+  // whose buffer is missing simply emits silence.
+  private mergeBuffers: AudioBuffer[] = [];
   private dropBuffer: AudioBuffer | null = null;
+  private gameoverBuffer: AudioBuffer | null = null;
   private samplesRequested = false;
 
-  // Pentatonic combo state — index of the next note in PENTATONIC_FREQS.
+  // Pentatonic combo state — index of the next buffer in mergeBuffers.
   // Resets to 0 after COMBO_RESET_MS of silence.
   private comboIndex = 0;
   private lastMergeAt = 0;
@@ -104,6 +102,11 @@ export class AudioManager {
   // of setBgmTrack() calls cancels in-flight fades cleanly without
   // stacking volume animations on top of each other.
   private bgmFadeGen = 0;
+  // Re-entrancy guard for setBgmTrack(). Set true while a manual track
+  // switch is mid-flight (fade-out / pause / src swap / play / fade-in)
+  // so the bgmEl 'ended' listener doesn't double-fire an auto-advance
+  // off the brief paused state we go through during the swap.
+  private bgmSwitching = false;
 
   private ensureContext(): AudioContext | null {
     if (this.ctx) return this.ctx;
@@ -152,24 +155,33 @@ export class AudioManager {
         console.warn(`[Audio] sample load failed (${url})`, err);
       }
     };
+    // Pre-allocate the merge slot array so out-of-order fetches land
+    // at the right index without surprising mid-decode reads (a
+    // playMergeWithCombo call before the higher-numbered notes finish
+    // simply hits an `undefined` and falls through to silence).
+    this.mergeBuffers = new Array<AudioBuffer | undefined>(
+      MERGE_URLS.length
+    ) as AudioBuffer[];
     await Promise.all([
-      loadOne(KOTO_URL, (b) => {
-        this.kotoBuffer = b;
-      }),
-      loadOne(BONSHO_URL, (b) => {
-        this.bonshoBuffer = b;
-      }),
+      ...MERGE_URLS.map((url, i) =>
+        loadOne(url, (b) => {
+          this.mergeBuffers[i] = b;
+        })
+      ),
       loadOne(DROP_URL, (b) => {
         this.dropBuffer = b;
       }),
+      loadOne(GAMEOVER_URL, (b) => {
+        this.gameoverBuffer = b;
+      }),
     ]);
+    const mergeReady = this.mergeBuffers.filter(Boolean).length;
     console.log(
-      "[Audio] samples ready — koto:",
-      !!this.kotoBuffer,
-      "bonshō:",
-      !!this.bonshoBuffer,
+      `[Audio] samples ready — merge: ${mergeReady}/${MERGE_URLS.length}`,
       "drop:",
-      !!this.dropBuffer
+      !!this.dropBuffer,
+      "gameover:",
+      !!this.gameoverBuffer
     );
   }
 
@@ -313,6 +325,7 @@ export class AudioManager {
   stopBGM() {
     if (!this.bgmEl) return;
     try {
+      this.bgmEl.removeEventListener("ended", this.handleBgmEnded);
       this.bgmEl.pause();
       this.bgmEl.src = "";
       this.bgmEl.load();
@@ -322,6 +335,7 @@ export class AudioManager {
     this.bgmEl = null;
     this.currentTrackId = null;
     this.bgmFadeGen += 1; // cancel any fade pinned to the dead element
+    this.bgmSwitching = false;
   }
 
   /**
@@ -351,54 +365,109 @@ export class AudioManager {
     if (id === this.currentTrackId && this.bgmEl) return;
 
     this.currentTrackId = id;
+    this.bgmSwitching = true;
+    try {
+      // First-time mount: build the element, attach the 'ended' →
+      // auto-advance listener, no fade-out, just fade-in.
+      if (!this.bgmEl) {
+        const el = new Audio();
+        // loop=false so 'ended' actually fires; auto-advance hands the
+        // baton to the next track in BGM_TRACKS instead of looping.
+        el.loop = false;
+        el.preload = "none";
+        el.volume = 0;
+        el.src = track.src;
+        el.addEventListener("ended", this.handleBgmEnded);
+        this.bgmEl = el;
+        if (this.bgmMuted) return; // recorded; resume later via setMusicEnabled
+        try {
+          await el.play();
+          if (this.currentTrackId !== id) return; // superseded
+          // Release the swap guard as soon as the new track has
+          // actually started — the guard's only job is to suppress
+          // spurious 'ended' events during the src-swap window. From
+          // here on, any 'ended' belongs to the new track and SHOULD
+          // be honoured by the auto-advance handler. Critically, this
+          // means the fade-in below cannot strand bgmSwitching=true
+          // if rAF stalls (backgrounded tab, etc).
+          this.bgmSwitching = false;
+          await this.fadeBgmTo(this.bgmVolume, BGM_FADE_MS);
+        } catch (err) {
+          console.warn("[Audio] BGM play failed:", err);
+        }
+        return;
+      }
 
-    // First-time mount: build the element, no fade-out, just fade-in.
-    if (!this.bgmEl) {
-      const el = new Audio();
-      el.loop = true;
-      el.preload = "none";
-      el.volume = 0;
-      el.src = track.src;
-      this.bgmEl = el;
-      if (this.bgmMuted) return; // recorded; resume later via setMusicEnabled
+      // Subsequent switch: fade out → swap src → fade in.
+      const el = this.bgmEl;
+      const wasAudible = !el.paused && !this.bgmMuted;
+      if (wasAudible) {
+        await this.fadeBgmTo(0, BGM_FADE_MS);
+        if (this.currentTrackId !== id) return; // superseded mid-fade
+      }
       try {
+        el.pause();
+        el.preload = "none";
+        // No explicit el.load() — setting src already triggers a
+        // fresh resource-selection cycle. Calling load() afterwards
+        // races el.play() and can reject with
+        //   "AbortError: The play() request was interrupted by a
+        //    call to load()"
+        // which we observed kicking in occasionally on the second
+        // auto-advance hop.
+        el.src = track.src;
+      } catch {
+        /* ignore — failed src swap will surface on play() below */
+      }
+      if (this.bgmMuted) {
+        el.volume = this.bgmVolume; // primed for the next unmute
+        return;
+      }
+      try {
+        el.volume = 0;
         await el.play();
         if (this.currentTrackId !== id) return; // superseded
+        // Release the swap guard immediately on play() success — see
+        // the matching comment in the first-time-mount branch above.
+        this.bgmSwitching = false;
         await this.fadeBgmTo(this.bgmVolume, BGM_FADE_MS);
       } catch (err) {
-        console.warn("[Audio] BGM play failed:", err);
+        console.warn("[Audio] BGM play failed (after swap):", err);
       }
-      return;
-    }
-
-    // Subsequent switch: fade out → swap src → fade in.
-    const el = this.bgmEl;
-    const wasAudible = !el.paused && !this.bgmMuted;
-    if (wasAudible) {
-      await this.fadeBgmTo(0, BGM_FADE_MS);
-      if (this.currentTrackId !== id) return; // superseded mid-fade
-    }
-    try {
-      el.pause();
-      el.src = track.src;
-      el.preload = "none";
-      el.load();
-    } catch {
-      /* ignore — failed src swap will surface on play() below */
-    }
-    if (this.bgmMuted) {
-      el.volume = this.bgmVolume; // primed for the next unmute
-      return;
-    }
-    try {
-      el.volume = 0;
-      await el.play();
-      if (this.currentTrackId !== id) return; // superseded
-      await this.fadeBgmTo(this.bgmVolume, BGM_FADE_MS);
-    } catch (err) {
-      console.warn("[Audio] BGM play failed (after swap):", err);
+    } finally {
+      // Belt-and-braces: if any branch returned before the
+      // play()-success release above (mute, mid-fade superseded, etc),
+      // make sure the guard always ends false — never strand it.
+      this.bgmSwitching = false;
     }
   }
+
+  /**
+   * Auto-advance handler — fires when the current track finishes
+   * naturally (loop = false). Picks the next track in BGM_TRACKS
+   * with wrap-around and delegates to setBgmTrack so all the fade
+   * + persistence + cancellation logic stays in one place.
+   *
+   * Two early-return guards:
+   *   1. bgmMuted → don't kick a new track; the user has music off.
+   *      When they re-enable, setMusicEnabled resumes from where the
+   *      paused element left off (which is the end of the prior
+   *      track, so the next play() will be a near-noop, but harmless).
+   *   2. bgmSwitching → a manual setBgmTrack is mid-flight; ignore
+   *      the spurious 'ended' that the brief paused state during a
+   *      src-swap can produce. setBgmTrack will set the next track
+   *      explicitly anyway.
+   */
+  private handleBgmEnded = () => {
+    if (this.bgmMuted) return;
+    if (this.bgmSwitching) return;
+    if (BGM_TRACKS.length === 0) return;
+    const idx = BGM_TRACKS.findIndex((t) => t.id === this.currentTrackId);
+    const nextIdx = idx >= 0 ? (idx + 1) % BGM_TRACKS.length : 0;
+    const nextId = BGM_TRACKS[nextIdx].id;
+    console.log("[Audio] BGM auto-advance →", nextId);
+    void this.setBgmTrack(nextId);
+  };
 
   getBgmTrack(): BgmTrackId | null {
     return this.currentTrackId;
@@ -497,46 +566,44 @@ export class AudioManager {
   // ==============================================================
 
   /**
-   * Unified merge SFX: plays the next note of the C-major pentatonic
-   * scale via the koto sample. comboIndex advances per merge, caps at
-   * A5, resets to 0 after COMBO_RESET_MS of silence. A fast streak
-   * climbs C4→D4→E4→G4→A4→C5→…; a single merge after a long pause
-   * plays C4.
+   * Unified merge SFX: plays one pre-tuned marimba note from
+   * mergeBuffers (C5 D5 E5 G5 A5). Two regimes:
+   *
+   *   - Cascade: a merge within COMBO_RESET_MS of the previous one
+   *     advances comboIndex one step, capped at lastIdx, so a long
+   *     streak still climbs C5 → D5 → E5 → G5 → A5 and plateaus on A5.
+   *   - Isolated: a merge after a >=COMBO_RESET_MS silence picks
+   *     uniformly from {0, 1, 2} (C5 / D5 / E5). This breaks the
+   *     "every merge plays C5" monotony that ~95% of Suika-physics
+   *     drops produce. Higher notes (G5, A5) stay reserved for the
+   *     payoff at the top of a real cascade.
+   *
+   * Buffers are pre-tuned, so no playbackRate / pitch math.
    */
   playMergeWithCombo() {
     const perfNow = performance.now();
-    if (perfNow - this.lastMergeAt > this.COMBO_RESET_MS) {
-      this.comboIndex = 0;
+    const lastIdx = Math.max(this.mergeBuffers.length - 1, 0);
+    const inCascade = perfNow - this.lastMergeAt < this.COMBO_RESET_MS;
+    if (inCascade) {
+      this.comboIndex = Math.min(this.comboIndex + 1, lastIdx);
+    } else {
+      // Random low-note pick on isolated merges. Math.floor(Math.random
+      // () * 3) is in {0, 1, 2}; clamp to lastIdx in case the registry
+      // ever shrinks below 3 entries.
+      this.comboIndex = Math.min(Math.floor(Math.random() * 3), lastIdx);
     }
     this.lastMergeAt = perfNow;
 
     const ctx = this.canPlay();
-    if (!ctx) {
-      // Advance even when muted so a mid-streak un-mute steps forward.
-      this.comboIndex = Math.min(
-        this.comboIndex + 1,
-        PENTATONIC_FREQS.length - 1
-      );
-      return;
-    }
+    if (!ctx) return; // muted / not unlocked — silent (state already advanced)
 
-    const idx = Math.min(this.comboIndex, PENTATONIC_FREQS.length - 1);
-    const freq = PENTATONIC_FREQS[idx];
-    this.comboIndex = Math.min(
-      this.comboIndex + 1,
-      PENTATONIC_FREQS.length - 1
-    );
+    const buffer = this.mergeBuffers[this.comboIndex];
+    if (!buffer) return; // sample for this slot not yet decoded — silent
 
-    this.playKotoNote(ctx, freq);
-  }
-
-  private playKotoNote(ctx: AudioContext, frequency: number) {
-    if (!this.kotoBuffer) return;
     const t = ctx.currentTime;
-
     const source = ctx.createBufferSource();
-    source.buffer = this.kotoBuffer;
-    source.playbackRate.setValueAtTime(frequency / KOTO_BASE_FREQ, t);
+    source.buffer = buffer;
+    // No playbackRate change — sample is already pre-tuned.
 
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.5, t);
@@ -546,24 +613,20 @@ export class AudioManager {
   }
 
   // ==============================================================
-  // GAME OVER — bonshō temple bell
+  // GAME OVER — pre-rendered 4-note minor cadence (~4.8s).
+  // The asset already bakes in the loudness emphasis vs merge SFX,
+  // so the playback path is plain: no per-source gain, no scheduling.
   // ==============================================================
 
   playGameOver() {
     const ctx = this.canPlay();
     if (!ctx) return;
-    if (!this.bonshoBuffer) return;
+    if (!this.gameoverBuffer) return; // sample not yet decoded — silent
 
-    const t = ctx.currentTime;
     const source = ctx.createBufferSource();
-    source.buffer = this.bonshoBuffer;
-    source.playbackRate.setValueAtTime(1, t);
-
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.6, t);
-
-    source.connect(gain).connect(this.sfxGain!);
-    source.start(t);
+    source.buffer = this.gameoverBuffer;
+    source.connect(this.sfxGain!);
+    source.start(ctx.currentTime);
   }
 
   // ==============================================================
