@@ -1,4 +1,9 @@
 {
+  "accountAssociation": {
+    "header": "eyJmaWQiOjMzNDc4NSwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDJjMmI0MkI1QmFGMDRiOWFlRmQ2NWVBYzgyNDk3OTdiQUEwMjY0NTMifQ",
+    "payload": "eyJkb21haW4iOiJrYW1pLW1lcmdlLnZlcmNlbC5hcHAifQ",
+    "signature": "/yWKOyZep7wJ/5g7VR/fSy/OTmeELtWIiUnaQGzcDVY21Xib7CqqNWbtHUP51AAdYZxh8kBKrypaAb2kB2Tmwhs="
+  },
   "frame": {
     "version": "1",
     "name": "Kami Merge",
