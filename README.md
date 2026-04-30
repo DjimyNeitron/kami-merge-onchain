@@ -132,6 +132,32 @@ npm run start     # Serve the production build
 - [ ] Production deploy to Vercel + mainnet switch
 - [ ] Submit to the Startale App directory
 
+## Backend (Supabase)
+
+Off-chain leaderboard, user profiles, and personal-best tracking live
+in Supabase. The schema, RLS policies, and the score-submission Edge
+Function are all checked into this repo and deployed via the Supabase
+CLI.
+
+- **Schema migrations:** `supabase/migrations/`
+- **Edge functions:** `supabase/functions/`
+- **TypeScript types:** `src/types/supabase.ts` (generated; regenerate
+  after schema changes via
+  `npx supabase gen types typescript --linked > src/types/supabase.ts`)
+
+Required env vars (see `.env.local.example`):
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` — server-side only, never prefix
+  `NEXT_PUBLIC_`
+
+The `submit-score` Edge Function verifies a Farcaster Quick Auth JWT,
+plausibility-checks the payload, enforces a 60-second per-FID rate
+limit, and uses `(fid, client_nonce)` for replay protection. The
+service-role key never reaches the browser; all writes go through the
+function.
+
 ## Security
 
 A living security checklist lives in `docs/SECURITY_AUDIT.md` (planned).
