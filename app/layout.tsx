@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Web3Provider } from "@/components/Web3Provider";
+import FarcasterUserBadge from "@/components/FarcasterUserBadge";
 
 // Canonical site origin — used by every absolute URL in the embed
 // metadata below. Exposing it as a const keeps the four occurrences
@@ -105,7 +106,16 @@ export default function RootLayout({
         {/* Web3Provider is a client component nested inside this server
          * component — valid in the Next.js App Router. Everything below
          * (game canvas, settings, dev panel) can freely use wagmi hooks. */}
-        <Web3Provider>{children}</Web3Provider>
+        <Web3Provider>
+          {/* FarcasterUserBadge sits as a sibling of {children} so it
+           * floats above the game canvas regardless of game state, but
+           * still inside Web3Provider — the hook it uses (useConnect)
+           * needs the wagmi context. Component is fully self-gating:
+           * returns null in standalone web / SSR / no-user cases, so
+           * mounting it unconditionally here is safe. */}
+          <FarcasterUserBadge />
+          {children}
+        </Web3Provider>
       </body>
     </html>
   );

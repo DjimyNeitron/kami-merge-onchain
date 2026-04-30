@@ -185,8 +185,10 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
   // Probing state: the SDK promise hasn't resolved yet. We don't know
   // whether to show "Connect Wallet" (would confuse a Mini App user
   // with no wallet UX) or skip straight to Welcome, so render a quiet
-  // loader instead.
-  const probing = isMiniApp === undefined || !miniAppReady;
+  // loader instead. !miniAppReady alone is sufficient because the
+  // hook only flips isReady=true once isMiniApp has settled to its
+  // final value (see useMiniAppContext.ts).
+  const probing = !miniAppReady;
 
   // TEMP diagnostic — logs only on input change. Kept in for now while
   // the chain-lock + Mini App flows stabilise; remove on a future pass.

@@ -7,6 +7,43 @@ import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
 import { soneium } from "viem/chains";
 
 /**
+ * Public Farcaster identity surface — projection of the SDK's
+ * UserContext narrowed to the fields we actually render.
+ *
+ * SECURITY: this is unauthenticated client-side data. The host
+ * iframe can hand us any `fid` it wants — `sdk.context` is a UX
+ * convenience, not an identity proof. Never use it to gate scoring,
+ * leaderboard writes, NFT mints, or anything else with onchain
+ * implications. Real authentication still flows through wallet
+ * signatures (wagmi). This shape exists only for personalisation.
+ */
+export type FarcasterUser = {
+  fid: number;
+  username?: string;
+  displayName?: string;
+  pfpUrl?: string;
+};
+
+/**
+ * Narrowed surface of the SDK's LocationContext.type union. The SDK
+ * exposes more variants (`cast_share`, `channel`, `open_miniapp`)
+ * but we collapse anything not in the MVP-relevant set to
+ * `'unknown'` so the consumer can switch on a closed enum.
+ */
+export type MiniAppLocation =
+  | "cast_embed"
+  | "notification"
+  | "launcher"
+  | "unknown";
+
+export type MiniAppContextValue = {
+  isMiniApp: boolean;
+  isReady: boolean;
+  user: FarcasterUser | null;
+  location: MiniAppLocation | null;
+};
+
+/**
  * Detects whether the app is running inside a Farcaster Mini App host
  * (Warpcast, Startale App, etc.) and, if so, auto-connects through the
  * host wallet via the @farcaster/miniapp-wagmi-connector.
@@ -16,7 +53,9 @@ import { soneium } from "viem/chains";
  *     Mini App host. We mark `isMiniApp = true`, fire `connect()` with
  *     the Farcaster connector pre-targeted at Soneium mainnet, then
  *     hand off to the host with `sdk.actions.ready()` so it can hide
- *     its splash screen.
+ *     its splash screen. The user/location shape from `ctx` is
+ *     surfaced for personalisation (badge, greeting); see SECURITY
+ *     note on FarcasterUser above for the trust boundary.
  *   - Resolves with `null` (or rejects) when running standalone. We
  *     mark `isMiniApp = false` and let the existing RainbowKit /
  *     useActualChainId flow take over.
@@ -26,20 +65,17 @@ import { soneium } from "viem/chains";
  * Mini App path the host manages chain switching, so we don't need
  * the wallet-extension-aware EIP-1193 plumbing at all.
  *
- * Return shape:
- *   - `isMiniApp`:
- *       `undefined` while the SDK probe is in flight (callers should
- *       treat this as "still loading" and not show wallet UX yet);
- *       `true`  inside a Mini App host (auto-connect kicked off);
- *       `false` for standalone web (use the legacy splash flow).
- *   - `isReady`:
- *       `true` once we've either signalled the host (Mini App path)
- *       or decided we're standalone. Use this to gate any UI that
- *       must wait for the probe to resolve.
+ * Return shape: see MiniAppContextValue. `isMiniApp` is typed as a
+ * boolean for caller convenience; while the probe is in flight it
+ * reads `false` and `isReady` is the gate for "we know which world
+ * we're in". `user`/`location` are `null` until the probe resolves
+ * (or forever in the standalone path).
  */
-export function useMiniAppContext() {
-  const [isMiniApp, setIsMiniApp] = useState<boolean | undefined>(undefined);
+export function useMiniAppContext(): MiniAppContextValue {
+  const [isMiniApp, setIsMiniApp] = useState<boolean>(false);
   const [isReady, setIsReady] = useState(false);
+  const [user, setUser] = useState<FarcasterUser | null>(null);
+  const [location, setLocation] = useState<MiniAppLocation | null>(null);
   const { connect } = useConnect();
 
   useEffect(() => {
@@ -51,6 +87,36 @@ export function useMiniAppContext() {
         if (ctx) {
           console.log("[useMiniAppContext] Mini App detected", ctx);
           setIsMiniApp(true);
+
+          // Project the SDK's UserContext onto our narrower
+          // FarcasterUser shape. ctx.user.fid is mandatory in the SDK
+          // type; the rest are optional. Defensive checks because a
+          // misbehaving host could in theory hand us a malformed
+          // payload — the type system trusts the SDK, but runtime
+          // shouldn't.
+          if (ctx.user && typeof ctx.user.fid === "number") {
+            setUser({
+              fid: ctx.user.fid,
+              username: ctx.user.username,
+              displayName: ctx.user.displayName,
+              pfpUrl: ctx.user.pfpUrl,
+            });
+          }
+
+          // Narrow the SDK's LocationContext.type union to our enum.
+          // Variants outside the MVP-relevant set collapse to 'unknown'
+          // so consumers can do an exhaustive switch.
+          const rawLoc = ctx.location?.type;
+          if (
+            rawLoc === "cast_embed" ||
+            rawLoc === "notification" ||
+            rawLoc === "launcher"
+          ) {
+            setLocation(rawLoc);
+          } else if (rawLoc) {
+            setLocation("unknown");
+          }
+
           // Auto-connect through the host wallet, pre-targeting
           // Soneium mainnet so wagmi's chainId state lines up with
           // gameplay expectations from the first render. (Mainnet
@@ -90,5 +156,5 @@ export function useMiniAppContext() {
     };
   }, [connect]);
 
-  return { isMiniApp, isReady };
+  return { isMiniApp, isReady, user, location };
 }
