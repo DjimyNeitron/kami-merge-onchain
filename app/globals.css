@@ -266,6 +266,14 @@ button {
   color: transparent;
   text-shadow: 0 2px 8px rgba(var(--gold-rgb) / 0.25);
   letter-spacing: var(--tracking-normal);
+  /* Descenders need vertical room — `background-clip: text` constrains
+   * the rendered ink to the line-box, so any consumer that applies
+   * `leading-none` (= 1) ends up cropping the tail of "g" / "y" / "p"
+   * at the splash heading. 1.15 is just enough that descenders sit
+   * inside the box without changing the visual stacking elsewhere.
+   * Wins over Tailwind's `leading-none` utility because the rule is
+   * unlayered while `.leading-none` lives in @layer utilities. */
+  line-height: 1.15;
 }
 
 /* Scroll panel (game over) */
