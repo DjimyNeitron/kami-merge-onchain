@@ -227,7 +227,7 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
       style={{
         zIndex: 100,
         background:
-          "linear-gradient(rgba(5,5,15,0.7), rgba(5,5,15,0.7)), url('/bg_game.jpg') center center / cover no-repeat fixed",
+          "linear-gradient(rgba(var(--indigo-rgb) / 0.7), rgba(var(--indigo-rgb) / 0.7)), url('/bg_game.jpg') center center / cover no-repeat fixed",
         paddingTop: "max(24px, env(safe-area-inset-top))",
         paddingBottom: "max(24px, env(safe-area-inset-bottom))",
       }}
@@ -236,7 +236,7 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
         <h1 className="kami-title kami-serif text-5xl sm:text-6xl font-bold leading-none">
           Kami Merge
         </h1>
-        <p className="kami-serif text-[#c8a84e]/85 tracking-[0.3em] text-base sm:text-lg">
+        <p className="kami-serif text-(--gold-200)/85 tracking-(--tracking-spaced) text-base sm:text-lg">
           神マージ
         </p>
 
@@ -255,7 +255,7 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
                 width: 24,
                 height: 24,
                 objectFit: "contain",
-                filter: "drop-shadow(0 0 4px rgba(200,168,78,0.4))",
+                filter: "drop-shadow(0 0 4px rgba(var(--gold-rgb) / 0.4))",
               }}
             />
           ))}
@@ -320,17 +320,17 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
             <div className="flex flex-col items-center gap-3 max-w-[22rem]">
               <div
                 className="text-4xl leading-none"
-                style={{ color: "#e87d3e" }}
+                style={{ color: "var(--accent-warning)" }}
                 aria-hidden="true"
               >
                 ⚠
               </div>
-              <h2 className="kami-serif text-xl font-semibold tracking-wider text-[#c8a04a]">
+              <h2 className="kami-serif text-xl font-semibold tracking-wider text-(--gold-200)">
                 Wrong Network
               </h2>
               <p className="kami-serif text-white/85 text-sm sm:text-base leading-relaxed text-center">
                 Kami Merge runs on{" "}
-                <strong className="text-[#c8a04a]">Soneium</strong>.
+                <strong className="text-(--gold-200)">Soneium</strong>.
                 <br />
                 You&rsquo;re currently on{" "}
                 {actualChainId !== undefined &&
@@ -347,10 +347,10 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
                   handleSwitchChain();
                 }}
                 disabled={isSwitching}
-                className="splash-pulse kami-serif text-[#f5e6c8] text-base sm:text-lg font-semibold tracking-wider px-6 py-2.5 rounded-md border border-[#c8a04a]/70 hover:bg-[#c8a04a]/10 transition-colors disabled:opacity-60 disabled:animation-none disabled:cursor-wait"
+                className="splash-pulse kami-serif text-(--gold-50) text-base sm:text-lg font-semibold tracking-wider px-6 py-2.5 rounded-md border border-(--gold-200)/70 hover:bg-(--gold-200)/10 transition-colors disabled:opacity-60 disabled:animation-none disabled:cursor-wait"
                 style={{
                   touchAction: "manipulation",
-                  boxShadow: "0 0 14px rgba(200,160,74,0.18)",
+                  boxShadow: "0 0 14px rgba(var(--gold-rgb) / 0.18)",
                 }}
               >
                 {isSwitching ? "Switching…" : "Switch to Soneium"}
@@ -373,10 +373,10 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
           {effectivelyConnected && (
             <>
               {walletReady ? (
-                <p className="kami-serif text-[#f5e6c8]/90 text-base sm:text-lg">
+                <p className="kami-serif text-(--gold-50)/90 text-base sm:text-lg">
                   Welcome,{" "}
                   <span
-                    className="text-[#c8a84e] font-semibold"
+                    className="text-(--gold-200) font-semibold"
                     style={{ fontFamily: "ui-monospace, Menlo, monospace" }}
                   >
                     {formatAddress(address!)}
@@ -387,7 +387,7 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
                 // be confused with a real wallet welcome line.
                 <p
                   className="kami-serif text-base sm:text-lg font-medium"
-                  style={{ color: "#ff9800" }}
+                  style={{ color: "var(--accent-warning)" }}
                 >
                   🛠 Dev mode (no wallet)
                 </p>
@@ -399,10 +399,10 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
                   e.preventDefault();
                   onStart();
                 }}
-                className="splash-pulse kami-serif text-[#f5e6c8] text-lg sm:text-xl font-semibold tracking-wider px-8 py-3 rounded-md border border-[#c8a04a]/70 hover:bg-[#c8a04a]/10 transition-colors"
+                className="splash-pulse kami-serif text-(--gold-50) text-lg sm:text-xl font-semibold tracking-wider px-8 py-3 rounded-md border border-(--gold-200)/70 hover:bg-(--gold-200)/10 transition-colors"
                 style={{
                   touchAction: "manipulation",
-                  boxShadow: "0 0 14px rgba(200,160,74,0.18)",
+                  boxShadow: "0 0 14px rgba(var(--gold-rgb) / 0.18)",
                 }}
               >
                 ~ Tap to Start ~
@@ -430,7 +430,7 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
         className="w-full flex justify-between items-end px-5"
         style={{ zIndex: 101 }}
       >
-        <span className="kami-serif text-[#c8a84e]/60 text-xs">v0.1</span>
+        <span className="kami-serif text-(--gold-200)/60 text-xs">v0.1</span>
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -448,9 +448,9 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
           style={{
             width: 40,
             height: 40,
-            color: "#c8a84e",
-            background: "rgba(10, 10, 25, 0.4)",
-            border: "1px solid rgba(200, 168, 78, 0.35)",
+            color: "var(--gold-200)",
+            background: "rgba(var(--indigo-rgb) / 0.4)",
+            border: "1px solid rgba(var(--gold-rgb) / 0.35)",
             touchAction: "manipulation",
           }}
         >

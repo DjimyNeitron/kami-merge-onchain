@@ -81,17 +81,17 @@ export default function Settings({
            * default to `min-height: auto`, which prevents shrinking
            * below intrinsic content size and defeats `overflow-y-auto`
            * on tight viewports. */}
-          <div className="scroll-panel kami-serif text-[#3d2510] border-x border-[#8a6f28]/40 flex flex-col max-h-[min(90vh,800px)]">
+          <div className="scroll-panel kami-serif text-(--wood-dark) border-x border-(--gold-700)/40 flex flex-col max-h-[min(90vh,800px)]">
             {/* Scrollable content region */}
             <div className="flex-1 min-h-0 overflow-y-auto px-5 pt-4 pb-2">
               {/* H1 — only bold heading in the panel */}
-              <div className="text-3xl font-bold tracking-[0.08em] text-center leading-none">
+              <div className="text-3xl font-bold tracking-(--tracking-extra) text-center leading-none">
                 Settings
               </div>
-              <div className="text-base tracking-[0.2em] text-[#5c3a1e]/60 text-center mt-1">
+              <div className="text-base tracking-(--tracking-cap) text-(--wood-light)/60 text-center mt-1">
                 設定
               </div>
-              <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-2" />
+              <div className="h-px bg-gradient-to-r from-transparent via-(--gold-700)/50 to-transparent my-2" />
 
               <ToggleRow
                 icon={<SuzuIcon muted={!sfxEnabled} size={28} />}
@@ -159,7 +159,7 @@ export default function Settings({
                   padding: 8,
                   background: "transparent",
                   border: "none",
-                  color: "#3d2510",
+                  color: "var(--wood-dark)",
                   lineHeight: 0,
                   cursor: bgmEnabled ? "pointer" : "not-allowed",
                   touchAction: "manipulation",
@@ -197,7 +197,7 @@ export default function Settings({
                     className="px-1 pt-0.5 pb-1"
                     style={{ opacity: bgmEnabled ? 1 : 0.4 }}
                   >
-                    <div className="text-xs uppercase tracking-[0.2em] text-[#5c3a1e]/65 text-center mb-1">
+                    <div className="text-xs uppercase tracking-(--tracking-cap) text-(--wood-light)/65 text-center mb-1">
                       Track
                     </div>
                     <div className="flex items-center gap-2">
@@ -222,7 +222,7 @@ export default function Settings({
                         {PrevIcon}
                       </button>
                       <span
-                        className="flex-1 text-center text-sm text-[#3d2510] leading-tight truncate"
+                        className="flex-1 text-center text-sm text-(--wood-dark) leading-tight truncate"
                         title={trackLabel}
                       >
                         {trackLabel}
@@ -252,13 +252,13 @@ export default function Settings({
                 );
               })()}
 
-              <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-2" />
+              <div className="h-px bg-gradient-to-r from-transparent via-(--gold-700)/50 to-transparent my-2" />
 
               {/* H2 — regular weight, matches Sound/Music size */}
-              <div className="text-xl uppercase tracking-[0.2em] text-[#5c3a1e]/75 text-center">
+              <div className="text-xl uppercase tracking-(--tracking-cap) text-(--wood-light)/75 text-center">
                 Yokai Collection
               </div>
-              <div className="text-sm tracking-[0.15em] text-[#5c3a1e]/60 text-center mt-0.5 mb-1">
+              <div className="text-sm tracking-(--tracking-label) text-(--wood-light)/60 text-center mt-0.5 mb-1">
                 妖怪図鑑
               </div>
               <div className="grid grid-cols-4 gap-x-2 gap-y-1 mb-1">
@@ -282,7 +282,7 @@ export default function Settings({
                       className="flex flex-col items-center gap-0.5 p-1 rounded"
                       style={{
                         background: isUnlocked
-                          ? "rgba(200, 168, 78, 0.12)"
+                          ? "rgba(var(--gold-rgb) / 0.12)"
                           : "transparent",
                         border: "none",
                         cursor: isUnlocked ? "pointer" : "default",
@@ -299,14 +299,14 @@ export default function Settings({
                           objectFit: "contain",
                           opacity: isUnlocked ? 1 : 0.3,
                           filter: isUnlocked
-                            ? "drop-shadow(0 0 3px rgba(200,168,78,0.5))"
+                            ? "drop-shadow(0 0 3px rgba(var(--gold-rgb) / 0.5))"
                             : "grayscale(1) brightness(0.7)",
                         }}
                       />
-                      <div className="text-sm text-center text-[#3d2510] leading-tight">
+                      <div className="text-sm text-center text-(--wood-dark) leading-tight">
                         {isUnlocked ? y.name : "???"}
                       </div>
-                      <div className="text-xs tracking-[0.15em] text-[#5c3a1e]/60 leading-none">
+                      <div className="text-xs tracking-(--tracking-label) text-(--wood-light)/60 leading-none">
                         {isUnlocked ? y.kanji : "\u00a0"}
                       </div>
                     </button>
@@ -314,9 +314,9 @@ export default function Settings({
                 })}
               </div>
 
-              <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-2" />
+              <div className="h-px bg-gradient-to-r from-transparent via-(--gold-700)/50 to-transparent my-2" />
 
-              <div className="text-[0.65rem] text-[#5c3a1e]/65 text-center tracking-wider">
+              <div className="text-[0.65rem] text-(--wood-light)/65 text-center tracking-wider">
                 Made by Kody Productions · Powered by Soneium
               </div>
             </div>
@@ -325,8 +325,10 @@ export default function Settings({
              * scroll position. Top border + cream-fade blends it into the
              * parchment so it reads as an action bar, not a hard cut. */}
             <div
-              className="shrink-0 px-5 pt-3 pb-4 flex justify-center border-t border-[#8a6f28]/25"
+              className="shrink-0 px-5 pt-3 pb-4 flex justify-center border-t border-(--gold-700)/25"
               style={{
+                // Parchment alphas — no --gold-50-rgb token in migration
+                // mapping, so kept as literals (see STYLE_MIGRATION_REPORT).
                 background:
                   "linear-gradient(to top, rgba(229,214,176,0.95), rgba(245,230,200,0.4))",
               }}
@@ -343,7 +345,7 @@ export default function Settings({
                 style={{ touchAction: "manipulation" }}
               >
                 <span>Close</span>
-                <span className="text-xs tracking-[0.15em] opacity-70 mt-0.5">
+                <span className="text-xs tracking-(--tracking-label) opacity-70 mt-0.5">
                   閉じる
                 </span>
               </button>
@@ -386,7 +388,7 @@ function ToggleRow({
           style={{
             width: 28,
             height: 28,
-            color: "#c8a84e",
+            color: "var(--gold-200)",
             opacity: enabled ? 1 : 0.5,
           }}
         >
@@ -394,8 +396,8 @@ function ToggleRow({
         </span>
         <div className="flex flex-col leading-tight">
           {/* H2 — regular weight, sized to match Yokai Collection heading */}
-          <span className="text-xl text-[#3d2510]">{label}</span>
-          <span className="text-sm tracking-[0.15em] text-[#5c3a1e]/60">
+          <span className="text-xl text-(--wood-dark)">{label}</span>
+          <span className="text-sm tracking-(--tracking-label) text-(--wood-light)/60">
             {kanji}
           </span>
         </div>
@@ -409,6 +411,7 @@ function ToggleRow({
         }}
         type="button"
         aria-label={`Toggle ${label}`}
+        className="rounded-full"
         style={{
           width: "48px",
           minWidth: "48px",
@@ -418,17 +421,19 @@ function ToggleRow({
           display: "inline-block",
           position: "relative",
           boxSizing: "border-box",
-          borderRadius: "9999px",
           padding: 0,
           margin: 0,
           border: "none",
-          background: enabled ? "#8a6f28" : "#4a4a4a",
+          // #4a4a4a is the toggle "off" neutral grey — unmapped, no token.
+          // See STYLE_MIGRATION_REPORT under "Unmapped hardcodes".
+          background: enabled ? "var(--gold-700)" : "#4a4a4a",
           transition: "background-color 0.2s",
           touchAction: "manipulation",
           cursor: "pointer",
         }}
       >
         <span
+          className="rounded-full"
           style={{
             position: "absolute",
             top: "50%",
@@ -437,9 +442,8 @@ function ToggleRow({
             height: "20px",
             margin: 0,
             boxSizing: "border-box",
-            borderRadius: "9999px",
             background: "#ffffff",
-            boxShadow: "0 1px 2px rgba(0, 0, 0, 0.3)",
+            boxShadow: "0 1px 2px rgba(var(--black-rgb) / 0.3)",
             transform: enabled
               ? "translate(24px, -50%)"
               : "translate(0, -50%)",

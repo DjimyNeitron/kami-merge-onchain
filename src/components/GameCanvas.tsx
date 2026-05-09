@@ -440,25 +440,25 @@ export default function GameCanvas() {
         style={{ maxWidth: CANVAS_WIDTH }}
       >
         <div className="flex flex-col items-start leading-tight">
-          <span className="kami-serif text-[0.6rem] uppercase tracking-[0.15em] text-[#c8a84e]">
+          <span className="kami-serif text-[0.6rem] uppercase tracking-(--tracking-label) text-(--gold-200)">
             Score
           </span>
-          <span className="kami-serif text-xl sm:text-2xl font-bold text-[#f5e6c8]">
+          <span className="kami-serif text-xl sm:text-2xl font-bold text-(--gold-50)">
             {score}
           </span>
         </div>
-        <div className="h-8 w-px bg-[#c8a84e]/25" />
+        <div className="h-8 w-px bg-(--gold-200)/25" />
         <div className="flex flex-col items-center leading-tight">
-          <span className="kami-serif text-[0.6rem] uppercase tracking-[0.15em] text-[#c8a84e]">
+          <span className="kami-serif text-[0.6rem] uppercase tracking-(--tracking-label) text-(--gold-200)">
             High
           </span>
-          <span className="kami-serif text-lg sm:text-xl font-semibold text-[#f5e6c8]/90">
+          <span className="kami-serif text-lg sm:text-xl font-semibold text-(--gold-50)/90">
             {highScore}
           </span>
         </div>
-        <div className="h-8 w-px bg-[#c8a84e]/25" />
+        <div className="h-8 w-px bg-(--gold-200)/25" />
         <div className="flex items-center gap-2">
-          <span className="kami-serif text-[0.6rem] uppercase tracking-[0.15em] text-[#c8a84e]">
+          <span className="kami-serif text-[0.6rem] uppercase tracking-(--tracking-label) text-(--gold-200)">
             Next
           </span>
           {next ? (
@@ -473,9 +473,9 @@ export default function GameCanvas() {
                 height: 40,
                 objectFit: "contain",
                 padding: 2,
-                border: "1px solid rgba(200, 168, 78, 0.5)",
-                background: "rgba(10, 10, 25, 0.4)",
-                filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.5))",
+                border: "1px solid rgba(var(--gold-rgb) / 0.5)",
+                background: "rgba(var(--indigo-rgb) / 0.4)",
+                filter: "drop-shadow(0 1px 2px rgba(var(--black-rgb) / 0.5))",
               }}
             />
           ) : (
@@ -491,9 +491,9 @@ export default function GameCanvas() {
           style={{
             width: 28,
             height: 28,
-            color: "#c8a84e",
-            background: "rgba(10, 10, 25, 0.3)",
-            border: "1px solid rgba(200, 168, 78, 0.25)",
+            color: "var(--gold-200)",
+            background: "rgba(var(--indigo-rgb) / 0.3)",
+            border: "1px solid rgba(var(--gold-rgb) / 0.25)",
             opacity: muted ? 0.55 : 0.9,
             touchAction: "manipulation",
           }}
@@ -509,9 +509,9 @@ export default function GameCanvas() {
           style={{
             width: 28,
             height: 28,
-            color: "#c8a84e",
-            background: "rgba(10, 10, 25, 0.3)",
-            border: "1px solid rgba(200, 168, 78, 0.25)",
+            color: "var(--gold-200)",
+            background: "rgba(var(--indigo-rgb) / 0.3)",
+            border: "1px solid rgba(var(--gold-rgb) / 0.25)",
             opacity: 0.9,
             touchAction: "manipulation",
           }}
@@ -532,9 +532,9 @@ export default function GameCanvas() {
             touchAction: "none",
             width: 0,
             height: 0,
-            borderRadius: 6,
+            borderRadius: 8,
             boxShadow:
-              "0 10px 30px rgba(0,0,0,0.55), 0 0 0 1px rgba(200,168,78,0.15)",
+              "0 10px 30px rgba(var(--black-rgb) / 0.55), 0 0 0 1px rgba(var(--gold-rgb) / 0.15)",
           }}
         >
           {gameOver && (
@@ -547,24 +547,24 @@ export default function GameCanvas() {
                 {/* Top wooden rod */}
                 <div className="wooden-rod absolute -top-1 left-3 right-3 h-3 rounded-full pointer-events-none" />
                 {/* Paper body */}
-                <div className="scroll-panel px-6 py-8 text-center text-[#3d2510] border-x border-[#8a6f28]/40">
-                  <div className="kami-serif text-2xl font-bold tracking-[0.1em] mb-1">
+                <div className="scroll-panel px-6 py-8 text-center text-(--wood-dark) border-x border-(--gold-700)/40">
+                  <div className="kami-serif text-2xl font-bold tracking-(--tracking-extra) mb-1">
                     GAME OVER
                   </div>
-                  <div className="text-[0.65rem] tracking-[0.3em] text-[#5c3a1e]/60">
+                  <div className="text-[0.65rem] tracking-(--tracking-spaced) text-(--wood-light)/60">
                     終
                   </div>
-                  <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-4" />
-                  <div className="kami-serif text-[0.6rem] uppercase tracking-[0.25em] text-[#5c3a1e]/70">
+                  <div className="h-px bg-gradient-to-r from-transparent via-(--gold-700)/50 to-transparent my-4" />
+                  <div className="kami-serif text-[0.6rem] uppercase tracking-(--tracking-spaced) text-(--wood-light)/70">
                     Final Score
                   </div>
-                  <div className="kami-serif text-4xl font-bold text-[#3d2510] mt-1">
+                  <div className="kami-serif text-4xl font-bold text-(--wood-dark) mt-1">
                     {finalScore}
                   </div>
-                  <div className="kami-serif text-[0.65rem] tracking-wider text-[#5c3a1e]/60 mt-2">
+                  <div className="kami-serif text-[0.65rem] tracking-wider text-(--wood-light)/60 mt-2">
                     Best: {highScore}
                   </div>
-                  <div className="h-px bg-gradient-to-r from-transparent via-[#8a6f28]/50 to-transparent my-4" />
+                  <div className="h-px bg-gradient-to-r from-transparent via-(--gold-700)/50 to-transparent my-4" />
                   <button
                     data-game-overlay
                     onClick={handleRestart}
@@ -615,7 +615,7 @@ export default function GameCanvas() {
                 objectFit: "contain",
                 opacity: isReached ? 1 : 0.25,
                 filter: isReached
-                  ? "drop-shadow(0 0 4px rgba(200,168,78,0.5))"
+                  ? "drop-shadow(0 0 4px rgba(var(--gold-rgb) / 0.5))"
                   : "grayscale(1) brightness(0.6)",
                 transition: "opacity 0.3s ease, filter 0.3s ease",
               }}
@@ -635,9 +635,9 @@ export default function GameCanvas() {
           Restart
         </button>
         {current && (
-          <div className="kami-serif text-[0.65rem] text-[#c8a84e]/60 tracking-wider">
+          <div className="kami-serif text-[0.65rem] text-(--gold-200)/60 tracking-wider">
             Dropping:{" "}
-            <span className="text-[#f5e6c8]/80">{current.name}</span>
+            <span className="text-(--gold-50)/80">{current.name}</span>
           </div>
         )}
       </div>
@@ -734,24 +734,25 @@ function WalletChip({ maxWidth }: { maxWidth: number }) {
         disabled={!ready}
         title="Wallet options"
         aria-label="Wallet options"
-        className="kami-serif px-3 py-1 rounded-full flex items-center gap-1.5 transition-colors"
+        className="kami-serif px-3 py-1 text-xs rounded-full flex items-center gap-1.5 transition-colors"
         style={{
-          fontSize: 12,
-          letterSpacing: "0.05em",
-          color: "#f5e6c8",
-          background: "rgba(10, 10, 25, 0.45)",
-          border: "1px solid rgba(200, 168, 78, 0.4)",
-          boxShadow: "0 0 6px rgba(200,168,78,0.12)",
+          letterSpacing: "var(--tracking-wide)",
+          color: "var(--gold-50)",
+          background: "rgba(var(--indigo-rgb) / 0.45)",
+          border: "1px solid rgba(var(--gold-rgb) / 0.4)",
+          boxShadow: "0 0 6px rgba(var(--gold-rgb) / 0.12)",
           cursor: ready ? "pointer" : "default",
           touchAction: "manipulation",
         }}
       >
         <span
+          className="rounded-full"
           style={{
             width: 6,
             height: 6,
-            borderRadius: "50%",
-            background: "#6fd28a",
+            background: "var(--accent-success)",
+            // green-status alpha — accent-success has no rgb triple token,
+            // see STYLE_MIGRATION_REPORT under "Unmapped hardcodes".
             boxShadow: "0 0 4px rgba(111,210,138,0.8)",
           }}
         />

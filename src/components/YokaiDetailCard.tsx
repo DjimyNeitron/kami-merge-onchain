@@ -80,6 +80,10 @@ export default function YokaiDetailCard({
   // sprite on the parchment without drawing a competing disc. Because
   // drop-shadow follows the alpha silhouette, the shape follows Oni's
   // horns, Tanuki's ears, Kodama's leaves — never a circle.
+  // rgba(26,21,40) is a slightly-purpler indigo than --bg-elev (#1a1a2e),
+  // tuned specifically to plug the alpha-translucent edges of the yokai
+  // sprites against the cream parchment. Unmapped — different RGB triple
+  // than --indigo-rgb (15 15 30). See STYLE_MIGRATION_REPORT.
   const spriteShadow =
     "drop-shadow(0 0 10px rgba(26,21,40,0.85)) drop-shadow(0 0 18px rgba(26,21,40,0.55))";
 
@@ -93,7 +97,7 @@ export default function YokaiDetailCard({
         zIndex: 120,
         // Game atmosphere shows through — blurred + gently darkened, never
         // pure black. backdrop-filter is supported in iOS Safari 9+.
-        backgroundColor: "rgba(0, 0, 0, 0.55)",
+        backgroundColor: "rgba(var(--black-rgb) / 0.55)",
         backdropFilter: "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
       }}
@@ -107,8 +111,8 @@ export default function YokaiDetailCard({
         onClick={(e) => e.stopPropagation()}
       >
         <div
-          className="scroll-panel rounded-lg border-x border-[#8a6f28]/40 h-full flex flex-col overflow-hidden"
-          style={{ color: "#3d2510" }}
+          className="scroll-panel rounded-lg border-x border-(--gold-700)/40 h-full flex flex-col overflow-hidden"
+          style={{ color: "var(--wood-dark)" }}
         >
           {/* Top book-binding ribbon — flush to card top */}
           <div className="wooden-rod shrink-0" style={{ height: 8 }} />
@@ -128,10 +132,9 @@ export default function YokaiDetailCard({
               }}
               type="button"
               aria-label="Close"
-              className="kami-serif absolute top-1 right-3 leading-none"
+              className="kami-serif absolute top-1 right-3 leading-none text-3xl"
               style={{
-                fontSize: 28,
-                color: "#c8a84e",
+                color: "var(--gold-200)",
                 background: "transparent",
                 border: "none",
                 padding: 4,
@@ -167,23 +170,23 @@ export default function YokaiDetailCard({
             </div>
 
             <div
-              className="kami-serif mt-1"
+              className="kami-serif mt-1 text-3xl font-bold"
               style={{
-                fontSize: 32,
-                fontWeight: 700,
-                color: "#c8a84e",
-                letterSpacing: "0.04em",
+                color: "var(--gold-200)",
+                letterSpacing: "var(--tracking-wide)",
+                // 1.1 unmapped — kanji glyphs need tighter leading than
+                // --leading-tight (1.25) to keep stacked accents from
+                // overlapping. See STYLE_MIGRATION_REPORT.
                 lineHeight: 1.1,
               }}
             >
               {yokai.kanji}
             </div>
             <div
-              className="kami-serif mt-1"
+              className="kami-serif mt-1 text-base"
               style={{
-                fontSize: 16,
-                color: "#8a6f28",
-                letterSpacing: "2px",
+                color: "var(--gold-700)",
+                letterSpacing: "var(--tracking-wide)",
                 textTransform: "uppercase",
               }}
             >
@@ -199,11 +202,9 @@ export default function YokaiDetailCard({
             />
 
             <p
-              className="kami-serif"
+              className="kami-serif text-sm leading-relaxed"
               style={{
-                fontSize: 14,
-                color: "#3d2510",
-                lineHeight: 1.7,
+                color: "var(--wood-dark)",
                 maxWidth: 320,
                 textAlign: "left",
               }}
@@ -223,12 +224,11 @@ export default function YokaiDetailCard({
                 }}
               />
               <div
-                className="kami-serif"
+                className="kami-serif text-[11px]"
                 style={{
-                  fontSize: 11,
-                  color: "#8a6f28",
+                  color: "var(--gold-700)",
                   textTransform: "uppercase",
-                  letterSpacing: "2px",
+                  letterSpacing: "var(--tracking-wide)",
                 }}
               >
                 Merge #{yokai.id}

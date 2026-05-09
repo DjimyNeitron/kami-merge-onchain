@@ -13,8 +13,8 @@
 // onchain logic. Real identity for those flows lives in the
 // connected wallet (wagmi).
 //
-// Visual language: dark indigo plate (rgba(10,10,25,0.72)) +
-// hairline gold border (#c8a04a, alpha-mixed via /50) + warm cream
+// Visual language: dark indigo plate (--indigo-rgb at 0.72 alpha) +
+// hairline gold border (--gold-200, alpha-mixed via /50) + warm cream
 // monospace for the address-style FID fallback. Matches the WalletChip
 // in GameCanvas.tsx and the bottom-bar settings button on the splash.
 
@@ -76,7 +76,7 @@ function FarcasterUserBadgeInner() {
 
   return (
     <div
-      className="fixed kami-serif"
+      className="fixed kami-serif rounded-full"
       style={{
         // env(safe-area-inset-*) keeps the chip clear of iOS notch /
         // host header bars. The 16px floor handles browsers that
@@ -88,11 +88,13 @@ function FarcasterUserBadgeInner() {
         alignItems: "center",
         gap: 8,
         padding: "4px 10px 4px 4px",
-        borderRadius: 9999,
-        background: "rgba(10, 10, 25, 0.72)",
+        background: "rgba(var(--indigo-rgb) / 0.72)",
+        // rgb(180, 150, 90) is a slightly-tan version of --gold-200; no
+        // exact rgb triple in the token map, kept literal. See
+        // STYLE_MIGRATION_REPORT under "Unmapped hardcodes".
         border: "1px solid rgba(180, 150, 90, 0.55)",
         boxShadow:
-          "0 0 8px rgba(200, 168, 78, 0.18), 0 1px 2px rgba(0,0,0,0.35)",
+          "0 0 8px rgba(var(--gold-rgb) / 0.18), 0 1px 2px rgba(var(--black-rgb) / 0.35)",
         backdropFilter: "blur(6px)",
         WebkitBackdropFilter: "blur(6px)",
         // Pointer-events: keep the chip non-interactive for now —
@@ -113,35 +115,33 @@ function FarcasterUserBadgeInner() {
           width={SIZE}
           height={SIZE}
           onError={() => setImgFailed(true)}
+          className="rounded-full"
           style={{
             width: SIZE,
             height: SIZE,
-            borderRadius: "50%",
             objectFit: "cover",
             display: "block",
             // 1px gold ring on the avatar so it reads as a single
             // chip even if the pfp's edges happen to clip dark.
-            boxShadow: "0 0 0 1px rgba(200, 168, 78, 0.4)",
+            boxShadow: "0 0 0 1px rgba(var(--gold-rgb) / 0.4)",
           }}
         />
       ) : (
         <div
+          className="rounded-full text-sm font-semibold leading-none"
           style={{
             width: SIZE,
             height: SIZE,
-            borderRadius: "50%",
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
             // Indigo → gold gradient — matches the project's "kami"
             // palette without inventing new colours.
+            // #3a3a6e mid-stop is unmapped (purpler indigo, no token).
             background:
-              "linear-gradient(135deg, #1a1a2e 0%, #3a3a6e 55%, #c8a04a 100%)",
-            color: "#f5e6c8",
-            fontWeight: 600,
-            fontSize: 14,
-            lineHeight: 1,
-            boxShadow: "0 0 0 1px rgba(200, 168, 78, 0.4)",
+              "linear-gradient(135deg, var(--bg-elev) 0%, #3a3a6e 55%, var(--gold-200) 100%)",
+            color: "var(--gold-50)",
+            boxShadow: "0 0 0 1px rgba(var(--gold-rgb) / 0.4)",
           }}
         >
           {fallbackInitial(user.username, user.fid)}
@@ -149,10 +149,10 @@ function FarcasterUserBadgeInner() {
       )}
 
       <span
+        className="text-[13px]"
         style={{
-          color: "#f5e6c8",
-          fontSize: 13,
-          letterSpacing: "0.04em",
+          color: "var(--gold-50)",
+          letterSpacing: "var(--tracking-wide)",
           // Long display names / usernames truncate gracefully so the
           // chip never balloons past the corner.
           maxWidth: 140,
