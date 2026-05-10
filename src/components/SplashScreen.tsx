@@ -31,7 +31,7 @@
 //   ConnectButton, which is the audited entrypoint.
 // - See SECURITY_AUDIT_KAMI_MERGE.md for the full threat model.
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useAccount, useDisconnect, useSwitchChain } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { soneium } from "viem/chains";
@@ -95,6 +95,60 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
   // / Startale-App / Warpcast host, false for standalone web. The hook
   // also fires its own connect() when host is detected.
   const { isMiniApp, isReady: miniAppReady } = useMiniAppContext();
+
+  // Two-video crossfade for a seamless splash loop. The MJ-generated
+  // source clip's first/last frames don't visually match, so a single
+  // <video loop> would show a noticeable pop at the seam every cycle.
+  // Instead we mount two identical <video> elements stacked at
+  // inset:0, fade between them with a 1.5s opacity transition just
+  // before the active clip ends, and swap roles each cycle. To the
+  // eye it reads as one continuous never-ending shot.
+  const videoARef = useRef<HTMLVideoElement>(null);
+  const videoBRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const a = videoARef.current;
+    const b = videoBRef.current;
+    if (!a || !b) return;
+
+    const FADE_MS = 1500;
+    let current = a;
+    let next = b;
+    let crossfading = false;
+
+    // Initial state — A visible, B latent. play() can throw on iOS if
+    // the user gesture hasn't unlocked autoplay yet; we swallow the
+    // rejection silently because muted+playsInline already covers the
+    // mainstream autoplay path.
+    a.style.opacity = "1";
+    b.style.opacity = "0";
+    a.play().catch(() => {});
+
+    const onTimeUpdate = () => {
+      if (!current.duration || crossfading) return;
+      const remaining = current.duration - current.currentTime;
+      if (remaining < FADE_MS / 1000) {
+        crossfading = true;
+        next.currentTime = 0;
+        next.play().catch(() => {});
+        next.style.opacity = "1";
+        current.style.opacity = "0";
+        window.setTimeout(() => {
+          const oldCurrent = current;
+          current = next;
+          next = oldCurrent;
+          crossfading = false;
+        }, FADE_MS);
+      }
+    };
+
+    a.addEventListener("timeupdate", onTimeUpdate);
+    b.addEventListener("timeupdate", onTimeUpdate);
+    return () => {
+      a.removeEventListener("timeupdate", onTimeUpdate);
+      b.removeEventListener("timeupdate", onTimeUpdate);
+    };
+  }, []);
 
   /**
    * Switch to Soneium mainnet. If the wallet doesn't know about the
@@ -226,25 +280,39 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
       className="fixed inset-0 overflow-hidden animate-splash-fade"
       style={{ zIndex: 100 }}
     >
-      {/* Layer 1: atmospheric video bg. autoPlay+muted+playsInline are
-       *   all required for iOS / mobile-Chrome autoplay. poster keeps
-       *   the existing bg_game.jpg up while the mp4 buffers and as a
-       *   fallback for clients with autoplay disabled. */}
+      {/* Layer 1: atmospheric video bg. Two stacked <video> elements
+       *   drive the crossfade pattern in useEffect above — each plays
+       *   the same source, never loops natively, and the active one
+       *   hands off to the latent one with a 1.5s opacity fade just
+       *   before its currentTime hits duration. The previous v1 video
+       *   had a baked-in 'KAMI MERGE' title so we used object-position
+       *   to crop it; v2 is title-free so the crop hint is dropped.
+       *   muted + playsInline are still required for iOS autoplay;
+       *   preload="auto" buffers both elements upfront so the swap
+       *   doesn't catch the second video mid-load. poster on A only
+       *   covers first-paint before the mp4 decode lands. */}
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <video
+        ref={videoARef}
         src="/kami_merge_splash_mobile.mp4"
         poster="/bg_game.jpg"
-        autoPlay
-        loop
         muted
         playsInline
+        preload="auto"
         aria-hidden="true"
-        // object-position: center 75% pushes the video upward so its
-        // top portion (which carries a baked-in 'KAMI MERGE' watermark
-        // from the MJ source) sits above the visible viewport where
-        // overflow:hidden on the parent crops it. The React h1 title
-        // below now reads as the only title on screen.
-        className="absolute inset-0 w-full h-full object-cover object-[center_75%]"
+        className="absolute inset-0 w-full h-full object-cover"
+        style={{ opacity: 0, transition: "opacity 1500ms ease-in-out" }}
+      />
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+      <video
+        ref={videoBRef}
+        src="/kami_merge_splash_mobile.mp4"
+        muted
+        playsInline
+        preload="auto"
+        aria-hidden="true"
+        className="absolute inset-0 w-full h-full object-cover"
+        style={{ opacity: 0, transition: "opacity 1500ms ease-in-out" }}
       />
       {/* Layer 2: indigo tint, identical opacity to the previous static
        *   linear-gradient (rgba(--indigo-rgb)/0.7). Keeps welcome-flow
