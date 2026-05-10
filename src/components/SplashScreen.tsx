@@ -239,7 +239,12 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
         muted
         playsInline
         aria-hidden="true"
-        className="absolute inset-0 w-full h-full object-cover"
+        // object-position: center 75% pushes the video upward so its
+        // top portion (which carries a baked-in 'KAMI MERGE' watermark
+        // from the MJ source) sits above the visible viewport where
+        // overflow:hidden on the parent crops it. The React h1 title
+        // below now reads as the only title on screen.
+        className="absolute inset-0 w-full h-full object-cover object-[center_75%]"
       />
       {/* Layer 2: indigo tint, identical opacity to the previous static
        *   linear-gradient (rgba(--indigo-rgb)/0.7). Keeps welcome-flow

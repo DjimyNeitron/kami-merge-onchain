@@ -76,7 +76,17 @@ function FarcasterUserBadgeInner() {
 
   return (
     <div
-      className="fixed kami-serif rounded-full"
+      // Padding + gap moved to Tailwind responsive utilities so the
+      // wrapper collapses to a snug circle around the 32x32 avatar
+      // below sm: (where the username span is hidden anyway). At sm+
+      // the pill returns: 4px top/bottom, 4px left, 12px right (~ the
+      // pre-fix asymmetric padding) + 8px gap between avatar and text.
+      // Inline-style padding/gap removed entirely — inline beats class
+      // by specificity, so leaving them inline would defeat the
+      // responsive switch.
+      className="fixed kami-serif rounded-full inline-flex items-center
+                 p-0.5 gap-0
+                 sm:py-1 sm:pl-1 sm:pr-3 sm:gap-2"
       style={{
         // env(safe-area-inset-*) keeps the chip clear of iOS notch /
         // host header bars. The 16px floor handles browsers that
@@ -84,10 +94,6 @@ function FarcasterUserBadgeInner() {
         top: "max(16px, env(safe-area-inset-top))",
         right: "max(16px, env(safe-area-inset-right))",
         zIndex: 150,
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "4px 10px 4px 4px",
         background: "rgba(var(--indigo-rgb) / 0.72)",
         // rgb(180, 150, 90) is a slightly-tan version of --gold-200; no
         // exact rgb triple in the token map, kept literal. See
