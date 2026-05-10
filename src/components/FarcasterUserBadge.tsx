@@ -148,8 +148,13 @@ function FarcasterUserBadgeInner() {
         </div>
       )}
 
+      {/* Hidden below sm: (640px) so the chip collapses to avatar-only
+       *   on iPhone-class viewports (375-414px), where the centered
+       *   header title 'Kami Merge' would otherwise bleed into the
+       *   right-anchored chip. From sm: up the full chip with username
+       *   text returns. */}
       <span
-        className="text-[13px]"
+        className="hidden sm:inline text-[13px]"
         style={{
           color: "var(--gold-50)",
           letterSpacing: "var(--tracking-wide)",
