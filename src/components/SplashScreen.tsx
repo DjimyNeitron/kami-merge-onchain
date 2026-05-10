@@ -223,15 +223,42 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
 
   return (
     <div
-      className="fixed inset-0 flex flex-col items-center justify-between animate-splash-fade"
-      style={{
-        zIndex: 100,
-        background:
-          "linear-gradient(rgba(var(--indigo-rgb) / 0.7), rgba(var(--indigo-rgb) / 0.7)), url('/bg_game.jpg') center center / cover no-repeat fixed",
-        paddingTop: "max(24px, env(safe-area-inset-top))",
-        paddingBottom: "max(24px, env(safe-area-inset-bottom))",
-      }}
+      className="fixed inset-0 overflow-hidden animate-splash-fade"
+      style={{ zIndex: 100 }}
     >
+      {/* Layer 1: atmospheric video bg. autoPlay+muted+playsInline are
+       *   all required for iOS / mobile-Chrome autoplay. poster keeps
+       *   the existing bg_game.jpg up while the mp4 buffers and as a
+       *   fallback for clients with autoplay disabled. */}
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+      <video
+        src="/kami_merge_splash_mobile.mp4"
+        poster="/bg_game.jpg"
+        autoPlay
+        loop
+        muted
+        playsInline
+        aria-hidden="true"
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+      {/* Layer 2: indigo tint, identical opacity to the previous static
+       *   linear-gradient (rgba(--indigo-rgb)/0.7). Keeps welcome-flow
+       *   text legible over the moving footage. */}
+      <div
+        className="absolute inset-0"
+        style={{ background: "rgba(var(--indigo-rgb) / 0.7)" }}
+      />
+      {/* Layer 3: welcome flow. Carries the original flex-column layout
+       *   plus the safe-area-inset paddings. Lives at z >= layers above
+       *   by source order; sub-element bottom bar still uses zIndex:101
+       *   to lift above any future overlays inside the welcome layer. */}
+      <div
+        className="absolute inset-0 flex flex-col items-center justify-between"
+        style={{
+          paddingTop: "max(24px, env(safe-area-inset-top))",
+          paddingBottom: "max(24px, env(safe-area-inset-bottom))",
+        }}
+      >
       <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 text-center">
         <h1 className="kami-title kami-serif text-5xl sm:text-6xl font-bold leading-none">
           Kami Merge
@@ -456,6 +483,7 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
         >
           <MonIcon size={22} />
         </button>
+      </div>
       </div>
     </div>
   );
