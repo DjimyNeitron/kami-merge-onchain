@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NFT Card Render</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: transparent; overflow: hidden; }
+body { display: flex; align-items: center; justify-content: center;
+       width: 240px; height: 336px; }
+
+.card {
+  position: relative; width: 240px; height: 336px; border-radius: 14px;
+  transform-style: preserve-3d; overflow: hidden;
+  background: #0a0d22; will-change: transform;
+}
+.card-art { position: absolute; inset: 0; width: 100%; height: 100%;
+            background-size: cover; background-position: center; z-index: 1; }
+.top-grad, .bot-grad { position: absolute; left: 0; right: 0;
+                       pointer-events: none; z-index: 6; }
+.top-grad { top: 0; height: 56px;
+            background: linear-gradient(to bottom, rgba(12,9,25,0.92),
+                        rgba(12,9,25,0.4) 60%, transparent); }
+.bot-grad { bottom: 0; height: 64px;
+            background: linear-gradient(to top, rgba(12,9,25,0.96) 25%,
+                        rgba(12,9,25,0.5) 70%, transparent); }
+.name, .kanji, .tier-label {
+  position: absolute; z-index: 10;
+  font-family: Georgia, 'Times New Roman', serif;
+  color: #e8c882;
+}
+.name { top: 12px; left: 14px; font-size: 12px; font-weight: 600;
+        letter-spacing: 2.5px; }
+.kanji { top: 9px; right: 14px; font-size: 22px; font-weight: 600;
+         font-family: 'Hiragino Mincho ProN', 'Yu Mincho',
+                      'Noto Serif CJK JP', serif; }
+.tier-label { bottom: 12px; left: 0; right: 0; text-align: center;
+              font-size: 10px; font-weight: 600; letter-spacing: 5px; }
+.frame-border { position: absolute; inset: 0; pointer-events: none;
+                border-radius: 14px; z-index: 30; }
+
+.holo-wrap {
+  position: absolute; inset: 6px; border-radius: 10px;
+  pointer-events: none; z-index: 20; overflow: hidden;
+  -webkit-mask-image: radial-gradient(ellipse 102% 100% at center,
+                      black 60%, transparent 100%);
+  mask-image: radial-gradient(ellipse 102% 100% at center,
+              black 60%, transparent 100%);
+}
+.holo-layer { position: absolute; pointer-events: none; opacity: 0;
+              transition: opacity 0.4s; }
+
+.layer-aurora {
+  inset: 0;
+  background-image:
+    radial-gradient(ellipse 50% 220% at 28% 50%,
+                    rgba(80, 220, 180, 0.55), transparent 45%),
+    radial-gradient(ellipse 40% 200% at 58% 50%,
+                    rgba(180, 100, 240, 0.45), transparent 50%),
+    radial-gradient(ellipse 35% 220% at 78% 50%,
+                    rgba(120, 180, 240, 0.40), transparent 50%);
+  mix-blend-mode: screen;
+  filter: blur(18px);
+  transform: scale(1.2);
+}
+.layer-aurora-streak {
+  inset: -10%;
+  background: linear-gradient(110deg, transparent 38%,
+              rgba(150,255,200,0.35) 49%, rgba(180,200,255,0.45) 50%,
+              rgba(150,255,200,0.35) 51%, transparent 60%);
+  background-size: 200% 200%;
+  mix-blend-mode: screen;
+  filter: blur(8px);
+}
+.layer-sparkles {
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 22% 28%, white 0.5px, transparent 1.6px),
+    radial-gradient(circle at 76% 42%, white 0.5px, transparent 1.4px),
+    radial-gradient(circle at 38% 72%, white 0.5px, transparent 1.6px),
+    radial-gradient(circle at 88% 58%, white 0.5px, transparent 1.4px),
+    radial-gradient(circle at 18% 60%, white 0.5px, transparent 1.4px),
+    radial-gradient(circle at 64% 22%, white 0.5px, transparent 1.4px),
+    radial-gradient(circle at 50% 50%, white 0.5px, transparent 1.4px);
+  mix-blend-mode: screen;
+}
+
+.card.common {
+  --aurora-op: 0.45; --aurora-streak-op: 0.30; --sparkle-op: 0.45;
+}
+.card.rare {
+  --aurora-op: 0.60; --aurora-streak-op: 0.45; --sparkle-op: 0.55;
+}
+.card.epic {
+  --aurora-op: 0.75; --aurora-streak-op: 0.60; --sparkle-op: 0.75;
+}
+.card.legendary {
+  --aurora-op: 0.90; --aurora-streak-op: 0.75; --sparkle-op: 0.95;
+}
+
+[data-style="aurora"].is-hovered .layer-aurora { opacity: var(--aurora-op); }
+[data-style="aurora"].is-hovered .layer-aurora-streak {
+  opacity: var(--aurora-streak-op);
+}
+[data-style="aurora"].is-hovered .layer-sparkles {
+  opacity: calc(var(--sparkle-op) * 0.5);
+}
+
+.card.common .frame-border {
+  box-shadow: inset 0 0 0 2px rgb(180, 150, 90);
+}
+.card.rare .frame-border {
+  box-shadow: inset 0 0 0 2.5px rgb(210, 175, 105);
+}
+.card.epic .frame-border {
+  box-shadow: inset 0 0 0 3px rgb(235, 195, 110),
+              0 0 16px rgba(255, 200, 100, 0.3);
+}
+.card.legendary .frame-border {
+  box-shadow: inset 0 0 0 3px rgb(255, 218, 110),
+              0 0 24px rgba(255, 215, 130, 0.45),
+              0 0 48px rgba(255, 215, 130, 0.25);
+}
+</style>
+</head>
+<body>
+<div class="card" data-tier="common" data-style="aurora" id="card">
+  <div class="card-art" id="art"></div>
+  <div class="top-grad"></div><div class="bot-grad"></div>
+  <div class="name" id="name">KODAMA</div>
+  <div class="kanji" id="kanji">木霊</div>
+  <div class="tier-label" id="tier">COMMON</div>
+  <div class="holo-wrap">
+    <div class="holo-layer layer-aurora"></div>
+    <div class="holo-layer layer-aurora-streak"></div>
+    <div class="holo-layer layer-sparkles"></div>
+  </div>
+  <div class="frame-border"></div>
+</div>
+<script>
+const params = new URLSearchParams(window.location.search);
+const art = params.get('art');
+const name = params.get('name') || 'KODAMA';
+const kanji = params.get('kanji') || '木霊';
+const tier = params.get('tier') || 'common';
+const hover = params.get('hover') === '1';
+
+const card = document.getElementById('card');
+const artEl = document.getElementById('art');
+
+card.className = 'card ' + tier + (hover ? ' is-hovered' : '');
+card.dataset.tier = tier;
+
+document.getElementById('name').textContent = name.toUpperCase();
+document.getElementById('kanji').textContent = kanji;
+document.getElementById('tier').textContent = tier.toUpperCase();
+
+if (art) artEl.style.backgroundImage = `url("${art}")`;
+
+// Frozen cursor pose only matters when hover-on
+if (hover) {
+  card.style.setProperty('--mx', '60%');
+  card.style.setProperty('--my', '40%');
+  card.style.setProperty('--ang', '216deg');
+  const streak = card.querySelector('.layer-aurora-streak');
+  if (streak) streak.style.backgroundPosition = '15% -8%';
+}
+
+window._cardReady = true;
+</script>
+</body>
+</html>
