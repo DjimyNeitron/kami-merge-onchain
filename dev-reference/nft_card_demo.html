@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kami Merge — NFT Card Style Lab</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: radial-gradient(ellipse at center, #1a1530 0%, #0a0815 60%, #050310 100%);
+  min-height: 100vh; color: #e8c882; padding: 24px 16px 48px;
+}
+.app { max-width: 1280px; margin: 0 auto; }
+h1 { font-size: 22px; font-weight: 300; letter-spacing: 6px; text-align: center; margin-bottom: 6px; color: #c8a04c; }
+.subtitle { text-align: center; font-size: 11px; opacity: 0.55; margin-bottom: 24px; letter-spacing: 1.5px; }
+.controls { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; align-items: flex-end; }
+.controls label { font-size: 10px; letter-spacing: 1.5px; color: rgba(232, 200, 130, 0.6); display: flex; flex-direction: column; gap: 4px; }
+.controls input[type="file"], .controls input[type="text"] {
+  background: rgba(20, 18, 38, 0.9); border: 1px solid rgba(200, 160, 76, 0.3);
+  color: #e8c882; padding: 7px 12px; font-size: 12px; border-radius: 5px;
+  font-family: inherit; outline: none;
+}
+.controls input[type="text"] { min-width: 130px; }
+.controls input[type="file"] { padding: 5px 8px; cursor: pointer; max-width: 240px; }
+.controls input:focus { border-color: #c8a04c; }
+.style-selector { display: flex; gap: 6px; justify-content: center; margin-bottom: 32px; flex-wrap: wrap; max-width: 1100px; margin-left: auto; margin-right: auto; }
+.style-btn {
+  background: rgba(20, 18, 38, 0.6); border: 1px solid rgba(200, 160, 76, 0.2);
+  color: rgba(232, 200, 130, 0.7); padding: 8px 12px; font-family: inherit;
+  cursor: pointer; border-radius: 5px; text-align: left; transition: all 0.2s;
+  display: flex; flex-direction: column; gap: 2px; min-width: 130px;
+}
+.style-btn:hover { border-color: rgba(200, 160, 76, 0.5); color: #e8c882; }
+.style-btn.active { background: rgba(200, 160, 76, 0.15); border-color: #c8a04c; color: #ffd285; }
+.style-name { font-size: 11px; font-weight: 600; letter-spacing: 1px; }
+.style-desc { font-size: 9px; opacity: 0.7; letter-spacing: 0.3px; }
+.cards-row { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; perspective: 1100px; }
+.card-stage { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.stage-inner { width: 240px; height: 336px; perspective: 1100px; display: flex; align-items: center; justify-content: center; }
+.card {
+  position: relative; width: 100%; height: 100%; border-radius: 14px;
+  transform-style: preserve-3d; transform: rotateY(0deg) rotateX(0deg) scale(1);
+  transition: transform 0.4s cubic-bezier(.2,.9,.3,1); overflow: hidden;
+  cursor: grab; background: #0a0d22; will-change: transform;
+}
+.card:active { cursor: grabbing; }
+.card-art { position: absolute; inset: 0; width: 100%; height: 100%; background-size: cover; background-position: center; z-index: 1; }
+.card-art-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: rgba(200, 160, 76, 0.4); font-size: 11px; text-align: center; padding: 16px; z-index: 1; }
+.top-grad, .bot-grad { position: absolute; left: 0; right: 0; pointer-events: none; z-index: 6; }
+.top-grad { top: 0; height: 56px; background: linear-gradient(to bottom, rgba(12,9,25,0.92), rgba(12,9,25,0.4) 60%, transparent); }
+.bot-grad { bottom: 0; height: 64px; background: linear-gradient(to top, rgba(12,9,25,0.96) 25%, rgba(12,9,25,0.5) 70%, transparent); }
+.name, .kanji, .tier-label { position: absolute; z-index: 10; font-family: Georgia, 'Times New Roman', serif; }
+.name { top: 12px; left: 14px; font-size: 12px; font-weight: 600; letter-spacing: 2.5px; }
+.kanji { top: 9px; right: 14px; font-size: 22px; font-weight: 600; font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif CJK JP', serif; }
+.tier-label { bottom: 12px; left: 0; right: 0; text-align: center; font-size: 10px; font-weight: 600; letter-spacing: 5px; }
+.frame-border { position: absolute; inset: 0; pointer-events: none; border-radius: 14px; z-index: 30; }
+.holo-wrap {
+  position: absolute; inset: 6px; border-radius: 10px;
+  pointer-events: none; z-index: 20; overflow: hidden;
+  -webkit-mask-image: radial-gradient(ellipse 102% 100% at center, black 60%, transparent 100%);
+  mask-image: radial-gradient(ellipse 102% 100% at center, black 60%, transparent 100%);
+}
+.holo-layer { position: absolute; pointer-events: none; opacity: 0; transition: opacity 0.4s; }
+
+/* === STYLE 1: RAINBOW HOLO (improved seam removal: scale 1.4 + blur 12) === */
+.layer-rainbow {
+  inset: 0;
+  background: conic-gradient(from var(--ang, 0deg) at var(--mx, 50%) var(--my, 50%),
+    hsl(0, 80%, 62%),
+    hsl(10, 80%, 62%),
+    hsl(20, 80%, 62%),
+    hsl(30, 80%, 62%),
+    hsl(40, 80%, 62%),
+    hsl(50, 80%, 62%),
+    hsl(60, 80%, 62%),
+    hsl(70, 80%, 62%),
+    hsl(80, 80%, 62%),
+    hsl(90, 80%, 62%),
+    hsl(100, 80%, 62%),
+    hsl(110, 80%, 62%),
+    hsl(120, 80%, 62%),
+    hsl(130, 80%, 62%),
+    hsl(140, 80%, 62%),
+    hsl(150, 80%, 62%),
+    hsl(160, 80%, 62%),
+    hsl(170, 80%, 62%),
+    hsl(180, 80%, 62%),
+    hsl(190, 80%, 62%),
+    hsl(200, 80%, 62%),
+    hsl(210, 80%, 62%),
+    hsl(220, 80%, 62%),
+    hsl(230, 80%, 62%),
+    hsl(240, 80%, 62%),
+    hsl(250, 80%, 62%),
+    hsl(260, 80%, 62%),
+    hsl(270, 80%, 62%),
+    hsl(280, 80%, 62%),
+    hsl(290, 80%, 62%),
+    hsl(300, 80%, 62%),
+    hsl(310, 80%, 62%),
+    hsl(320, 80%, 62%),
+    hsl(330, 80%, 62%),
+    hsl(340, 80%, 62%),
+    hsl(350, 80%, 62%),
+    hsl(360, 80%, 62%));
+  mix-blend-mode: overlay;
+  filter: blur(12px);
+  transform: scale(1.4);
+}
+.layer-shine {
+  inset: -10%;
+  background: linear-gradient(105deg, transparent 35%, rgba(255,230,150,0.5) 47%, rgba(200,130,255,0.4) 50%, rgba(100,220,255,0.45) 53%, transparent 65%);
+  background-size: 200% 200%; mix-blend-mode: color-dodge; filter: blur(4px);
+}
+
+/* === STYLE 2: MIRROR SHINE === */
+.layer-mirror-glow {
+  inset: 0;
+  background: radial-gradient(ellipse 55% 35% at var(--mx, 50%) var(--my, 50%),
+    rgba(255, 252, 235, 0.85), rgba(255, 248, 210, 0.35) 25%, rgba(255, 240, 180, 0.08) 55%, transparent 75%);
+  mix-blend-mode: color-dodge;
+}
+.layer-mirror-streak1 {
+  inset: -20%;
+  background: linear-gradient(105deg, transparent 38%, rgba(255, 250, 230, 0.75) 48%, rgba(255, 255, 255, 0.95) 50%, rgba(255, 250, 230, 0.75) 52%, transparent 62%);
+  background-size: 200% 200%; mix-blend-mode: color-dodge; filter: blur(3px);
+}
+.layer-mirror-streak2 {
+  inset: -20%;
+  background: linear-gradient(65deg, transparent 42%, rgba(220, 240, 255, 0.45) 49%, rgba(240, 250, 255, 0.7) 50%, rgba(220, 240, 255, 0.45) 51%, transparent 58%);
+  background-size: 200% 200%; mix-blend-mode: screen; filter: blur(4px);
+}
+
+/* === STYLE 3: PEARL === */
+.layer-pearl {
+  inset: 0;
+  background: conic-gradient(from var(--ang, 0deg) at var(--mx, 50%) var(--my, 50%),
+    hsl(0, 38%, 82%),
+    hsl(10, 38%, 82%),
+    hsl(20, 38%, 82%),
+    hsl(30, 38%, 82%),
+    hsl(40, 38%, 82%),
+    hsl(50, 38%, 82%),
+    hsl(60, 38%, 82%),
+    hsl(70, 38%, 82%),
+    hsl(80, 38%, 82%),
+    hsl(90, 38%, 82%),
+    hsl(100, 38%, 82%),
+    hsl(110, 38%, 82%),
+    hsl(120, 38%, 82%),
+    hsl(130, 38%, 82%),
+    hsl(140, 38%, 82%),
+    hsl(150, 38%, 82%),
+    hsl(160, 38%, 82%),
+    hsl(170, 38%, 82%),
+    hsl(180, 38%, 82%),
+    hsl(190, 38%, 82%),
+    hsl(200, 38%, 82%),
+    hsl(210, 38%, 82%),
+    hsl(220, 38%, 82%),
+    hsl(230, 38%, 82%),
+    hsl(240, 38%, 82%),
+    hsl(250, 38%, 82%),
+    hsl(260, 38%, 82%),
+    hsl(270, 38%, 82%),
+    hsl(280, 38%, 82%),
+    hsl(290, 38%, 82%),
+    hsl(300, 38%, 82%),
+    hsl(310, 38%, 82%),
+    hsl(320, 38%, 82%),
+    hsl(330, 38%, 82%),
+    hsl(340, 38%, 82%),
+    hsl(350, 38%, 82%),
+    hsl(360, 38%, 82%));
+  mix-blend-mode: overlay; filter: blur(16px); transform: scale(1.4);
+}
+
+/* === STYLE 4: OIL SLICK === */
+.layer-oil {
+  inset: 0;
+  background: conic-gradient(from var(--ang, 0deg) at var(--mx, 50%) var(--my, 50%),
+    hsl(250.0, 75%, 38%),
+    hsl(244.2, 76%, 37%),
+    hsl(238.3, 77%, 36%),
+    hsl(232.5, 78%, 35%),
+    hsl(226.7, 78%, 34%),
+    hsl(220.8, 79%, 33%),
+    hsl(215.0, 80%, 32%),
+    hsl(209.2, 79%, 33%),
+    hsl(203.3, 77%, 34%),
+    hsl(197.5, 76%, 35%),
+    hsl(191.7, 75%, 36%),
+    hsl(185.8, 73%, 37%),
+    hsl(180.0, 72%, 38%),
+    hsl(158.3, 72%, 40%),
+    hsl(136.7, 73%, 41%),
+    hsl(115.0, 74%, 43%),
+    hsl(93.3, 74%, 45%),
+    hsl(71.7, 74%, 46%),
+    hsl(50.0, 75%, 48%),
+    hsl(96.7, 74%, 47%),
+    hsl(143.3, 73%, 46%),
+    hsl(190.0, 72%, 45%),
+    hsl(236.7, 72%, 44%),
+    hsl(283.3, 71%, 43%),
+    hsl(330.0, 70%, 42%),
+    hsl(320.0, 71%, 41%),
+    hsl(310.0, 73%, 40%),
+    hsl(300.0, 74%, 38%),
+    hsl(290.0, 75%, 37%),
+    hsl(280.0, 77%, 36%),
+    hsl(270.0, 78%, 35%),
+    hsl(266.7, 78%, 36%),
+    hsl(263.3, 77%, 36%),
+    hsl(260.0, 76%, 36%),
+    hsl(256.7, 76%, 37%),
+    hsl(253.3, 76%, 38%),
+    hsl(250.0, 75%, 38%));
+  mix-blend-mode: screen; filter: blur(12px); transform: scale(1.4);
+}
+.layer-oil-shine {
+  inset: -10%;
+  background: linear-gradient(105deg, transparent 38%, rgba(180,140,220,0.45) 48%, rgba(80,160,200,0.55) 50%, rgba(180,140,220,0.45) 52%, transparent 62%);
+  background-size: 200% 200%; mix-blend-mode: color-dodge; filter: blur(5px);
+}
+
+/* === STYLE 5: BRUSHED METAL === */
+.layer-brushed-pattern {
+  inset: 0;
+  background: repeating-linear-gradient(105deg,
+    transparent 0px, rgba(255, 240, 200, 0.04) 1px, transparent 2px,
+    rgba(255, 230, 170, 0.10) 3px, transparent 5px,
+    rgba(255, 245, 210, 0.05) 7px, transparent 10px);
+  mix-blend-mode: color-dodge;
+}
+.layer-brushed-glow {
+  inset: 0;
+  background: radial-gradient(ellipse 65% 45% at var(--mx, 50%) var(--my, 50%),
+    rgba(255, 230, 160, 0.85), rgba(255, 220, 140, 0.30) 35%, transparent 70%);
+  mix-blend-mode: color-dodge;
+}
+
+/* === STYLE 6: AURORA — vertical color flows, no seams (linear gradients) === */
+.layer-aurora {
+  inset: 0;
+  background-image:
+    radial-gradient(ellipse 50% 220% at 28% 50%, rgba(80, 220, 180, 0.55), transparent 45%),
+    radial-gradient(ellipse 40% 200% at 58% 50%, rgba(180, 100, 240, 0.45), transparent 50%),
+    radial-gradient(ellipse 35% 220% at 78% 50%, rgba(120, 180, 240, 0.40), transparent 50%);
+  mix-blend-mode: screen;
+  filter: blur(18px);
+  transform: scale(1.2);
+}
+.layer-aurora-streak {
+  inset: -10%;
+  background: linear-gradient(110deg, transparent 38%, rgba(150,255,200,0.35) 49%, rgba(180,200,255,0.45) 50%, rgba(150,255,200,0.35) 51%, transparent 60%);
+  background-size: 200% 200%; mix-blend-mode: screen; filter: blur(8px);
+}
+
+/* === STYLE 7: COSMIC NEBULA — dark space with cursor-following gas clouds === */
+.layer-cosmic {
+  inset: 0;
+  background-image:
+    radial-gradient(circle 220px at var(--mx, 50%) var(--my, 50%), rgba(180, 100, 240, 0.60), transparent 60%),
+    radial-gradient(circle at 25% 30%, rgba(80, 100, 220, 0.45), transparent 45%),
+    radial-gradient(circle at 75% 75%, rgba(220, 100, 180, 0.40), transparent 45%),
+    radial-gradient(circle at 80% 25%, rgba(255, 200, 100, 0.30), transparent 35%),
+    radial-gradient(circle at 20% 80%, rgba(100, 200, 220, 0.30), transparent 40%);
+  mix-blend-mode: screen;
+  filter: blur(22px);
+  transform: scale(1.15);
+}
+.layer-cosmic-stars {
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 12% 18%, white 0.7px, transparent 1.8px),
+    radial-gradient(circle at 32% 42%, white 0.5px, transparent 1.6px),
+    radial-gradient(circle at 58% 22%, white 0.6px, transparent 1.7px),
+    radial-gradient(circle at 78% 38%, white 0.5px, transparent 1.5px),
+    radial-gradient(circle at 18% 65%, white 0.6px, transparent 1.7px),
+    radial-gradient(circle at 42% 78%, white 0.5px, transparent 1.5px),
+    radial-gradient(circle at 68% 62%, white 0.7px, transparent 1.8px),
+    radial-gradient(circle at 88% 82%, white 0.5px, transparent 1.4px),
+    radial-gradient(circle at 28% 12%, white 0.4px, transparent 1.3px);
+  mix-blend-mode: screen;
+}
+
+/* === STYLE 8: FROSTED GLASS — bokeh dots, soft and clean === */
+.layer-frost {
+  inset: 0;
+  background-image:
+    radial-gradient(circle 80px at var(--mx, 30%) var(--my, 30%), rgba(255,255,255,0.45), transparent 80%),
+    radial-gradient(circle 60px at calc(var(--mx, 50%) + 70px) calc(var(--my, 50%) + 50px), rgba(220,240,255,0.30), transparent 80%),
+    radial-gradient(circle 50px at calc(var(--mx, 50%) - 60px) calc(var(--my, 50%) + 80px), rgba(255,240,220,0.25), transparent 80%),
+    radial-gradient(circle 40px at calc(var(--mx, 50%) + 30px) calc(var(--my, 50%) - 70px), rgba(220,255,240,0.25), transparent 80%);
+  mix-blend-mode: screen;
+  filter: blur(8px);
+}
+.layer-frost-haze {
+  inset: 0;
+  background: linear-gradient(125deg, rgba(255,255,255,0.05) 0%, rgba(220,230,255,0.10) 50%, rgba(255,240,230,0.05) 100%);
+  mix-blend-mode: overlay;
+}
+
+/* === STYLE 9: SOAP BUBBLE — concentric thin-film rings === */
+.layer-soap {
+  inset: 0;
+  background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%),
+    rgba(255, 220, 200, 0.0) 8%,
+    rgba(180, 220, 255, 0.30) 18%,
+    rgba(255, 200, 220, 0.35) 28%,
+    rgba(180, 255, 200, 0.30) 38%,
+    rgba(255, 240, 180, 0.25) 48%,
+    rgba(220, 180, 255, 0.20) 58%,
+    rgba(180, 220, 255, 0.15) 68%,
+    transparent 85%);
+  mix-blend-mode: screen;
+  filter: blur(8px);
+  transform: scale(1.2);
+}
+
+/* === Sparkles (shared) === */
+.layer-sparkles {
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 22% 28%, white 0.5px, transparent 1.6px),
+    radial-gradient(circle at 76% 42%, white 0.5px, transparent 1.4px),
+    radial-gradient(circle at 38% 72%, white 0.5px, transparent 1.6px),
+    radial-gradient(circle at 88% 58%, white 0.5px, transparent 1.4px),
+    radial-gradient(circle at 18% 60%, white 0.5px, transparent 1.4px),
+    radial-gradient(circle at 64% 22%, white 0.5px, transparent 1.4px),
+    radial-gradient(circle at 50% 50%, white 0.5px, transparent 1.4px);
+  mix-blend-mode: screen;
+}
+
+/* === Tier opacity vars === */
+.card.common {
+  --rainbow-op: 0.32; --shine-op: 0.40; --sparkle-op: 0.45;
+  --mglow-op: 0.55; --mstreak-op: 0.40;
+  --pearl-op: 0.38;
+  --oil-op: 0.38; --oil-shine-op: 0.30;
+  --bglow-op: 0.55;
+  --aurora-op: 0.45; --aurora-streak-op: 0.30;
+  --cosmic-op: 0.55; --cosmic-star-op: 0.45;
+  --frost-op: 0.55; --frost-haze-op: 0.4;
+  --soap-op: 0.45;
+}
+.card.rare {
+  --rainbow-op: 0.42; --shine-op: 0.55; --sparkle-op: 0.55;
+  --mglow-op: 0.70; --mstreak-op: 0.55;
+  --pearl-op: 0.48;
+  --oil-op: 0.50; --oil-shine-op: 0.45;
+  --bglow-op: 0.65;
+  --aurora-op: 0.60; --aurora-streak-op: 0.45;
+  --cosmic-op: 0.70; --cosmic-star-op: 0.6;
+  --frost-op: 0.70; --frost-haze-op: 0.55;
+  --soap-op: 0.60;
+}
+.card.epic {
+  --rainbow-op: 0.50; --shine-op: 0.70; --sparkle-op: 0.75;
+  --mglow-op: 0.85; --mstreak-op: 0.70;
+  --pearl-op: 0.58;
+  --oil-op: 0.62; --oil-shine-op: 0.60;
+  --bglow-op: 0.80;
+  --aurora-op: 0.75; --aurora-streak-op: 0.60;
+  --cosmic-op: 0.85; --cosmic-star-op: 0.75;
+  --frost-op: 0.85; --frost-haze-op: 0.70;
+  --soap-op: 0.75;
+}
+.card.legendary {
+  --rainbow-op: 0.55; --shine-op: 0.85; --sparkle-op: 0.95;
+  --mglow-op: 0.95; --mstreak-op: 0.85;
+  --pearl-op: 0.68;
+  --oil-op: 0.75; --oil-shine-op: 0.75;
+  --bglow-op: 0.95;
+  --aurora-op: 0.90; --aurora-streak-op: 0.75;
+  --cosmic-op: 1.0; --cosmic-star-op: 0.95;
+  --frost-op: 1.0; --frost-haze-op: 0.85;
+  --soap-op: 0.90;
+}
+
+/* === Style activation === */
+[data-style="rainbow"].is-hovered .layer-rainbow { opacity: var(--rainbow-op); }
+[data-style="rainbow"].is-hovered .layer-shine { opacity: var(--shine-op); }
+[data-style="rainbow"].is-hovered .layer-sparkles { opacity: var(--sparkle-op); }
+
+[data-style="mirror"].is-hovered .layer-mirror-glow { opacity: var(--mglow-op); }
+[data-style="mirror"].is-hovered .layer-mirror-streak1 { opacity: var(--mstreak-op); }
+[data-style="mirror"].is-hovered .layer-mirror-streak2 { opacity: calc(var(--mstreak-op) * 0.85); }
+[data-style="mirror"].is-hovered .layer-sparkles { opacity: calc(var(--sparkle-op) * 0.7); }
+
+[data-style="pearl"].is-hovered .layer-pearl { opacity: var(--pearl-op); }
+[data-style="pearl"].is-hovered .layer-shine { opacity: calc(var(--shine-op) * 0.6); }
+[data-style="pearl"].is-hovered .layer-sparkles { opacity: var(--sparkle-op); }
+
+[data-style="oil"].is-hovered .layer-oil { opacity: var(--oil-op); }
+[data-style="oil"].is-hovered .layer-oil-shine { opacity: var(--oil-shine-op); }
+[data-style="oil"].is-hovered .layer-sparkles { opacity: calc(var(--sparkle-op) * 0.5); }
+
+[data-style="brushed"].is-hovered .layer-brushed-pattern { opacity: 1; }
+[data-style="brushed"].is-hovered .layer-brushed-glow { opacity: var(--bglow-op); }
+
+[data-style="aurora"].is-hovered .layer-aurora { opacity: var(--aurora-op); }
+[data-style="aurora"].is-hovered .layer-aurora-streak { opacity: var(--aurora-streak-op); }
+[data-style="aurora"].is-hovered .layer-sparkles { opacity: calc(var(--sparkle-op) * 0.5); }
+
+[data-style="cosmic"].is-hovered .layer-cosmic { opacity: var(--cosmic-op); }
+[data-style="cosmic"].is-hovered .layer-cosmic-stars { opacity: var(--cosmic-star-op); }
+
+[data-style="frost"].is-hovered .layer-frost { opacity: var(--frost-op); }
+[data-style="frost"].is-hovered .layer-frost-haze { opacity: var(--frost-haze-op); }
+[data-style="frost"].is-hovered .layer-sparkles { opacity: calc(var(--sparkle-op) * 0.4); }
+
+[data-style="soap"].is-hovered .layer-soap { opacity: var(--soap-op); }
+[data-style="soap"].is-hovered .layer-sparkles { opacity: calc(var(--sparkle-op) * 0.4); }
+
+/* Frame styling per tier */
+.card.common .name, .card.common .kanji { color: rgb(180, 150, 90); }
+.card.common .tier-label { color: rgb(140, 115, 60); }
+.card.common .frame-border { box-shadow: inset 0 0 0 2px rgb(180, 150, 90); }
+.card.rare .name, .card.rare .kanji { color: rgb(210, 175, 105); }
+.card.rare .tier-label { color: rgb(180, 145, 85); }
+.card.rare .frame-border { box-shadow: inset 0 0 0 2.5px rgb(210, 175, 105); }
+.card.epic .name, .card.epic .kanji { color: rgb(235, 195, 110); }
+.card.epic .tier-label { color: rgb(220, 180, 100); }
+.card.epic .frame-border { box-shadow: inset 0 0 0 3px rgb(235, 195, 110), 0 0 16px rgba(255, 200, 100, 0.3); }
+.card.legendary .name, .card.legendary .kanji { color: rgb(255, 218, 110); }
+.card.legendary .tier-label { color: rgb(255, 215, 110); }
+.card.legendary .frame-border { box-shadow: inset 0 0 0 3px rgb(255, 218, 110), 0 0 24px rgba(255, 215, 130, 0.45), 0 0 48px rgba(255, 215, 130, 0.25); }
+
+.label { font-size: 11px; letter-spacing: 3px; font-weight: 500; color: rgba(232, 200, 130, 0.7); }
+.instruction { text-align: center; font-size: 11px; margin-top: 28px; opacity: 0.55; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>KAMI MERGE · STYLE LAB</h1>
+  <p class="subtitle">9 holo styles × 4 tiers · live mouse interaction</p>
+
+  <div class="controls">
+    <label>Загрузи арт<input type="file" accept="image/*" id="imgInput"></label>
+    <label>Имя yokai<input type="text" id="nameInput" value="KODAMA"></label>
+    <label>Кандзи<input type="text" id="kanjiInput" value="木霊"></label>
+  </div>
+
+  <div class="style-selector" id="styleSel">
+    <button class="style-btn active" data-style="rainbow"><span class="style-name">RAINBOW HOLO</span><span class="style-desc">Pokemon-фольга, 36 stops</span></button>
+    <button class="style-btn" data-style="mirror"><span class="style-name">MIRROR SHINE</span><span class="style-desc">Чистый зеркальный блик</span></button>
+    <button class="style-btn" data-style="pearl"><span class="style-name">PEARL</span><span class="style-desc">Пастельная иридесценция</span></button>
+    <button class="style-btn" data-style="oil"><span class="style-name">OIL SLICK</span><span class="style-desc">Тёмная нефтяная фольга</span></button>
+    <button class="style-btn" data-style="brushed"><span class="style-name">BRUSHED METAL</span><span class="style-desc">Полированное золото</span></button>
+    <button class="style-btn" data-style="aurora"><span class="style-name">AURORA</span><span class="style-desc">Северное сияние</span></button>
+    <button class="style-btn" data-style="cosmic"><span class="style-name">COSMIC NEBULA</span><span class="style-desc">Космос + газовые облака</span></button>
+    <button class="style-btn" data-style="frost"><span class="style-name">FROSTED GLASS</span><span class="style-desc">Bokeh на матовом стекле</span></button>
+    <button class="style-btn" data-style="soap"><span class="style-name">SOAP BUBBLE</span><span class="style-desc">Тонкоплёночные кольца</span></button>
+  </div>
+
+  <div class="cards-row">
+    
+    <div class="card-stage">
+      <div class="stage-inner" data-stage>
+        <div class="card common" data-tier="common" data-style="rainbow">
+          <div class="card-art"></div>
+          <div class="card-art-empty">↑ выбери арт</div>
+          <div class="top-grad"></div><div class="bot-grad"></div>
+          <div class="name">KODAMA</div><div class="kanji">木霊</div>
+          <div class="tier-label">COMMON</div>
+          <div class="holo-wrap">
+            <div class="holo-layer layer-rainbow"></div>
+            <div class="holo-layer layer-shine"></div>
+            <div class="holo-layer layer-mirror-glow"></div>
+            <div class="holo-layer layer-mirror-streak1"></div>
+            <div class="holo-layer layer-mirror-streak2"></div>
+            <div class="holo-layer layer-pearl"></div>
+            <div class="holo-layer layer-oil"></div>
+            <div class="holo-layer layer-oil-shine"></div>
+            <div class="holo-layer layer-brushed-pattern"></div>
+            <div class="holo-layer layer-brushed-glow"></div>
+            <div class="holo-layer layer-aurora"></div>
+            <div class="holo-layer layer-aurora-streak"></div>
+            <div class="holo-layer layer-cosmic"></div>
+            <div class="holo-layer layer-cosmic-stars"></div>
+            <div class="holo-layer layer-frost"></div>
+            <div class="holo-layer layer-frost-haze"></div>
+            <div class="holo-layer layer-soap"></div>
+            <div class="holo-layer layer-sparkles"></div>
+          </div>
+          <div class="frame-border"></div>
+        </div>
+      </div>
+      <div class="label">COMMON</div>
+    </div>
+
+    <div class="card-stage">
+      <div class="stage-inner" data-stage>
+        <div class="card rare" data-tier="rare" data-style="rainbow">
+          <div class="card-art"></div>
+          <div class="card-art-empty">↑ выбери арт</div>
+          <div class="top-grad"></div><div class="bot-grad"></div>
+          <div class="name">KODAMA</div><div class="kanji">木霊</div>
+          <div class="tier-label">RARE</div>
+          <div class="holo-wrap">
+            <div class="holo-layer layer-rainbow"></div>
+            <div class="holo-layer layer-shine"></div>
+            <div class="holo-layer layer-mirror-glow"></div>
+            <div class="holo-layer layer-mirror-streak1"></div>
+            <div class="holo-layer layer-mirror-streak2"></div>
+            <div class="holo-layer layer-pearl"></div>
+            <div class="holo-layer layer-oil"></div>
+            <div class="holo-layer layer-oil-shine"></div>
+            <div class="holo-layer layer-brushed-pattern"></div>
+            <div class="holo-layer layer-brushed-glow"></div>
+            <div class="holo-layer layer-aurora"></div>
+            <div class="holo-layer layer-aurora-streak"></div>
+            <div class="holo-layer layer-cosmic"></div>
+            <div class="holo-layer layer-cosmic-stars"></div>
+            <div class="holo-layer layer-frost"></div>
+            <div class="holo-layer layer-frost-haze"></div>
+            <div class="holo-layer layer-soap"></div>
+            <div class="holo-layer layer-sparkles"></div>
+          </div>
+          <div class="frame-border"></div>
+        </div>
+      </div>
+      <div class="label">RARE</div>
+    </div>
+
+    <div class="card-stage">
+      <div class="stage-inner" data-stage>
+        <div class="card epic" data-tier="epic" data-style="rainbow">
+          <div class="card-art"></div>
+          <div class="card-art-empty">↑ выбери арт</div>
+          <div class="top-grad"></div><div class="bot-grad"></div>
+          <div class="name">KODAMA</div><div class="kanji">木霊</div>
+          <div class="tier-label">EPIC</div>
+          <div class="holo-wrap">
+            <div class="holo-layer layer-rainbow"></div>
+            <div class="holo-layer layer-shine"></div>
+            <div class="holo-layer layer-mirror-glow"></div>
+            <div class="holo-layer layer-mirror-streak1"></div>
+            <div class="holo-layer layer-mirror-streak2"></div>
+            <div class="holo-layer layer-pearl"></div>
+            <div class="holo-layer layer-oil"></div>
+            <div class="holo-layer layer-oil-shine"></div>
+            <div class="holo-layer layer-brushed-pattern"></div>
+            <div class="holo-layer layer-brushed-glow"></div>
+            <div class="holo-layer layer-aurora"></div>
+            <div class="holo-layer layer-aurora-streak"></div>
+            <div class="holo-layer layer-cosmic"></div>
+            <div class="holo-layer layer-cosmic-stars"></div>
+            <div class="holo-layer layer-frost"></div>
+            <div class="holo-layer layer-frost-haze"></div>
+            <div class="holo-layer layer-soap"></div>
+            <div class="holo-layer layer-sparkles"></div>
+          </div>
+          <div class="frame-border"></div>
+        </div>
+      </div>
+      <div class="label">EPIC</div>
+    </div>
+
+    <div class="card-stage">
+      <div class="stage-inner" data-stage>
+        <div class="card legendary" data-tier="legendary" data-style="rainbow">
+          <div class="card-art"></div>
+          <div class="card-art-empty">↑ выбери арт</div>
+          <div class="top-grad"></div><div class="bot-grad"></div>
+          <div class="name">KODAMA</div><div class="kanji">木霊</div>
+          <div class="tier-label">LEGENDARY</div>
+          <div class="holo-wrap">
+            <div class="holo-layer layer-rainbow"></div>
+            <div class="holo-layer layer-shine"></div>
+            <div class="holo-layer layer-mirror-glow"></div>
+            <div class="holo-layer layer-mirror-streak1"></div>
+            <div class="holo-layer layer-mirror-streak2"></div>
+            <div class="holo-layer layer-pearl"></div>
+            <div class="holo-layer layer-oil"></div>
+            <div class="holo-layer layer-oil-shine"></div>
+            <div class="holo-layer layer-brushed-pattern"></div>
+            <div class="holo-layer layer-brushed-glow"></div>
+            <div class="holo-layer layer-aurora"></div>
+            <div class="holo-layer layer-aurora-streak"></div>
+            <div class="holo-layer layer-cosmic"></div>
+            <div class="holo-layer layer-cosmic-stars"></div>
+            <div class="holo-layer layer-frost"></div>
+            <div class="holo-layer layer-frost-haze"></div>
+            <div class="holo-layer layer-soap"></div>
+            <div class="holo-layer layer-sparkles"></div>
+          </div>
+          <div class="frame-border"></div>
+        </div>
+      </div>
+      <div class="label">LEGENDARY</div>
+    </div>
+  </div>
+
+  <p class="instruction">
+    9 стилей × 4 tier = 36 комбинаций. Переключай стили вверху, двигай мышью на картах.<br>
+    Загрузи свой NFT через input — все обновится мгновенно.
+  </p>
+</div>
+
+<script>
+const imgInput = document.getElementById('imgInput');
+const nameInput = document.getElementById('nameInput');
+const kanjiInput = document.getElementById('kanjiInput');
+const allCards = document.querySelectorAll('.card');
+const allArts = document.querySelectorAll('.card-art');
+const allEmpties = document.querySelectorAll('.card-art-empty');
+const allNames = document.querySelectorAll('.name');
+const allKanji = document.querySelectorAll('.kanji');
+
+imgInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  allArts.forEach(a => a.style.backgroundImage = 'url(' + url + ')');
+  allEmpties.forEach(e => e.style.display = 'none');
+});
+function updateText() {
+  const n = nameInput.value.toUpperCase();
+  const k = kanjiInput.value;
+  allNames.forEach(el => el.textContent = n);
+  allKanji.forEach(el => el.textContent = k);
+}
+nameInput.addEventListener('input', updateText);
+kanjiInput.addEventListener('input', updateText);
+
+document.querySelectorAll('.style-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
+    e.currentTarget.classList.add('active');
+    const style = e.currentTarget.dataset.style;
+    allCards.forEach(c => c.dataset.style = style);
+  });
+});
+
+document.querySelectorAll('[data-stage]').forEach(stage => {
+  const card = stage.querySelector('.card');
+  stage.addEventListener('mouseenter', () => card.classList.add('is-hovered'));
+  stage.addEventListener('mouseleave', () => {
+    card.classList.remove('is-hovered');
+    card.style.transform = 'rotateY(0) rotateX(0) scale(1)';
+  });
+  stage.addEventListener('mousemove', (e) => {
+    const r = stage.getBoundingClientRect();
+    const x = e.clientX - r.left;
+    const y = e.clientY - r.top;
+    const cx = r.width / 2;
+    const cy = r.height / 2;
+    const ry = ((x - cx) / cx) * 16;
+    const rx = -((y - cy) / cy) * 16;
+    card.style.transform = `rotateY(${ry}deg) rotateX(${rx}deg) scale(1.04)`;
+    const px = (x / r.width) * 100;
+    const py = (y / r.height) * 100;
+    card.style.setProperty('--mx', px + '%');
+    card.style.setProperty('--my', py + '%');
+    card.style.setProperty('--ang', (px * 3.6) + 'deg');
+    const s1 = stage.querySelector('.layer-shine');
+    if (s1) s1.style.backgroundPosition = ((px-50)*2) + '% ' + ((py-50)*2) + '%';
+    const ms1 = stage.querySelector('.layer-mirror-streak1');
+    if (ms1) ms1.style.backgroundPosition = ((px-50)*1.8) + '% ' + ((py-50)*1.5) + '%';
+    const ms2 = stage.querySelector('.layer-mirror-streak2');
+    if (ms2) ms2.style.backgroundPosition = (-(px-50)*1.4) + '% ' + ((py-50)*1.0) + '%';
+    const oil_s = stage.querySelector('.layer-oil-shine');
+    if (oil_s) oil_s.style.backgroundPosition = ((px-50)*1.6) + '% ' + ((py-50)*1.3) + '%';
+    const aurora_s = stage.querySelector('.layer-aurora-streak');
+    if (aurora_s) aurora_s.style.backgroundPosition = ((px-50)*1.5) + '% ' + ((py-50)*0.8) + '%';
+  });
+});
+</script>
+</body>
+</html>

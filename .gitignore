@@ -41,3 +41,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+kami-merge-nft-source/
+nft_source_clean/
+audit_for_claude_*.md
+public/nft_assets/
