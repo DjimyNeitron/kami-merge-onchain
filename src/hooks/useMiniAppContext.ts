@@ -81,7 +81,24 @@ export function useMiniAppContext(): MiniAppContextValue {
   useEffect(() => {
     let cancelled = false;
 
-    sdk.context
+    // Race sdk.context against a hard timeout. In a Farcaster host
+    // (Warpcast, Startale-App, etc.) the SDK's postMessage handshake
+    // typically resolves in <500ms. In every other webview — MetaMask
+    // Browser, Rainbow Browser, plain mobile Safari — nothing on the
+    // other end ever responds, so sdk.context hangs forever. Without
+    // the race, `isReady` would stay false indefinitely and the splash
+    // would sit on its "Loading…" / "Verifying network…" interstitial
+    // with no path forward. 1500ms gives the real Farcaster path a
+    // generous margin while keeping the standalone fallback snappy.
+    // Captured 2026-05-11 via on-device eruda console: state stuck at
+    // `{isMiniApp:false, miniAppReady:false, probing:true}` with no
+    // log line beyond initial mount.
+    const CONTEXT_TIMEOUT_MS = 1500;
+    const timeoutPromise = new Promise<null>((resolve) =>
+      setTimeout(() => resolve(null), CONTEXT_TIMEOUT_MS)
+    );
+
+    Promise.race([sdk.context, timeoutPromise])
       .then((ctx) => {
         if (cancelled) return;
         if (ctx) {
@@ -135,7 +152,14 @@ export function useMiniAppContext(): MiniAppContextValue {
             if (!cancelled) setIsReady(true);
           });
         } else {
-          console.log("[useMiniAppContext] Standalone web");
+          // Two paths land here: (1) sdk.context resolved with a real
+          // null because we're outside a host, (2) the 1500ms timeout
+          // won the race. From the caller's perspective both mean the
+          // same thing — fall through to the standalone web path and
+          // let RainbowKit drive wallet connection.
+          console.log(
+            "[useMiniAppContext] Standalone web (no Mini App context within timeout)"
+          );
           setIsMiniApp(false);
           setIsReady(true);
         }
