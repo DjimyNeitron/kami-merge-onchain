@@ -100,9 +100,14 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
   // source clip's first/last frames don't visually match, so a single
   // <video loop> would show a noticeable pop at the seam every cycle.
   // Instead we mount two identical <video> elements stacked at
-  // inset:0, fade between them with a 1.5s opacity transition just
+  // inset:0, fade between them with a 2.5s opacity transition just
   // before the active clip ends, and swap roles each cycle. To the
   // eye it reads as one continuous never-ending shot.
+  //
+  // Pace tuning: both videos also run at playbackRate 0.7 to stretch
+  // the 9s source loop to a perceived ~12.9s. Slower playback +
+  // softer crossfade together push the splash into slow-cinema
+  // territory rather than arcade pace.
   const videoARef = useRef<HTMLVideoElement>(null);
   const videoBRef = useRef<HTMLVideoElement>(null);
 
@@ -111,10 +116,17 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
     const b = videoBRef.current;
     if (!a || !b) return;
 
-    const FADE_MS = 1500;
+    const FADE_MS = 2500;
     let current = a;
     let next = b;
     let crossfading = false;
+
+    // Slow both videos to 0.7x. Has to be set before play() because
+    // some mobile browsers (Safari especially) reset playbackRate on
+    // each play() if applied after — setting it on the element first
+    // keeps it sticky across the crossfade swaps too.
+    a.playbackRate = 0.7;
+    b.playbackRate = 0.7;
 
     // Initial state — A visible, B latent. play() can throw on iOS if
     // the user gesture hasn't unlocked autoplay yet; we swallow the
@@ -301,7 +313,7 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
         preload="auto"
         aria-hidden="true"
         className="absolute inset-0 w-full h-full object-cover"
-        style={{ opacity: 0, transition: "opacity 1500ms ease-in-out" }}
+        style={{ opacity: 0, transition: "opacity 2500ms ease-in-out" }}
       />
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <video
@@ -312,7 +324,7 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
         preload="auto"
         aria-hidden="true"
         className="absolute inset-0 w-full h-full object-cover"
-        style={{ opacity: 0, transition: "opacity 1500ms ease-in-out" }}
+        style={{ opacity: 0, transition: "opacity 2500ms ease-in-out" }}
       />
       {/* Layer 2: indigo tint, identical opacity to the previous static
        *   linear-gradient (rgba(--indigo-rgb)/0.7). Keeps welcome-flow
