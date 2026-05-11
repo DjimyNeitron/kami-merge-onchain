@@ -277,7 +277,7 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
 
   return (
     <div
-      className="fixed inset-0 overflow-hidden animate-splash-fade"
+      className="fixed inset-0 overflow-hidden animate-splash-fade bg-[rgb(var(--indigo-rgb))]"
       style={{ zIndex: 100 }}
     >
       {/* Layer 1: atmospheric video bg. Two stacked <video> elements
