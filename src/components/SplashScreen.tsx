@@ -519,7 +519,15 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
               >
                 ~ Tap to Start ~
               </button>
-              {walletConnected && (
+              {walletConnected && !inMiniApp && (
+                // Hide Disconnect inside a Farcaster Mini App host. The
+                // host wallet binding is owned by the platform — tapping
+                // Disconnect triggers a brief "loading host wallet"
+                // state that then auto-reconnects on reload, because
+                // the SDK re-binds from `sdk.context` every mount. This
+                // is expected SDK behavior, but reads as a flicker /
+                // half-broken UX. Standalone web users still see and
+                // need the button to swap wallets, so keep it there.
                 <button
                   type="button"
                   onClick={() => disconnect()}
