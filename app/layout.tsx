@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Web3Provider } from "@/components/Web3Provider";
 import FarcasterUserBadge from "@/components/FarcasterUserBadge";
+import DebugConsole from "@/components/DebugConsole";
 
 // Canonical site origin — used by every absolute URL in the embed
 // metadata below. Exposing it as a const keeps the four occurrences
@@ -103,6 +104,13 @@ export default function RootLayout({
          * plus the legacy iOS tag without duplicating them here. */}
       </head>
       <body className="min-h-full bg-[#0f0f1e] text-white">
+        {/* DebugConsole renders BEFORE Web3Provider so the eruda gear
+         * mounts as early as possible in the body — important for
+         * catching wagmi/RainbowKit init errors that fire during
+         * provider mount in a mobile webview. Returns null (no DOM,
+         * no listeners) unless the URL has `?debug=1`, so the prod
+         * path is zero-cost. */}
+        <DebugConsole />
         {/* Web3Provider is a client component nested inside this server
          * component — valid in the Next.js App Router. Everything below
          * (game canvas, settings, dev panel) can freely use wagmi hooks. */}
