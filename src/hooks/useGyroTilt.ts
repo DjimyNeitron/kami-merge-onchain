@@ -2,174 +2,234 @@
 
 // useGyroTilt — DeviceOrientationEvent-driven tilt for mobile NFT cards.
 //
+// Module-singleton design: a single window listener is shared across
+// every component that calls the hook. Each consumer subscribes to the
+// same state, so when the user grants iOS permission via the demo's
+// "Enable Motion" button, every mounted card immediately switches into
+// the granted state without needing its own tap. (The per-instance
+// version we shipped in PR #20 left cards stuck on needsPermission=true
+// until each was individually tapped — fine for the spec's literal
+// acceptance criteria, awful for actual UX. PR #21 refactor.)
+//
 // Cross-platform behaviour:
-//   - Android (Chrome / Firefox / Samsung): listener attaches on mount,
-//     no user-permission gate. Reads `event.beta` (front-back tilt) and
-//     `event.gamma` (left-right tilt) directly.
-//   - iOS 13+ (Safari / Chrome iOS): `DeviceOrientationEvent.requestPermission`
-//     exists as a static method. We do NOT auto-attach on mount —
-//     instead we expose `needsPermission: true` and a `requestPermission`
-//     callback that consumers wire to a user gesture (e.g. first card
-//     tap). Granted → listener attaches; denied → silent no-op, the
-//     caller's mouse / aurora paths remain unaffected.
-//   - Desktop / browsers without DeviceOrientationEvent: hook stays
-//     dormant (`isActive: false`, `needsPermission: false`). Callers
-//     branch on `isActive` and fall back to their pointer-based tilt.
+//   - Desktop / browsers without DeviceOrientationEvent: state stays
+//     at `permissionState: 'unsupported'`, isActive false, eventCount 0.
+//   - Android (Chrome / Firefox / Samsung): listener attaches on first
+//     useGyroTilt() call (on platform detect), no user-permission gate.
+//     permissionState flips straight to 'granted'.
+//   - iOS 13+ (Safari / Chrome iOS): static
+//     DeviceOrientationEvent.requestPermission exists. We hold off on
+//     attaching the listener until the consumer fires requestPermission
+//     from a user gesture. Granted → attach + 'granted'. Denied →
+//     'denied' (silent — caller's other tilt sources remain unaffected).
 //
 // Smoothing: raw orientation data is noisy (~60 Hz with fine wobble),
 // so we apply an exponential moving average with α = 0.15. Trades a
 // tiny bit of latency for cards that don't jitter when the phone is
 // resting on a table.
 //
-// Calibration: we subtract 45° from beta before mapping to rotateX,
-// because the natural way someone holds a phone vertically while
-// looking at a card is ~45° back-tilt — that should read as the card
-// being held flat, not tilted forward. Without the offset, every card
-// would render with a permanent forward pitch on iOS lock-screen
-// orientation.
+// Calibration: we subtract 45° from beta before mapping to rotateX
+// — natural phone-holding angle is ~45° back-tilt, so without offset
+// every card would render with a permanent forward pitch.
 //
-// Tilt range: clamped to ±MAX_TILT_DEG (12°) to match the desktop
-// mouse-tilt range, so the visual treatment is consistent across input
-// methods.
+// Tilt clamp: ±MAX_TILT_DEG (12°) to match the desktop mouse-tilt range.
 //
-// Listener count: each hook call attaches its OWN window listener.
-// For a grid of 44 cards this means 44 listeners + 44 setState calls
-// per orientation event. React 18+ batches the setState within one
-// event, so the renders all collapse to a single commit per tick.
-// We accept the listener-count cost over a more invasive
-// singleton-store refactor since the simpler shape matches the spec
-// and 44 listeners at 60 Hz is well within browser tolerance.
+// Debug surface: alpha, beta, gamma, permissionState, eventCount all
+// exposed in the return value so a debug overlay can display them
+// without instantiating a second listener.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useReducer } from "react";
 
 const SMOOTHING = 0.15;
 const MAX_TILT_DEG = 12;
 const BETA_NEUTRAL_OFFSET = 45;
-const TILT_SCALE = 4; // divisor: gamma 24° → rotateY 6°, beta 24° → rotateX 6°
+const TILT_SCALE = 4;
+
+export type GyroPermissionState =
+  | "pending" // iOS, awaiting requestPermission() resolution
+  | "granted" // listener attached, events flowing (or about to)
+  | "denied" // user denied or error
+  | "unsupported"; // DeviceOrientationEvent not in window
 
 interface GyroState {
+  alpha: number;
   beta: number;
   gamma: number;
   isActive: boolean;
   needsPermission: boolean;
+  permissionState: GyroPermissionState;
+  eventCount: number;
 }
 
-// iOS Safari exposes a static `requestPermission` on the constructor
-// itself; standard DOM types don't include it, so we narrow with a
-// local interface rather than reaching for `any`.
 interface DeviceOrientationCtor {
   requestPermission?: () => Promise<"granted" | "denied">;
 }
 
 export interface UseGyroTilt {
-  /** Pitch in degrees, clamped to ±12. */
+  /** Smoothed compass heading (-180..180), 0 on platforms without it. */
+  alpha: number;
+  /** Smoothed front-back tilt (-180..180). */
+  beta: number;
+  /** Smoothed left-right tilt (-90..90). */
+  gamma: number;
+  /** Pitch in degrees, clamped to ±12 (matches mouse tilt range). */
   rotateX: number;
   /** Yaw in degrees, clamped to ±12. */
   rotateY: number;
-  /** True once a listener is attached (Android on mount, iOS after grant). */
+  /** True once a listener is attached (Android on mount, iOS post-grant). */
   isActive: boolean;
   /** True on iOS until requestPermission() resolves 'granted'. */
   needsPermission: boolean;
+  /** Disambiguated state for debug overlays. */
+  permissionState: GyroPermissionState;
+  /** Increments on each orientation event received. */
+  eventCount: number;
   /**
    * Fire from a user gesture on iOS to trigger the system permission
-   * prompt. No-op on Android / desktop / already-active.
+   * prompt. Idempotent — calling again after 'granted' resolves
+   * instantly without re-prompting. No-op on Android / desktop.
    */
   requestPermission: () => Promise<void>;
 }
 
-export function useGyroTilt(): UseGyroTilt {
-  const [state, setState] = useState<GyroState>({
-    beta: 0,
-    gamma: 0,
-    isActive: false,
-    needsPermission: false,
-  });
+// ─── Module-level singleton state + subscribers ───
+// The hook lives outside React because device orientation is a single
+// hardware event source — instantiating it per-component would attach
+// N listeners for no benefit and split state across React subtrees.
 
-  // Stable handler — we want the listener wrapper to be the same
-  // function reference across renders so addEventListener /
-  // removeEventListener pair up cleanly. The handler itself reads
-  // through a ref that gets updated each render, but the wrapper
-  // never changes.
-  const handlerRef = useRef<((e: DeviceOrientationEvent) => void) | null>(
-    null
-  );
-  handlerRef.current = (event: DeviceOrientationEvent) => {
-    const beta = event.beta ?? 0; // -180..180 (front-back)
-    const gamma = event.gamma ?? 0; // -90..90 (left-right)
+let _state: GyroState = {
+  alpha: 0,
+  beta: 0,
+  gamma: 0,
+  isActive: false,
+  needsPermission: false,
+  permissionState: "unsupported",
+  eventCount: 0,
+};
+
+const _subscribers = new Set<() => void>();
+let _listenerAttached = false;
+let _platformDetected = false;
+
+function setState(updater: (s: GyroState) => GyroState): void {
+  _state = updater(_state);
+  // Notify subscribers in a microtask so a burst of updates collapses
+  // into one render flush per tick. (Plain forEach also works; the
+  // microtask just avoids re-entrance edge cases.)
+  _subscribers.forEach((fn) => fn());
+}
+
+function attachListenerOnce(): void {
+  if (_listenerAttached) return;
+  if (typeof window === "undefined") return;
+
+  const handler = (event: DeviceOrientationEvent) => {
+    const alpha = event.alpha ?? 0;
+    const beta = event.beta ?? 0;
+    const gamma = event.gamma ?? 0;
     setState((s) => ({
       ...s,
-      // Exponential moving average — α = SMOOTHING controls
-      // responsiveness vs. jitter. Higher α → snappier, more jitter.
+      alpha: s.alpha + (alpha - s.alpha) * SMOOTHING,
       beta: s.beta + (beta - s.beta) * SMOOTHING,
       gamma: s.gamma + (gamma - s.gamma) * SMOOTHING,
+      eventCount: s.eventCount + 1,
     }));
   };
 
-  const attach = useCallback(() => {
-    if (typeof window === "undefined") return () => {};
-    const wrapper = (e: DeviceOrientationEvent) => handlerRef.current?.(e);
-    window.addEventListener("deviceorientation", wrapper);
-    setState((s) => ({ ...s, isActive: true }));
+  window.addEventListener("deviceorientation", handler);
+  _listenerAttached = true;
+  setState((s) => ({ ...s, isActive: true }));
+}
+
+function detectPlatformOnce(): void {
+  if (_platformDetected) return;
+  _platformDetected = true;
+  if (typeof window === "undefined") return;
+  if (!("DeviceOrientationEvent" in window)) {
+    setState((s) => ({ ...s, permissionState: "unsupported" }));
+    return;
+  }
+  const D = window.DeviceOrientationEvent as unknown as DeviceOrientationCtor;
+  if (typeof D.requestPermission === "function") {
+    // iOS — wait for user gesture.
+    setState((s) => ({
+      ...s,
+      needsPermission: true,
+      permissionState: "pending",
+    }));
+    return;
+  }
+  // Android / non-iOS — auto-attach.
+  setState((s) => ({ ...s, permissionState: "granted" }));
+  attachListenerOnce();
+}
+
+async function requestPermissionImpl(): Promise<void> {
+  if (typeof window === "undefined") return;
+  const D = window.DeviceOrientationEvent as unknown as DeviceOrientationCtor;
+  if (typeof D.requestPermission !== "function") return;
+
+  try {
+    const result = await D.requestPermission();
+    if (result === "granted") {
+      setState((s) => ({
+        ...s,
+        needsPermission: false,
+        permissionState: "granted",
+      }));
+      attachListenerOnce();
+    } else {
+      setState((s) => ({
+        ...s,
+        needsPermission: false,
+        permissionState: "denied",
+      }));
+    }
+  } catch {
+    setState((s) => ({
+      ...s,
+      needsPermission: false,
+      permissionState: "denied",
+    }));
+  }
+}
+
+// ─── React hook ───
+
+export function useGyroTilt(): UseGyroTilt {
+  // We don't need the count value, only a way to force a render when
+  // singleton state changes. useReducer's increment dispatcher is the
+  // cheapest "trigger a render" primitive React exposes.
+  const [, forceRender] = useReducer((x: number) => x + 1, 0);
+
+  useEffect(() => {
+    detectPlatformOnce();
+    _subscribers.add(forceRender);
     return () => {
-      window.removeEventListener("deviceorientation", wrapper);
+      _subscribers.delete(forceRender);
     };
   }, []);
 
-  // Mount-time platform probe + auto-attach for Android.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!("DeviceOrientationEvent" in window)) return;
-
-    const D = window.DeviceOrientationEvent as unknown as DeviceOrientationCtor;
-    const requiresPermission = typeof D.requestPermission === "function";
-
-    if (requiresPermission) {
-      // iOS — wait for user gesture via requestPermission below.
-      setState((s) => ({ ...s, needsPermission: true }));
-      return;
-    }
-
-    // Android / non-iOS — auto-attach.
-    return attach();
-  }, [attach]);
-
-  const requestPermission = useCallback(async () => {
-    if (typeof window === "undefined") return;
-    const D = window.DeviceOrientationEvent as unknown as DeviceOrientationCtor;
-    if (typeof D.requestPermission !== "function") return;
-
-    try {
-      const result = await D.requestPermission();
-      if (result === "granted") {
-        setState((s) => ({ ...s, needsPermission: false }));
-        attach();
-      }
-    } catch {
-      // User denied or browser threw — silent failure. Caller's other
-      // tilt sources (mouse) and the aurora effect are unaffected.
-    }
-  }, [attach]);
-
   // Map smoothed orientation → clamped tilt degrees.
-  // - gamma drives Y rotation (the phone roll left/right axis maps
-  //   directly to the card's vertical axis as seen by the user).
-  // - beta drives X rotation, but inverted: tilting the top of the
-  //   phone toward the user (beta decreasing past the 45° neutral)
-  //   should tilt the card's top toward us, i.e. negative rotateX.
   const rotateY = Math.max(
     -MAX_TILT_DEG,
-    Math.min(MAX_TILT_DEG, state.gamma / TILT_SCALE)
+    Math.min(MAX_TILT_DEG, _state.gamma / TILT_SCALE)
   );
   const rotateX = Math.max(
     -MAX_TILT_DEG,
-    Math.min(MAX_TILT_DEG, -(state.beta - BETA_NEUTRAL_OFFSET) / TILT_SCALE)
+    Math.min(MAX_TILT_DEG, -(_state.beta - BETA_NEUTRAL_OFFSET) / TILT_SCALE)
   );
 
   return {
+    alpha: _state.alpha,
+    beta: _state.beta,
+    gamma: _state.gamma,
     rotateX,
     rotateY,
-    isActive: state.isActive,
-    needsPermission: state.needsPermission,
-    requestPermission,
+    isActive: _state.isActive,
+    needsPermission: _state.needsPermission,
+    permissionState: _state.permissionState,
+    eventCount: _state.eventCount,
+    requestPermission: requestPermissionImpl,
   };
 }
