@@ -30,13 +30,18 @@
 import { useEffect, useRef, useState } from "react";
 import styles from "./NFTCard.module.css";
 import {
-  AURORA_OPACITY,
   BASE_LORE,
   KANJI,
   TIER_FLAVOR,
   type Tier,
   type YokaiName,
 } from "@/config/yokai";
+
+// AURORA_OPACITY is no longer consumed here — the per-tier holo CSS vars
+// (--aurora-op, --aurora-streak-op, --sparkle-op) live entirely in the
+// tier classes inside NFTCard.module.css. AURORA_OPACITY stays exported
+// from yokai.ts as the canonical source for Stage 7 metadata generation
+// (the "Aurora Opacity" attribute on the NFT manifest).
 
 export interface NFTCardProps {
   yokai: YokaiName;
@@ -75,9 +80,14 @@ export default function NFTCard({
   // We also subscribe to the change event so a user docking an iPad into
   // a keyboard / trackpad mid-session transitions correctly.
   const [isCoarse, setIsCoarse] = useState(false);
-  // Hover state drives the desktop hover-swap to animated.webp. Coarse
-  // devices ignore this entirely (they autoplay from mount).
-  const [isHovered, setIsHovered] = useState(false);
+  // Hover state drives BOTH the desktop hover-swap to animated.webp AND
+  // the `.isHovered` class that fades the holo layers in via CSS.
+  // Initial seed: `false` for interactive cards (idle = static art only),
+  // `true` for non-interactive cards (static previews always show the
+  // holo, since there's no cursor to trigger it). Touch devices bypass
+  // this entirely — see the `@media (hover: none)` block in the CSS
+  // module — so we don't seed it from isCoarse here.
+  const [isHovered, setIsHovered] = useState(!interactive);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
@@ -140,11 +150,14 @@ export default function NFTCard({
   const artSrc = useAnimated ? animSrc : staticSrc;
 
   const displayName = toTitle(yokai);
-  const auroraOpacity = AURORA_OPACITY[tier];
 
   // Build className. CSS modules give us a unique class per name so we
   // compose with template literals; the optional `className` escape
-  // hatch wins last for parent-driven sizing.
+  // hatch wins last for parent-driven sizing. The .isHovered class
+  // gates the holo layers — on desktop it follows mouseenter/leave,
+  // on touch the CSS @media (hover: none) block makes the class
+  // irrelevant (holo shows always), and on !interactive we seeded
+  // isHovered=true at mount so it stays on permanently.
   const sizeClass =
     size === "sm" ? styles.sizeSm : size === "lg" ? styles.sizeLg : styles.sizeMd;
   const tierClass =
@@ -156,15 +169,7 @@ export default function NFTCard({
           ? styles.tierEpic
           : styles.tierLegendary;
   const interactiveClass = interactive ? "" : styles.nonInteractive;
-
-  // CSS custom property carrying the per-tier aurora opacity. Typed via
-  // a satisfies-style assertion because React.CSSProperties does not
-  // know about custom props by default. (Casting to a wider record
-  // type keeps this single-line and avoids a one-off type util.)
-  const styleVars: React.CSSProperties = {
-    ["--aurora-opacity" as keyof React.CSSProperties]:
-      auroraOpacity as unknown as React.CSSProperties[keyof React.CSSProperties],
-  };
+  const hoveredClass = isHovered ? styles.isHovered : "";
 
   return (
     <div
@@ -174,6 +179,7 @@ export default function NFTCard({
         sizeClass,
         tierClass,
         interactiveClass,
+        hoveredClass,
         className ?? "",
       ]
         .filter(Boolean)
@@ -181,7 +187,6 @@ export default function NFTCard({
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      style={styleVars}
       data-tier={tier}
       data-yokai={yokai}
       role="img"
@@ -201,10 +206,8 @@ export default function NFTCard({
         decoding="async"
         draggable={false}
       />
-      <div className={styles.aurora} aria-hidden="true" />
       <div className={styles.topGrad} aria-hidden="true" />
       <div className={styles.botGrad} aria-hidden="true" />
-      <div className={styles.frame} aria-hidden="true" />
       <div className={styles.tierBadge}>{tier}</div>
       <div className={styles.nameBlock}>
         <span className={styles.kanji}>{KANJI[yokai]}</span>
@@ -221,6 +224,21 @@ export default function NFTCard({
           </p>
         </div>
       )}
+      {/* Holo composition — three stacked layers inside a masked
+       *  container that trims corner bleed. All start at opacity 0;
+       *  the `.isHovered` class on the card root fades them in over
+       *  400ms (or they show always on touch / non-interactive cards
+       *  via the CSS module's @media + .isHovered seeded by React). */}
+      <div className={styles.holoWrap} aria-hidden="true">
+        <div className={`${styles.holoLayer} ${styles.layerAurora}`} />
+        <div className={`${styles.holoLayer} ${styles.layerAuroraStreak}`} />
+        <div className={`${styles.holoLayer} ${styles.layerSparkles}`} />
+      </div>
+      {/* Frame sits ABOVE the holo so the gold border stays crisp
+       *  against the screen-blended aurora. z-index in CSS module
+       *  handles the actual stacking; placing this last in JSX is
+       *  conventional for clarity. */}
+      <div className={styles.frame} aria-hidden="true" />
     </div>
   );
 }
