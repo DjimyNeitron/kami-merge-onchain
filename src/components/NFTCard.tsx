@@ -31,12 +31,21 @@ import { useEffect, useRef, useState } from "react";
 import styles from "./NFTCard.module.css";
 import {
   BASE_LORE,
-  KANJI,
   TIER_FLAVOR,
   type Tier,
   type YokaiName,
 } from "@/config/yokai";
 import { useGyroTilt } from "@/hooks/useGyroTilt";
+
+// KANJI import removed — all yokai name / kanji / tier text is now
+// baked directly into the PNG/WebP assets at Stage 2 render time
+// (see scripts/stage2_render.py + dev-reference/nft_card_render.html).
+// Verified visually for all 44 assets: each has KODAMA/AMATERASU/etc
+// top-LEFT, kanji top-RIGHT, tier label bottom-CENTRE, and a gold
+// frame border drawn into the bitmap. CSS text overlays in PR #20
+// duplicated this content in DIFFERENT positions (tier badge TR,
+// kanji bottom), creating both a visual duplicate AND misalignment.
+// This component now defers to the asset entirely for text + frame.
 
 // AURORA_OPACITY is no longer consumed here — the per-tier holo CSS vars
 // (--aurora-op, --aurora-streak-op, --sparkle-op) live entirely in the
@@ -234,7 +243,7 @@ export default function NFTCard({
       data-tier={tier}
       data-yokai={yokai}
       role="img"
-      aria-label={`${displayName} (${KANJI[yokai]}) — ${tier} tier NFT card`}
+      aria-label={`${displayName} — ${tier} tier NFT card`}
     >
       {/* The <img> is keyed on its src so swapping static ↔ animated
        *  triggers a fresh image element and lets the browser decode
@@ -250,17 +259,11 @@ export default function NFTCard({
         decoding="async"
         draggable={false}
       />
-      <div className={styles.topGrad} aria-hidden="true" />
-      <div className={styles.botGrad} aria-hidden="true" />
-      {/* Four absolute-positioned text overlays (no flex stack).
-       *  Layout: name top-LEFT, tier badge top-RIGHT (bordered),
-       *  large kanji bottom-CENTRE, small romaji directly below.
-       *  All four share --frame-color from the tier class so the
-       *  gold tone stays consistent. */}
-      <div className={styles.name}>{displayName.toUpperCase()}</div>
-      <div className={styles.tierBadge}>{tier.toUpperCase()}</div>
-      <div className={styles.kanji}>{KANJI[yokai]}</div>
-      <div className={styles.romaji}>{displayName.toUpperCase()}</div>
+      {/* No CSS text overlays — yokai name, kanji, tier label, and the
+       *  gold frame border are all baked into the asset PNG/WebP at
+       *  Stage 2 render time. The card defers to the asset entirely
+       *  for those surfaces; React only adds the dynamic layers
+       *  (hover-triggered holo + 3D tilt) on top. */}
       {showLore && (
         <div
           className={`${styles.loreOverlay} ${interactive ? styles.interactive : ""}`}
@@ -282,11 +285,11 @@ export default function NFTCard({
         <div className={`${styles.holoLayer} ${styles.layerAuroraStreak}`} />
         <div className={`${styles.holoLayer} ${styles.layerSparkles}`} />
       </div>
-      {/* Frame sits ABOVE the holo so the gold border stays crisp
-       *  against the screen-blended aurora. z-index in CSS module
-       *  handles the actual stacking; placing this last in JSX is
-       *  conventional for clarity. */}
-      <div className={styles.frame} aria-hidden="true" />
+      {/* No CSS frame border — the gold frame is baked into the asset
+       *  PNG/WebP. Adding a CSS box-shadow on top would double-print
+       *  the border slightly off-position (the asset frame sits inset
+       *  from the bitmap edge by a few pixels, where CSS box-shadow
+       *  would sit right at edge), creating a visible misalignment. */}
     </div>
   );
 }
