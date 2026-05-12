@@ -4,8 +4,9 @@
  * Layer stack (bottom → top, z-index sequence in parens):
  *   1. .card          — flex root, owns aspect-ratio, perspective, bg fallback
  *   2. .art           (z=1) — full-bleed <img> of the static png or animated webp
- *   3. .aurora        (z=2) — 36-stop HSL conic gradient, blur(14px) scale(1.4),
- *                              opacity scales with tier via --aurora-opacity
+ *   3. .aurora        (z=2) — three-band aurora-borealis gradient + drifting
+ *                              halo (::before), opacity scales with tier via
+ *                              --aurora-opacity
  *   4. .topGrad       (z=3) — top fade for tier-badge legibility
  *   5. .botGrad       (z=3) — bottom fade for name-block legibility
  *   6. .frame         (z=5) — tier-scaled gold border (and outer glow for epic+)
@@ -19,19 +20,15 @@
  * the rest). preserve-3d on .card is what lets the children sit in the
  * same perspective space and stay flat against the rotated face.
  *
- * @property --aurora-angle isolates the conic-gradient rotation so it can
- * be animated as a true CSS value, not a transform on a wrapping div —
- * this keeps the blur halo perfectly stationary while only the color
- * spectrum rotates. Safari ≥ 16.4 and modern Chromium / Firefox 128+
- * support @property; older browsers fall through the @supports block to
- * a static radial fallback that still reads as a holo effect.
+ * Aurora palette: teal / violet / cyan / indigo only — no warm hues, no
+ * full HSL spectrum. The earlier draft used a 36-stop conic-gradient
+ * rainbow which read as "Pokemon foil" rather than northern lights;
+ * this version mirrors the palette from the Stage 2 static-rendered
+ * cards (dev-reference/nft_card_render.html) so live React cards and
+ * baked PNGs share one visual language. The drift animation is a slow
+ * translate+scale oscillation on a blurred halo (::before), giving the
+ * impression of aurora "breathing" without any rotational motion.
  */
-
-@property --aurora-angle {
-  syntax: "<angle>";
-  initial-value: 0deg;
-  inherits: false;
-}
 
 .card {
   position: relative;
@@ -77,6 +74,23 @@
   -webkit-user-drag: none;
 }
 
+/* Aurora layer — northern-lights palette (teal / violet / cyan only),
+ * no full-spectrum HSL rainbow. Three stacked elliptical radial
+ * gradients give the multi-band aurora effect, with a soft top-to-
+ * bottom indigo wash filling the gaps. Colour values are ported
+ * verbatim from `dev-reference/nft_card_render.html` so the live React
+ * card matches the Stage 2-rendered static PNGs in palette.
+ *
+ * The base layer holds the gradient stack; the ::before pseudo-element
+ * carries a wider-blurred copy that drifts slowly via `aurora-drift`
+ * — a translation + scale oscillation, not a rotation. This reads as
+ * the aurora "breathing" across the card without the Pokemon-rainbow
+ * feel of a spinning conic gradient.
+ *
+ * Opacity is driven entirely by the per-tier `--aurora-opacity` custom
+ * property (Common 0.45 → Legendary 0.90), set inline on .card by the
+ * React component. The keyframe never touches opacity, so tier-scaling
+ * stays clean and easy to debug. */
 .aurora {
   position: absolute;
   inset: 0;
@@ -84,75 +98,51 @@
   pointer-events: none;
   opacity: var(--aurora-opacity, 0.45);
   mix-blend-mode: screen;
-  filter: blur(14px);
-  transform: scale(1.4);
-  animation: aurora-spin 8s linear infinite;
-  background: conic-gradient(
-    from var(--aurora-angle),
-    hsl(0, 100%, 60%),
-    hsl(10, 100%, 60%),
-    hsl(20, 100%, 60%),
-    hsl(30, 100%, 60%),
-    hsl(40, 100%, 60%),
-    hsl(50, 100%, 60%),
-    hsl(60, 100%, 60%),
-    hsl(70, 100%, 60%),
-    hsl(80, 100%, 60%),
-    hsl(90, 100%, 60%),
-    hsl(100, 100%, 60%),
-    hsl(110, 100%, 60%),
-    hsl(120, 100%, 60%),
-    hsl(130, 100%, 60%),
-    hsl(140, 100%, 60%),
-    hsl(150, 100%, 60%),
-    hsl(160, 100%, 60%),
-    hsl(170, 100%, 60%),
-    hsl(180, 100%, 60%),
-    hsl(190, 100%, 60%),
-    hsl(200, 100%, 60%),
-    hsl(210, 100%, 60%),
-    hsl(220, 100%, 60%),
-    hsl(230, 100%, 60%),
-    hsl(240, 100%, 60%),
-    hsl(250, 100%, 60%),
-    hsl(260, 100%, 60%),
-    hsl(270, 100%, 60%),
-    hsl(280, 100%, 60%),
-    hsl(290, 100%, 60%),
-    hsl(300, 100%, 60%),
-    hsl(310, 100%, 60%),
-    hsl(320, 100%, 60%),
-    hsl(330, 100%, 60%),
-    hsl(340, 100%, 60%),
-    hsl(350, 100%, 60%),
-    hsl(360, 100%, 60%)
-  );
+  filter: blur(2px);
+  background-image:
+    radial-gradient(
+      ellipse 50% 220% at 28% 50%,
+      rgba(80, 220, 180, 0.55),
+      transparent 45%
+    ),
+    radial-gradient(
+      ellipse 40% 200% at 58% 50%,
+      rgba(180, 100, 240, 0.45),
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse 35% 220% at 78% 50%,
+      rgba(120, 180, 240, 0.4),
+      transparent 50%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(49, 46, 129, 0.3) 0%,
+      transparent 50%,
+      rgba(91, 33, 182, 0.25) 100%
+    );
+  transition: opacity 200ms ease-out;
 }
 
-@keyframes aurora-spin {
-  to {
-    --aurora-angle: 360deg;
+/* Soft drifting halo — wider blur, slightly larger inset, slow back-
+ * and-forth motion. Inherits the same gradient via `background: inherit`
+ * so palette changes only need to land in one place. */
+.aurora::before {
+  content: "";
+  position: absolute;
+  inset: -10%;
+  background: inherit;
+  filter: blur(20px);
+  opacity: 0.4;
+  animation: aurora-drift 12s ease-in-out infinite alternate;
+}
+
+@keyframes aurora-drift {
+  0% {
+    transform: translate(-2%, -1%) scale(1);
   }
-}
-
-/* Static fallback for engines without @property support (Safari < 16.4
- * mostly). The fall-through removes the conic rotation but keeps a
- * stationary multi-color radial halo so the card still reads as a holo
- * card, not a flat tile. */
-@supports not (background: conic-gradient(from 0deg, red, blue)) {
-  .aurora {
-    animation: none;
-    background:
-      radial-gradient(
-        ellipse 70% 50% at 30% 50%,
-        hsl(280, 80%, 60%) 0%,
-        transparent 60%
-      ),
-      radial-gradient(
-        ellipse 60% 60% at 70% 50%,
-        hsl(180, 80%, 60%) 0%,
-        transparent 60%
-      );
+  100% {
+    transform: translate(2%, 1%) scale(1.05);
   }
 }
 
@@ -336,7 +326,10 @@
 
 /* Reduce-motion respect: skip aurora rotation if the user opted out */
 @media (prefers-reduced-motion: reduce) {
-  .aurora {
+  /* Animation lives on the ::before in this version (the base .aurora
+   * layer is itself static); pin both to a no-op for users who opt
+   * out of motion. */
+  .aurora::before {
     animation: none;
   }
   .card {
