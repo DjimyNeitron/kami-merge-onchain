@@ -3,16 +3,18 @@
  *
  * Layer stack (bottom → top, z-index sequence in parens):
  *   1. .card          — flex root, owns aspect-ratio, perspective, bg fallback
- *   2. .art           (z=1) — full-bleed <img> of the static png or animated webp
- *   3. .aurora        (z=2) — three-band aurora-borealis gradient + drifting
- *                              halo (::before), opacity scales with tier via
- *                              --aurora-opacity
- *   4. .topGrad       (z=3) — top fade for tier-badge legibility
- *   5. .botGrad       (z=3) — bottom fade for name-block legibility
- *   6. .frame         (z=5) — tier-scaled gold border (and outer glow for epic+)
- *   7. .loreOverlay   (z=8) — translucent description panel, opt-in
- *   8. .tierBadge     (z=10) — top-right corner pill
- *   9. .nameBlock     (z=10) — bottom-center kanji + romaji
+ *   2. .art           (z=1)  — full-bleed <img> of the static png or animated webp
+ *   3. .topGrad       (z=3)  — top fade for tier-badge legibility
+ *   4. .botGrad       (z=3)  — bottom fade for name-block legibility
+ *   5. .loreOverlay   (z=8)  — translucent description panel, opt-in
+ *   6. .tierBadge     (z=10) — top-right corner pill
+ *   7. .nameBlock     (z=10) — bottom-center kanji + romaji
+ *   8. .holoWrap      (z=20) — masked container for the three holo layers
+ *        ├── .layerAurora        teal/violet/cyan radial bands
+ *        ├── .layerAuroraStreak  diagonal pale-lavender light band
+ *        └── .layerSparkles      seven white pinpoints
+ *   9. .frame         (z=30) — tier-scaled gold border (above holo so it
+ *                              stays crisp against the screen-blended glow)
  *
  * Tilt is applied to .card via inline `transform: perspective(...) rotate*()`
  * set from JS pointer-move handler. CSS only provides the smoothing
@@ -20,14 +22,14 @@
  * the rest). preserve-3d on .card is what lets the children sit in the
  * same perspective space and stay flat against the rotated face.
  *
- * Aurora palette: teal / violet / cyan / indigo only — no warm hues, no
- * full HSL spectrum. The earlier draft used a 36-stop conic-gradient
- * rainbow which read as "Pokemon foil" rather than northern lights;
- * this version mirrors the palette from the Stage 2 static-rendered
- * cards (dev-reference/nft_card_render.html) so live React cards and
- * baked PNGs share one visual language. The drift animation is a slow
- * translate+scale oscillation on a blurred halo (::before), giving the
- * impression of aurora "breathing" without any rotational motion.
+ * Holo effect: hover-triggered (or always-on for !interactive / touch),
+ * three layers fade in together over 400ms when .isHovered is on the
+ * card root. Palette is teal / violet / cyan / pale-lavender only — no
+ * warm hues, no full HSL spectrum, no rotation. Per-tier intensity via
+ * three CSS custom properties set in the tier classes:
+ *   --aurora-op, --aurora-streak-op, --sparkle-op
+ * Common 0.45 → Legendary 0.90 on the main aurora var; streak + sparkle
+ * follow with their own ramps. Values match prototype exactly.
  */
 
 .card {
@@ -74,31 +76,60 @@
   -webkit-user-drag: none;
 }
 
-/* Aurora layer — northern-lights palette (teal / violet / cyan only),
- * no full-spectrum HSL rainbow. Three stacked elliptical radial
- * gradients give the multi-band aurora effect, with a soft top-to-
- * bottom indigo wash filling the gaps. Colour values are ported
- * verbatim from `dev-reference/nft_card_render.html` so the live React
- * card matches the Stage 2-rendered static PNGs in palette.
+/* Holo effect — three-layer composition ported verbatim from
+ * dev-reference/nft_card_render.html (style "Aurora — Северное сияние").
  *
- * The base layer holds the gradient stack; the ::before pseudo-element
- * carries a wider-blurred copy that drifts slowly via `aurora-drift`
- * — a translation + scale oscillation, not a rotation. This reads as
- * the aurora "breathing" across the card without the Pokemon-rainbow
- * feel of a spinning conic gradient.
+ * Layers (all stacked inside .holoWrap, painted bottom → top):
+ *   .layerAurora        — three vertical color flows (teal / violet /
+ *                         cyan), heavy blur, scale 1.2, mix-blend screen
+ *   .layerAuroraStreak  — a diagonal light band (pale teal → pale
+ *                         lavender → pale teal) suggesting refraction
+ *   .layerSparkles      — seven small white dots, mix-blend screen,
+ *                         scaled down to ~0.5x per-tier opacity
  *
- * Opacity is driven entirely by the per-tier `--aurora-opacity` custom
- * property (Common 0.45 → Legendary 0.90), set inline on .card by the
- * React component. The keyframe never touches opacity, so tier-scaling
- * stays clean and easy to debug. */
-.aurora {
+ * Trigger model: each layer starts at opacity 0. Adding `.isHovered`
+ * to the card root fades all three in over 400ms via the
+ * `transition: opacity 0.4s` on .holoLayer. Per-tier intensity is
+ * driven by three CSS custom properties (--aurora-op,
+ * --aurora-streak-op, --sparkle-op) that the tier classes set, so
+ * Common reads as a subtle hint and Legendary as a saturated halo.
+ *
+ * Touch devices (`@media (hover: none) and (pointer: coarse)`) bypass
+ * the hover gate entirely — there's no cursor to trigger it, so we
+ * just show the holo always. Same fallback when the card runs in
+ * non-interactive mode (Inventory thumbnail, mint ceremony, etc):
+ * React seeds `isHovered = true` at mount so the class is always on.
+ *
+ * holoWrap mask trims the holo at the corner curve so the glow never
+ * bleeds past the frame border. */
+.holoWrap {
   position: absolute;
-  inset: 0;
-  z-index: 2;
+  inset: 6px;
+  border-radius: 10px;
   pointer-events: none;
-  opacity: var(--aurora-opacity, 0.45);
-  mix-blend-mode: screen;
-  filter: blur(2px);
+  z-index: 20;
+  overflow: hidden;
+  -webkit-mask-image: radial-gradient(
+    ellipse 102% 100% at center,
+    black 60%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse 102% 100% at center,
+    black 60%,
+    transparent 100%
+  );
+}
+
+.holoLayer {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+
+.layerAurora {
+  inset: 0;
   background-image:
     radial-gradient(
       ellipse 50% 220% at 28% 50%,
@@ -114,35 +145,65 @@
       ellipse 35% 220% at 78% 50%,
       rgba(120, 180, 240, 0.4),
       transparent 50%
-    ),
-    linear-gradient(
-      180deg,
-      rgba(49, 46, 129, 0.3) 0%,
-      transparent 50%,
-      rgba(91, 33, 182, 0.25) 100%
     );
-  transition: opacity 200ms ease-out;
+  mix-blend-mode: screen;
+  filter: blur(18px);
+  transform: scale(1.2);
 }
 
-/* Soft drifting halo — wider blur, slightly larger inset, slow back-
- * and-forth motion. Inherits the same gradient via `background: inherit`
- * so palette changes only need to land in one place. */
-.aurora::before {
-  content: "";
-  position: absolute;
+.layerAuroraStreak {
   inset: -10%;
-  background: inherit;
-  filter: blur(20px);
-  opacity: 0.4;
-  animation: aurora-drift 12s ease-in-out infinite alternate;
+  background: linear-gradient(
+    110deg,
+    transparent 38%,
+    rgba(150, 255, 200, 0.35) 49%,
+    rgba(180, 200, 255, 0.45) 50%,
+    rgba(150, 255, 200, 0.35) 51%,
+    transparent 60%
+  );
+  background-size: 200% 200%;
+  mix-blend-mode: screen;
+  filter: blur(8px);
 }
 
-@keyframes aurora-drift {
-  0% {
-    transform: translate(-2%, -1%) scale(1);
+.layerSparkles {
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 22% 28%, white 0.5px, transparent 1.6px),
+    radial-gradient(circle at 76% 42%, white 0.5px, transparent 1.4px),
+    radial-gradient(circle at 38% 72%, white 0.5px, transparent 1.6px),
+    radial-gradient(circle at 88% 58%, white 0.5px, transparent 1.4px),
+    radial-gradient(circle at 18% 60%, white 0.5px, transparent 1.4px),
+    radial-gradient(circle at 64% 22%, white 0.5px, transparent 1.4px),
+    radial-gradient(circle at 50% 50%, white 0.5px, transparent 1.4px);
+  mix-blend-mode: screen;
+}
+
+/* Hover-triggered visibility — applies when React adds .isHovered to
+ * the card root (mouseenter on desktop, or always on for
+ * !interactive). Per-tier CSS vars below set the saturation. */
+.card.isHovered .layerAurora {
+  opacity: var(--aurora-op, 0.45);
+}
+.card.isHovered .layerAuroraStreak {
+  opacity: var(--aurora-streak-op, 0.3);
+}
+.card.isHovered .layerSparkles {
+  opacity: calc(var(--sparkle-op, 0.45) * 0.5);
+}
+
+/* Touch / no-hover devices: there's no cursor to trigger .isHovered,
+ * so we show the holo unconditionally. Matches the prototype's
+ * touch-fallback behavior described in spec section 5. */
+@media (hover: none) and (pointer: coarse) {
+  .card .layerAurora {
+    opacity: var(--aurora-op, 0.45);
   }
-  100% {
-    transform: translate(2%, 1%) scale(1.05);
+  .card .layerAuroraStreak {
+    opacity: var(--aurora-streak-op, 0.3);
+  }
+  .card .layerSparkles {
+    opacity: calc(var(--sparkle-op, 0.45) * 0.5);
   }
 }
 
@@ -187,20 +248,52 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 5;
+  /* Above holoWrap (z=20) so the gold border stays crisp and isn't
+   * washed by the aurora's screen-blended glow. Matches prototype
+   * stacking. */
+  z-index: 30;
   border-radius: 18px;
 }
 
+/* Per-tier control surfaces. Each tier class:
+ *   1. Sets the three holo-layer opacity vars consumed by the .isHovered
+ *      and touch-fallback selectors above. Values match prototype exactly.
+ *   2. Drives the frame box-shadow weight + outer glow.
+ * Keeping both concerns colocated on the tier class avoids hopping between
+ * blocks when adding a 5th tier later (mythic? — see Brief v13). */
+.tierCommon {
+  --aurora-op: 0.45;
+  --aurora-streak-op: 0.3;
+  --sparkle-op: 0.45;
+}
 .tierCommon .frame {
   box-shadow: inset 0 0 0 2px rgb(180, 150, 90);
 }
+
+.tierRare {
+  --aurora-op: 0.6;
+  --aurora-streak-op: 0.45;
+  --sparkle-op: 0.55;
+}
 .tierRare .frame {
   box-shadow: inset 0 0 0 2.5px rgb(210, 175, 105);
+}
+
+.tierEpic {
+  --aurora-op: 0.75;
+  --aurora-streak-op: 0.6;
+  --sparkle-op: 0.75;
 }
 .tierEpic .frame {
   box-shadow:
     inset 0 0 0 3px rgb(235, 195, 110),
     0 0 16px rgba(255, 200, 100, 0.3);
+}
+
+.tierLegendary {
+  --aurora-op: 0.9;
+  --aurora-streak-op: 0.75;
+  --sparkle-op: 0.95;
 }
 .tierLegendary .frame {
   box-shadow:
@@ -326,11 +419,12 @@
 
 /* Reduce-motion respect: skip aurora rotation if the user opted out */
 @media (prefers-reduced-motion: reduce) {
-  /* Animation lives on the ::before in this version (the base .aurora
-   * layer is itself static); pin both to a no-op for users who opt
-   * out of motion. */
-  .aurora::before {
-    animation: none;
+  /* The only animated motion now is the 0.4s opacity fade on holoLayer.
+   * For reduced-motion users we snap it to instant. Tilt transitions
+   * also pinned to none — the rotate values are already small but we
+   * skip the easing curve regardless. */
+  .holoLayer {
+    transition: none;
   }
   .card {
     transition: none;
