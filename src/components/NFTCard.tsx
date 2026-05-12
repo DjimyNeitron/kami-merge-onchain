@@ -1,0 +1,226 @@
+"use client";
+
+// NFTCard — atomic React component for rendering a Kami Merge NFT card
+// with tier-scaled aurora holo + mouse tilt. Visual spec from Brief v13
+// Session A; lore strings from `src/config/yokai.ts` (per Session B).
+//
+// Asset filename convention is owned by `scripts/stage2_render.py` and
+// matches the YOKAI_ORDER × TIER_ORDER cross-product:
+//   /nft_assets/static/{yokai}_{tier}.png       (2048×2867, RGBA)
+//   /nft_assets/animated/{yokai}_{tier}.webp    (1024×1434, 36-frame loop)
+//
+// Interactivity matrix:
+//                       | static |  hover-swap → animated | autoplay animated
+//   interactive=false   |   ✓    |          ✗            |        ✗
+//   interactive=true,   |   ✓    |          ✓            |        ✗
+//     coarse=false      |        |  (desktop hover)      |
+//   interactive=true,   |   ✗    |          ✗            |        ✓
+//     coarse=true       |        |                       |  (touch device)
+//
+// The animated webp is heavier (~1.8 MB avg per Stage 2 render report)
+// so we hold off loading it until either the user hovers a card on
+// desktop or we detect a coarse pointer (touch) — never both at once.
+// Once loaded the browser caches it, so subsequent hovers are instant.
+//
+// This component is pure UI and intentionally has no side effects beyond
+// pointer-driven transforms. It owns no wallet, no metadata fetching,
+// no mint logic — those belong to Stage 3.4+ (Inventory) and 3.5+ (mint
+// flow). Constraint: must not touch wagmi / Mini App / Splash code.
+
+import { useEffect, useRef, useState } from "react";
+import styles from "./NFTCard.module.css";
+import {
+  AURORA_OPACITY,
+  BASE_LORE,
+  KANJI,
+  TIER_FLAVOR,
+  type Tier,
+  type YokaiName,
+} from "@/config/yokai";
+
+export interface NFTCardProps {
+  yokai: YokaiName;
+  tier: Tier;
+  /** Pixel-width preset. Aspect-ratio (5:7) is fixed in CSS. Default 'md' (240px). */
+  size?: "sm" | "md" | "lg";
+  /** When false: disables tilt + hover-swap, renders flat static-only card. Default true. */
+  interactive?: boolean;
+  /** When true: render translucent bottom overlay with `BASE_LORE[yokai] + TIER_FLAVOR[tier]`. Default false. */
+  showLore?: boolean;
+  /** Escape hatch for grid sizing in Inventory etc. Applied to the card root. */
+  className?: string;
+}
+
+const TILT_MAX = 12; // degrees — matches Brief v13 spec
+const STATIC_BASE = "/nft_assets/static";
+const ANIM_BASE = "/nft_assets/animated";
+
+// Title-case helper for the romaji label. Avoids importing a util just
+// for one-liner.
+function toTitle(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+export default function NFTCard({
+  yokai,
+  tier,
+  size = "md",
+  interactive = true,
+  showLore = false,
+  className,
+}: NFTCardProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  // Coarse-pointer (touch) detection. SSR-safe: defaults to false on the
+  // server, then flips on mount if the matchMedia query resolves coarse.
+  // We also subscribe to the change event so a user docking an iPad into
+  // a keyboard / trackpad mid-session transitions correctly.
+  const [isCoarse, setIsCoarse] = useState(false);
+  // Hover state drives the desktop hover-swap to animated.webp. Coarse
+  // devices ignore this entirely (they autoplay from mount).
+  const [isHovered, setIsHovered] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(pointer: coarse)");
+    setIsCoarse(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsCoarse(e.matches);
+    // addEventListener is the modern shape; older Safari aliases to
+    // addListener but we're already at 16.4+ for @property support so
+    // we can rely on the modern shape exclusively.
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  // Pointer-move handler. Maps cursor position inside the card rect to
+  // a perspective rotation around X (pitch) and Y (yaw). Negating the
+  // X-component on the Y axis inverts the natural-feeling tilt (mouse
+  // moves up → card tilts back, not forward).
+  //
+  // We mutate `card.style.transform` directly via the ref rather than
+  // routing through React state because pointer-move can fire ~120
+  // times/sec and the inline-style write is ~free, while a React
+  // re-render at that rate would cost real frames on mobile.
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!interactive || isCoarse) return;
+    const card = cardRef.current;
+    if (!card) return;
+    const rect = card.getBoundingClientRect();
+    const cx = (e.clientX - rect.left) / rect.width; // 0..1
+    const cy = (e.clientY - rect.top) / rect.height; // 0..1
+    const rotY = (cx - 0.5) * TILT_MAX * 2; // -TILT_MAX..TILT_MAX
+    const rotX = -(cy - 0.5) * TILT_MAX * 2;
+    card.style.transform =
+      `perspective(800px) rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg)`;
+  };
+
+  const handleMouseLeave = () => {
+    if (!interactive || isCoarse) return;
+    setIsHovered(false);
+    const card = cardRef.current;
+    if (!card) return;
+    // Smooth reset to neutral — the CSS `transition: transform 120ms`
+    // on .card handles the easing without us doing it in JS.
+    card.style.transform = "perspective(800px) rotateX(0deg) rotateY(0deg)";
+  };
+
+  const handleMouseEnter = () => {
+    if (!interactive || isCoarse) return;
+    setIsHovered(true);
+  };
+
+  const staticSrc = `${STATIC_BASE}/${yokai}_${tier}.png`;
+  const animSrc = `${ANIM_BASE}/${yokai}_${tier}.webp`;
+
+  // Pick the asset per interactivity matrix above. The animated webp
+  // path always wins on touch (where there's no hover affordance) or
+  // on desktop hover (where the user is actively engaging the card).
+  // Defaults to static everywhere else, including the non-interactive
+  // mode used by static thumbnail grids.
+  const useAnimated = interactive && (isCoarse || isHovered);
+  const artSrc = useAnimated ? animSrc : staticSrc;
+
+  const displayName = toTitle(yokai);
+  const auroraOpacity = AURORA_OPACITY[tier];
+
+  // Build className. CSS modules give us a unique class per name so we
+  // compose with template literals; the optional `className` escape
+  // hatch wins last for parent-driven sizing.
+  const sizeClass =
+    size === "sm" ? styles.sizeSm : size === "lg" ? styles.sizeLg : styles.sizeMd;
+  const tierClass =
+    tier === "common"
+      ? styles.tierCommon
+      : tier === "rare"
+        ? styles.tierRare
+        : tier === "epic"
+          ? styles.tierEpic
+          : styles.tierLegendary;
+  const interactiveClass = interactive ? "" : styles.nonInteractive;
+
+  // CSS custom property carrying the per-tier aurora opacity. Typed via
+  // a satisfies-style assertion because React.CSSProperties does not
+  // know about custom props by default. (Casting to a wider record
+  // type keeps this single-line and avoids a one-off type util.)
+  const styleVars: React.CSSProperties = {
+    ["--aurora-opacity" as keyof React.CSSProperties]:
+      auroraOpacity as unknown as React.CSSProperties[keyof React.CSSProperties],
+  };
+
+  return (
+    <div
+      ref={cardRef}
+      className={[
+        styles.card,
+        sizeClass,
+        tierClass,
+        interactiveClass,
+        className ?? "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      onMouseMove={handleMouseMove}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      style={styleVars}
+      data-tier={tier}
+      data-yokai={yokai}
+      role="img"
+      aria-label={`${displayName} (${KANJI[yokai]}) — ${tier} tier NFT card`}
+    >
+      {/* The <img> is keyed on its src so swapping static ↔ animated
+       *  triggers a fresh image element and lets the browser decode
+       *  the next one in parallel instead of flashing through a
+       *  half-decoded frame. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        key={artSrc}
+        src={artSrc}
+        alt=""
+        className={styles.art}
+        loading="lazy"
+        decoding="async"
+        draggable={false}
+      />
+      <div className={styles.aurora} aria-hidden="true" />
+      <div className={styles.topGrad} aria-hidden="true" />
+      <div className={styles.botGrad} aria-hidden="true" />
+      <div className={styles.frame} aria-hidden="true" />
+      <div className={styles.tierBadge}>{tier}</div>
+      <div className={styles.nameBlock}>
+        <span className={styles.kanji}>{KANJI[yokai]}</span>
+        <span className={styles.romaji}>{displayName}</span>
+      </div>
+      {showLore && (
+        <div
+          className={`${styles.loreOverlay} ${interactive ? styles.interactive : ""}`}
+        >
+          <p className={styles.loreText}>
+            {BASE_LORE[yokai]}
+            {"\n\n"}
+            {TIER_FLAVOR[tier]}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
