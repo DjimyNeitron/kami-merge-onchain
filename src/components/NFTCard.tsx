@@ -36,6 +36,7 @@ import {
   type Tier,
   type YokaiName,
 } from "@/config/yokai";
+import { useGyroTilt } from "@/hooks/useGyroTilt";
 
 // AURORA_OPACITY is no longer consumed here — the per-tier holo CSS vars
 // (--aurora-op, --aurora-streak-op, --sparkle-op) live entirely in the
@@ -101,6 +102,36 @@ export default function NFTCard({
     return () => mq.removeEventListener("change", handler);
   }, []);
 
+  // Gyroscope tilt for touch devices. The hook stays dormant on
+  // desktop (returns isActive: false) so the mouse-driven tilt below
+  // continues to own the transform. On Android it auto-attaches at
+  // mount; on iOS we hold off until the user taps a card (handleTap
+  // below fires requestPermission). When active, the effect block
+  // below writes the smoothed orientation directly to the card's
+  // style.transform — same ref-mutation pattern as the mouse handler
+  // so React doesn't re-render at 60 Hz.
+  const gyro = useGyroTilt();
+  const useGyro = isCoarse && gyro.isActive;
+  useEffect(() => {
+    if (!useGyro) return;
+    const card = cardRef.current;
+    if (!card) return;
+    card.style.transform =
+      `perspective(800px) rotateX(${gyro.rotateX.toFixed(2)}deg) rotateY(${gyro.rotateY.toFixed(2)}deg)`;
+  }, [useGyro, gyro.rotateX, gyro.rotateY]);
+
+  // Reset transform to neutral when gyro deactivates (e.g. permission
+  // revoked, matchMedia flips back to fine pointer after dock). Without
+  // this, a stale tilted transform would persist.
+  useEffect(() => {
+    if (useGyro) return;
+    if (isCoarse) {
+      const card = cardRef.current;
+      if (!card) return;
+      card.style.transform = "perspective(800px) rotateX(0deg) rotateY(0deg)";
+    }
+  }, [useGyro, isCoarse]);
+
   // Pointer-move handler. Maps cursor position inside the card rect to
   // a perspective rotation around X (pitch) and Y (yaw). Negating the
   // X-component on the Y axis inverts the natural-feeling tilt (mouse
@@ -136,6 +167,18 @@ export default function NFTCard({
   const handleMouseEnter = () => {
     if (!interactive || isCoarse) return;
     setIsHovered(true);
+  };
+
+  // iOS permission gate: any tap on a card on iOS fires the system
+  // permission prompt for DeviceOrientationEvent (if not already
+  // granted). Implicit pattern — no explicit "Enable motion" button
+  // per spec. On Android / desktop / already-granted, this is a no-op.
+  // Wired to onClick rather than onTouchStart so click semantics from
+  // assistive tech and keyboard activation also work.
+  const handleTap = () => {
+    if (gyro.needsPermission) {
+      void gyro.requestPermission();
+    }
   };
 
   const staticSrc = `${STATIC_BASE}/${yokai}_${tier}.png`;
@@ -187,6 +230,7 @@ export default function NFTCard({
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onClick={handleTap}
       data-tier={tier}
       data-yokai={yokai}
       role="img"
@@ -208,11 +252,15 @@ export default function NFTCard({
       />
       <div className={styles.topGrad} aria-hidden="true" />
       <div className={styles.botGrad} aria-hidden="true" />
-      <div className={styles.tierBadge}>{tier}</div>
-      <div className={styles.nameBlock}>
-        <span className={styles.kanji}>{KANJI[yokai]}</span>
-        <span className={styles.romaji}>{displayName}</span>
-      </div>
+      {/* Four absolute-positioned text overlays (no flex stack).
+       *  Layout: name top-LEFT, tier badge top-RIGHT (bordered),
+       *  large kanji bottom-CENTRE, small romaji directly below.
+       *  All four share --frame-color from the tier class so the
+       *  gold tone stays consistent. */}
+      <div className={styles.name}>{displayName.toUpperCase()}</div>
+      <div className={styles.tierBadge}>{tier.toUpperCase()}</div>
+      <div className={styles.kanji}>{KANJI[yokai]}</div>
+      <div className={styles.romaji}>{displayName.toUpperCase()}</div>
       {showLore && (
         <div
           className={`${styles.loreOverlay} ${interactive ? styles.interactive : ""}`}
