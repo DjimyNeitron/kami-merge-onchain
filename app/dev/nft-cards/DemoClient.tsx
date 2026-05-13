@@ -16,7 +16,7 @@
 // Purely internal — see ./page.tsx for the NODE_ENV-based 404 gate;
 // the only people who land here are devs running `npm run dev`.
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import NFTCard from "@/components/NFTCard";
 import {
   TIER_ORDER,
@@ -43,85 +43,6 @@ export default function DemoClient() {
   const [selectedYokai, setSelectedYokai] = useState<YokaiName>("kodama");
   const [selectedTier, setSelectedTier] = useState<Tier>("legendary");
 
-  // DIAGNOSTIC — visible state panel for iPhone debug. Activates only
-  // when URL contains ?debug=1 so production / casual dev runs see
-  // nothing. Tracks: render count (catches "state changes but UI
-  // doesn't"), event log (last 10), live values of every React state
-  // bound by this component. NFTCard touch handlers also pipe into the
-  // log via window.__cardDebugLog. All DIAGNOSTIC additions are marked
-  // for easy removal after the iPhone state-mystery is identified.
-  const [debugLog, setDebugLog] = useState<string[]>([]);
-  const [showDebug, setShowDebug] = useState(false);
-  const [renderCount, setRenderCount] = useState(0);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    setShowDebug(window.location.search.includes("debug=1"));
-  }, []);
-
-  // DIAGNOSTIC — stable log function (setDebugLog from useState is
-  // stable, so useCallback with empty deps gives a stable reference).
-  // Stores last 10 entries with HH:MM:SS timestamp.
-  const log = useCallback((msg: string) => {
-    const ts = new Date().toISOString().slice(11, 19);
-    setDebugLog((prev) => [...prev.slice(-9), `${ts} ${msg}`]);
-  }, []);
-
-  // DIAGNOSTIC — expose log() to NFTCard via window.__cardDebugLog.
-  // Set after mount to ensure window exists; cleanup on unmount.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    (
-      window as unknown as { __cardDebugLog?: (m: string) => void }
-    ).__cardDebugLog = log;
-    return () => {
-      delete (window as unknown as { __cardDebugLog?: (m: string) => void })
-        .__cardDebugLog;
-    };
-  }, [log]);
-
-  // DIAGNOSTIC — bump render counter when any tracked state changes.
-  // If state mutates but counter doesn't tick, React isn't responding
-  // to setState (a real but rare bug class — usually means setState
-  // was called with the same reference / value).
-  useEffect(() => {
-    setRenderCount((n) => n + 1);
-  }, [previewMode, size, interactive, showLore, selectedYokai, selectedTier]);
-
-  // DIAGNOSTIC — handlers that wrap setState with a log line so we can
-  // see if onChange fires AT ALL on iPhone (vs setState applies but UI
-  // doesn't reflect it — different bug classes).
-  const handleModeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value as PreviewMode;
-    log(`Mode change attempt: ${val}`);
-    setPreviewMode(val);
-  };
-  const handleSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value as Size;
-    log(`Size change attempt: ${val}`);
-    setSize(val);
-  };
-  const handleYokaiChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value as YokaiName;
-    log(`Yokai change attempt: ${val}`);
-    setSelectedYokai(val);
-  };
-  const handleTierChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value as Tier;
-    log(`Tier change attempt: ${val}`);
-    setSelectedTier(val);
-  };
-  const handleInteractiveChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    log(`Interactive toggle: ${e.target.checked}`);
-    setInteractive(e.target.checked);
-  };
-  const handleShowLoreChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    log(`showLore toggle: ${e.target.checked}`);
-    setShowLore(e.target.checked);
-  };
-
   // Scroll to top when the preview mode changes. Without this, a user
   // scrolled deep in the grid (e.g. at Amaterasu) who flips to single
   // mode keeps the scroll position — but single mode only has one
@@ -139,59 +60,6 @@ export default function DemoClient() {
 
   return (
     <main style={pageStyle}>
-      {/* DIAGNOSTIC — top-of-viewport panel showing live React state,
-       *  render count, and the last 10 event log entries. URL-gated:
-       *  only renders when window.location.search contains debug=1.
-       *  Removable in one block when iPhone state-mystery is resolved. */}
-      {showDebug && (
-        <div style={debugPanelStyle}>
-          <div>== React State ==</div>
-          <div>
-            previewMode: <strong>{previewMode}</strong>
-          </div>
-          <div>
-            size: <strong>{size}</strong>
-          </div>
-          <div>
-            interactive: <strong>{String(interactive)}</strong>
-          </div>
-          <div>
-            showLore: <strong>{String(showLore)}</strong>
-          </div>
-          <div>
-            selectedYokai: <strong>{selectedYokai}</strong>
-          </div>
-          <div>
-            selectedTier: <strong>{selectedTier}</strong>
-          </div>
-          <div>
-            render count: <strong>{renderCount}</strong>
-          </div>
-          <div>
-            UA:{" "}
-            {typeof navigator !== "undefined"
-              ? navigator.userAgent.slice(0, 60)
-              : "?"}
-          </div>
-          <div>
-            viewport:{" "}
-            {typeof window !== "undefined"
-              ? `${window.innerWidth}×${window.innerHeight}`
-              : "?"}
-          </div>
-          <div>
-            scrollY:{" "}
-            {typeof window !== "undefined" ? window.scrollY.toFixed(0) : "?"}
-          </div>
-          <div style={{ marginTop: 6 }}>== Event Log (last 10) ==</div>
-          {debugLog.length === 0 ? (
-            <div style={{ opacity: 0.6 }}>(no events yet)</div>
-          ) : (
-            debugLog.map((entry, i) => <div key={i}>{entry}</div>)
-          )}
-        </div>
-      )}
-
       <header style={headerStyle}>
         <div style={titleBlock}>
           <h1 style={titleStyle}>NFT Cards — 44 variants</h1>
@@ -205,9 +73,7 @@ export default function DemoClient() {
             Mode:&nbsp;
             <select
               value={previewMode}
-              /* DIAGNOSTIC — wrapped with log; restore to inline
-                 setPreviewMode after panel removed. */
-              onChange={handleModeChange}
+              onChange={(e) => setPreviewMode(e.target.value as PreviewMode)}
               style={selectStyle}
             >
               <option value="grid">Grid (44 cards)</option>
@@ -220,8 +86,9 @@ export default function DemoClient() {
                 Yokai:&nbsp;
                 <select
                   value={selectedYokai}
-                  /* DIAGNOSTIC */
-                  onChange={handleYokaiChange}
+                  onChange={(e) =>
+                    setSelectedYokai(e.target.value as YokaiName)
+                  }
                   style={selectStyle}
                 >
                   {YOKAI_ORDER.map((y) => (
@@ -235,8 +102,7 @@ export default function DemoClient() {
                 Tier:&nbsp;
                 <select
                   value={selectedTier}
-                  /* DIAGNOSTIC */
-                  onChange={handleTierChange}
+                  onChange={(e) => setSelectedTier(e.target.value as Tier)}
                   style={selectStyle}
                 >
                   {TIER_ORDER.map((t) => (
@@ -252,8 +118,7 @@ export default function DemoClient() {
             Size:&nbsp;
             <select
               value={size}
-              /* DIAGNOSTIC */
-              onChange={handleSizeChange}
+              onChange={(e) => setSize(e.target.value as Size)}
               style={selectStyle}
             >
               <option value="sm">sm (160px)</option>
@@ -265,8 +130,7 @@ export default function DemoClient() {
             <input
               type="checkbox"
               checked={interactive}
-              /* DIAGNOSTIC */
-              onChange={handleInteractiveChange}
+              onChange={(e) => setInteractive(e.target.checked)}
             />
             &nbsp;interactive
           </label>
@@ -274,8 +138,7 @@ export default function DemoClient() {
             <input
               type="checkbox"
               checked={showLore}
-              /* DIAGNOSTIC */
-              onChange={handleShowLoreChange}
+              onChange={(e) => setShowLore(e.target.checked)}
             />
             &nbsp;showLore
           </label>
@@ -393,28 +256,6 @@ const controlLabel: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   letterSpacing: "0.05em",
-};
-
-// DIAGNOSTIC — fixed top-of-viewport panel for state inspection on
-// device. z-index 99999 ensures it sits above the sticky header
-// (z=50) and every card. pointerEvents intentionally remains
-// 'auto' so the panel is scrollable on mobile when log overflows.
-const debugPanelStyle: React.CSSProperties = {
-  position: "fixed",
-  top: 0,
-  left: 0,
-  right: 0,
-  background: "rgba(0, 0, 0, 0.92)",
-  color: "#0f9",
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, monospace",
-  fontSize: 11,
-  padding: 8,
-  zIndex: 99999,
-  lineHeight: 1.5,
-  maxHeight: "40vh",
-  overflowY: "auto",
-  borderBottom: "1px solid #0f9",
-  textShadow: "0 0 2px rgba(0,0,0,0.8)",
 };
 
 const singleStyle: React.CSSProperties = {

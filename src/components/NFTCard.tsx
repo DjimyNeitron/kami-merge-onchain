@@ -50,7 +50,7 @@
 // mint logic — those belong to Stage 3.4+ (Inventory) and 3.5+
 // (mint flow). Constraint: must not touch wagmi / Mini App / Splash.
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import styles from "./NFTCard.module.css";
 import {
   BASE_LORE,
@@ -164,24 +164,8 @@ export default function NFTCard({
   // touchstart. Without resetting tilt there, the card would stay
   // frozen at the last touchmove angle until the next touchstart.
 
-  // DIAGNOSTIC — temporary touch event logging via window.__cardDebugLog
-  // (set by DemoClient when ?debug=1 is in the URL). Lets us see on the
-  // iPhone state panel whether touch events are even reaching NFTCard,
-  // vs. being swallowed by a parent / CSS pointer-events / etc. Helper
-  // tolerates window.__cardDebugLog being undefined (production, dev
-  // without debug=1, NFTCard rendered outside the demo) so it costs
-  // nothing in normal use. Remove after diagnosis lands.
-  const debugTouch = (msg: string) => {
-    if (typeof window === "undefined") return;
-    const dbg = (
-      window as unknown as { __cardDebugLog?: (m: string) => void }
-    ).__cardDebugLog;
-    dbg?.(msg);
-  };
-
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     if (!interactive) return;
-    debugTouch(`touchstart ${yokai}-${tier}`); // DIAGNOSTIC
     const touch = e.touches[0];
     if (!touch) return;
     setIsInteracting(true);
@@ -197,14 +181,12 @@ export default function NFTCard({
 
   const handleTouchEnd = () => {
     if (!interactive) return;
-    debugTouch(`touchend ${yokai}-${tier}`); // DIAGNOSTIC
     setIsInteracting(false);
     resetTilt();
   };
 
   const handleTouchCancel = () => {
     if (!interactive) return;
-    debugTouch(`touchcancel ${yokai}-${tier}`); // DIAGNOSTIC
     setIsInteracting(false);
     resetTilt();
   };
@@ -212,6 +194,28 @@ export default function NFTCard({
   // ─── Asset path selection ──────────────────────────────────────────
   const staticSrc = `${STATIC_BASE}/${yokai}_${tier}.png`;
   const animSrc = `${ANIM_BASE}/${yokai}_${tier}.webp`;
+
+  // Preload static image on mount. Without this the first touch on a
+  // never-yet-rendered card had a visible flash: aurora gradient (pure
+  // CSS) lit up instantly while the PNG was still being fetched, so
+  // for ~100-300ms the card frame showed an empty rectangle with only
+  // the holo glow inside. `new Image()` creates an off-DOM image
+  // element the browser caches; by the time the user actually
+  // interacts the bitmap is already decoded and ready. The <img>
+  // below also drops `loading="lazy"` and adds `fetchPriority="high"`
+  // so the in-DOM tag gets fetched at the same priority.
+  //
+  // Animated webp intentionally NOT preloaded — it's heavier
+  // (~1.8 MB each × 44 cards would be ~80 MB on grid mount), and the
+  // flash matters less for the hover/touch swap (the user has
+  // already engaged the card, micro-delays read as responsiveness
+  // rather than glitch). Animated.webp lazy-loads on first swap and
+  // caches from there.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const img = new window.Image();
+    img.src = staticSrc;
+  }, [staticSrc]);
 
   // Animated webp shown when card is interactive AND actively engaged.
   // For interactive=false (Inventory thumbnails) the swap never fires
@@ -265,14 +269,23 @@ export default function NFTCard({
       {/* The <img> is keyed on its src so swapping static ↔ animated
        *  triggers a fresh image element and lets the browser decode
        *  the next one in parallel instead of flashing through a
-       *  half-decoded frame. */}
+       *  half-decoded frame.
+       *
+       *  Eager loading + high fetch priority (was loading="lazy"):
+       *  the demo grid renders 44 cards at once, all in the initial
+       *  viewport on a typical desktop monitor. Lazy-loading delayed
+       *  bitmaps that aren't actually off-screen, producing a
+       *  visible flash where the holo gradient lit up an empty
+       *  frame while the PNG was still being fetched. Eager + high
+       *  priority + the new Image() preload above keep the
+       *  bitmaps in cache before the user can interact. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         key={artSrc}
         src={artSrc}
         alt=""
         className={styles.art}
-        loading="lazy"
+        fetchPriority="high"
         decoding="async"
         draggable={false}
       />
