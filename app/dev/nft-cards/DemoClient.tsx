@@ -7,18 +7,17 @@
 //   Single           — one card centred at size 'lg' with yokai + tier
 //                      dropdowns, for iteration / screenshot work.
 //
-// The control bar also exposes the size selector, the interactive +
-// showLore prop toggles, and the iOS "Enable Motion" affordance for
-// the DeviceOrientation tilt path. A floating <GyroDebugOverlay> shows
-// the singleton gyro state for diagnostic work on the actual device.
+// The control bar exposes the size selector + interactive + showLore
+// toggles. Tilt on mobile is driven by direct touch drag (parallel to
+// desktop mouse tilt), so no permission gate, no debug overlay, no
+// gyroscope buttons here — see NFTCard.tsx for the unified
+// applyTilt(clientX, clientY) helper.
 //
 // Purely internal — see ./page.tsx for the NODE_ENV-based 404 gate;
 // the only people who land here are devs running `npm run dev`.
 
 import { useEffect, useState } from "react";
 import NFTCard from "@/components/NFTCard";
-import GyroDebugOverlay from "@/components/GyroDebugOverlay";
-import { useGyroTilt } from "@/hooks/useGyroTilt";
 import {
   TIER_ORDER,
   YOKAI_ORDER,
@@ -43,12 +42,6 @@ export default function DemoClient() {
   const [previewMode, setPreviewMode] = useState<PreviewMode>("grid");
   const [selectedYokai, setSelectedYokai] = useState<YokaiName>("kodama");
   const [selectedTier, setSelectedTier] = useState<Tier>("legendary");
-
-  // The hook is a module-singleton so calling it here AND inside every
-  // NFTCard subscribes them all to the same shared state. The button
-  // / hint elements below read this instance's view of permission +
-  // events; cards see the same view through their own subscriptions.
-  const gyro = useGyroTilt();
 
   // Scroll to top when the preview mode changes. Without this, a user
   // scrolled deep in the grid (e.g. at Amaterasu) who flips to single
@@ -149,35 +142,6 @@ export default function DemoClient() {
             />
             &nbsp;showLore
           </label>
-
-          {/* iOS-specific affordances. The "Enable Motion" button is
-           *  the explicit-action replacement for the implicit-on-tap
-           *  pattern we tried in PR #20 — first-tap-on-card was
-           *  flaky on iOS (sometimes Safari suppresses the popup
-           *  during scroll / fast tap). An explicit button is the
-           *  documented Apple pattern and never gets swallowed.
-           *  Hidden on Android / desktop where permissionState
-           *  collapses to 'granted' or 'unsupported'. */}
-          {gyro.permissionState === "pending" && (
-            <button
-              type="button"
-              onClick={() => void gyro.requestPermission()}
-              style={enableMotionBtnStyle}
-            >
-              Enable Motion (iOS)
-            </button>
-          )}
-          {gyro.permissionState === "denied" && (
-            <span style={hintErrorStyle}>
-              Motion denied — re-enable in Safari → Settings → Motion &amp;
-              Orientation Access
-            </span>
-          )}
-          {gyro.permissionState === "granted" && gyro.eventCount === 0 && (
-            <span style={hintWarnStyle}>
-              Granted but no events — device may lack a gyro sensor
-            </span>
-          )}
         </div>
       </header>
 
@@ -204,8 +168,6 @@ export default function DemoClient() {
           />
         </div>
       )}
-
-      <GyroDebugOverlay />
     </main>
   );
 }
@@ -294,31 +256,6 @@ const controlLabel: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   letterSpacing: "0.05em",
-};
-
-const enableMotionBtnStyle: React.CSSProperties = {
-  padding: "8px 16px",
-  background: "#5b21b6",
-  color: "white",
-  border: "none",
-  borderRadius: 6,
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: "pointer",
-  fontFamily: "inherit",
-  letterSpacing: "0.05em",
-};
-
-const hintErrorStyle: React.CSSProperties = {
-  color: "#f87171",
-  fontSize: 12,
-  letterSpacing: "0.03em",
-};
-
-const hintWarnStyle: React.CSSProperties = {
-  color: "#fbbf24",
-  fontSize: 12,
-  letterSpacing: "0.03em",
 };
 
 const singleStyle: React.CSSProperties = {
