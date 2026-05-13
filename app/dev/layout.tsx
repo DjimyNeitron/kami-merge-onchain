@@ -34,18 +34,50 @@
 
 import type { ReactNode } from "react";
 
+// CSS override expanded after PR #21 regression: PR #19's initial
+// version pinned `position` / `overflow` / `height` on html only.
+// Chrome's computed-styles panel showed `body { overflow-x: hidden }`
+// still winning from somewhere in the cascade (likely a Tailwind v4
+// generated rule that we don't control), AND body's `position` was
+// never overridden — so it inherited `static` from the default but
+// other rules could push it back. The expanded version is belt-and-
+// suspenders: explicit overrides on every property game globals
+// could possibly touch on html and body, plus a defensive reset on
+// the Next.js root container in case future layout rules add a
+// position-locked wrapper there.
 const SEGMENT_OVERRIDE = `
   html {
     position: static !important;
     overflow: auto !important;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
     height: auto !important;
+    min-height: 100vh !important;
     width: auto !important;
+    inset: auto !important;
   }
   body {
+    position: static !important;
     overflow: auto !important;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
     height: auto !important;
-    min-height: 100vh;
+    min-height: 100vh !important;
+    width: auto !important;
+    inset: auto !important;
     background: #0a0d22 !important;
+  }
+  /* Next.js App Router renders children directly under <body>, but
+   * defensive: any wrapper div around the page also needs to drop
+   * position-locked + overflow-clipped rules so the document scrolls
+   * naturally. #__next is a Pages Router idiom kept here for forward
+   * compatibility if we ever opt into hybrid routing. */
+  #__next,
+  body > div:first-child {
+    position: static !important;
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow: visible !important;
   }
 `;
 
