@@ -163,8 +163,25 @@ export default function NFTCard({
   // decides the gesture belongs to a parent scroll container after
   // touchstart. Without resetting tilt there, the card would stay
   // frozen at the last touchmove angle until the next touchstart.
+
+  // DIAGNOSTIC — temporary touch event logging via window.__cardDebugLog
+  // (set by DemoClient when ?debug=1 is in the URL). Lets us see on the
+  // iPhone state panel whether touch events are even reaching NFTCard,
+  // vs. being swallowed by a parent / CSS pointer-events / etc. Helper
+  // tolerates window.__cardDebugLog being undefined (production, dev
+  // without debug=1, NFTCard rendered outside the demo) so it costs
+  // nothing in normal use. Remove after diagnosis lands.
+  const debugTouch = (msg: string) => {
+    if (typeof window === "undefined") return;
+    const dbg = (
+      window as unknown as { __cardDebugLog?: (m: string) => void }
+    ).__cardDebugLog;
+    dbg?.(msg);
+  };
+
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     if (!interactive) return;
+    debugTouch(`touchstart ${yokai}-${tier}`); // DIAGNOSTIC
     const touch = e.touches[0];
     if (!touch) return;
     setIsInteracting(true);
@@ -180,12 +197,14 @@ export default function NFTCard({
 
   const handleTouchEnd = () => {
     if (!interactive) return;
+    debugTouch(`touchend ${yokai}-${tier}`); // DIAGNOSTIC
     setIsInteracting(false);
     resetTilt();
   };
 
   const handleTouchCancel = () => {
     if (!interactive) return;
+    debugTouch(`touchcancel ${yokai}-${tier}`); // DIAGNOSTIC
     setIsInteracting(false);
     resetTilt();
   };
