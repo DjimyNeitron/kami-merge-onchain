@@ -26,9 +26,13 @@
  * children sit in the same perspective space and stay flat against the
  * rotated face.
  *
- * Holo effect: hover-triggered (or always-on for !interactive / touch),
- * three layers fade in together over 400ms when .isHovered is on the
- * card root. Palette is teal / violet / cyan / pale-lavender only — no
+ * Holo effect: interaction-triggered. Three layers fade in together
+ * over 400ms when .isInteracting is on the card root — set by React
+ * on mouseenter (desktop) OR touchstart (mobile), cleared on
+ * mouseleave / touchend / touchcancel. For !interactive cards (static
+ * preview thumbnails) React seeds isInteracting=true at mount so the
+ * holo shows always without a pointer event. Palette is teal /
+ * violet / cyan / pale-lavender only — no
  * warm hues, no full HSL spectrum, no rotation. Per-tier intensity via
  * three CSS custom properties set in the tier classes:
  *   --aurora-op, --aurora-streak-op, --sparkle-op
@@ -49,6 +53,14 @@
   will-change: transform;
   user-select: none;
   -webkit-user-select: none;
+  /* pan-y splits gestures naturally: vertical pans (page scroll) pass
+   * through to the parent scroller, horizontal / diagonal drags get
+   * captured by the card for the touch-tilt handlers. Without this,
+   * a user trying to scroll the demo grid by swiping over a card
+   * would either get stuck tilting the card OR get a janky combined
+   * tilt+scroll. Mouse / desktop is unaffected — touch-action only
+   * governs touch input. */
+  touch-action: pan-y;
 }
 
 /* Size variants — width drives, aspect-ratio handles height */
@@ -91,18 +103,18 @@
  *   .layerSparkles      — seven small white dots, mix-blend screen,
  *                         scaled down to ~0.5x per-tier opacity
  *
- * Trigger model: each layer starts at opacity 0. Adding `.isHovered`
+ * Trigger model: each layer starts at opacity 0. Adding `.isInteracting`
  * to the card root fades all three in over 400ms via the
  * `transition: opacity 0.4s` on .holoLayer. Per-tier intensity is
  * driven by three CSS custom properties (--aurora-op,
  * --aurora-streak-op, --sparkle-op) that the tier classes set, so
  * Common reads as a subtle hint and Legendary as a saturated halo.
  *
- * Touch devices (`@media (hover: none) and (pointer: coarse)`) bypass
- * the hover gate entirely — there's no cursor to trigger it, so we
- * just show the holo always. Same fallback when the card runs in
- * non-interactive mode (Inventory thumbnail, mint ceremony, etc):
- * React seeds `isHovered = true` at mount so the class is always on.
+ * Mouse hover OR touch (finger on card) both set .isInteracting via
+ * the React state in NFTCard.tsx — no platform-specific CSS branch
+ * needed. For !interactive cards (Inventory thumbnail, mint ceremony)
+ * React seeds isInteracting=true at mount so the class stays on
+ * permanently.
  *
  * holoWrap mask trims the holo at the corner curve so the glow never
  * bleeds past the frame border. */
@@ -183,37 +195,26 @@
   mix-blend-mode: screen;
 }
 
-/* Hover-triggered visibility — applies when React adds .isHovered to
- * the card root (mouseenter on desktop, or always on for
- * !interactive). Per-tier CSS vars below set the saturation. */
-.card.isHovered .layerAurora {
+/* Interaction-triggered visibility — applies when React adds
+ * .isInteracting to the card root, which happens on mouseenter
+ * (desktop), touchstart (mobile), or at mount if !interactive
+ * (static preview). Per-tier CSS vars below set the saturation.
+ * There's no separate `@media (hover: none)` fallback anymore —
+ * touch input flips .isInteracting through the same React state
+ * path as mouse input, so the class IS the cross-platform gate. */
+.card.isInteracting .layerAurora {
   opacity: var(--aurora-op, 0.45);
 }
-.card.isHovered .layerAuroraStreak {
+.card.isInteracting .layerAuroraStreak {
   opacity: var(--aurora-streak-op, 0.3);
 }
-.card.isHovered .layerSparkles {
+.card.isInteracting .layerSparkles {
   opacity: calc(var(--sparkle-op, 0.45) * 0.5);
 }
 
-/* Touch / no-hover devices: there's no cursor to trigger .isHovered,
- * so we show the holo unconditionally. Matches the prototype's
- * touch-fallback behavior described in spec section 5. */
-@media (hover: none) and (pointer: coarse) {
-  .card .layerAurora {
-    opacity: var(--aurora-op, 0.45);
-  }
-  .card .layerAuroraStreak {
-    opacity: var(--aurora-streak-op, 0.3);
-  }
-  .card .layerSparkles {
-    opacity: calc(var(--sparkle-op, 0.45) * 0.5);
-  }
-}
-
 /* Per-tier control surfaces. Each tier class sets THREE holo-layer
- * opacity vars (consumed by .isHovered + touch-fallback selectors
- * above). Values match the prototype exactly. The tier-coloured gold
+ * opacity vars (consumed by the .isInteracting selectors above).
+ * Values match the prototype exactly. The tier-coloured gold
  * surfaces (yokai name, kanji, tier badge, frame border) are all
  * baked into the asset bitmap, so no --frame-color var is needed
  * here — the tier classes are now purely for the holo opacity ramp. */
