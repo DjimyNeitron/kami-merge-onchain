@@ -15,7 +15,7 @@
 // Purely internal — see ./page.tsx for the NODE_ENV-based 404 gate;
 // the only people who land here are devs running `npm run dev`.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import NFTCard from "@/components/NFTCard";
 import GyroDebugOverlay from "@/components/GyroDebugOverlay";
 import { useGyroTilt } from "@/hooks/useGyroTilt";
@@ -49,6 +49,21 @@ export default function DemoClient() {
   // / hint elements below read this instance's view of permission +
   // events; cards see the same view through their own subscriptions.
   const gyro = useGyroTilt();
+
+  // Scroll to top when the preview mode changes. Without this, a user
+  // scrolled deep in the grid (e.g. at Amaterasu) who flips to single
+  // mode keeps the scroll position — but single mode only has one
+  // card sitting near the top of the document, so the viewport shows
+  // blank space below the header. From the user's point of view the
+  // mode dropdown "didn't switch" — which was the symptom reported
+  // after PR #21. The body+html scroll target also handles browsers
+  // that scroll one or the other depending on quirks mode.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.scrollTo(0, 0);
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+  }, [previewMode]);
 
   return (
     <main style={pageStyle}>
