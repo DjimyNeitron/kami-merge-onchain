@@ -21,7 +21,7 @@
 // can drive them. Production callers use the locked defaults (198 /
 // 198 / 360) and never touch the props.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import YokaiOverviewCard from "@/components/YokaiOverviewCard";
 import YokaiDetail from "@/components/YokaiDetail";
 import CardDetail from "@/components/CardDetail";
@@ -64,6 +64,23 @@ export default function Inventory({
   const [screen, setScreen] = useState<InventoryScreen>(
     initialScreen ?? { name: "overview" }
   );
+
+  // The body element is the scroll container for all three screens
+  // — its scrollTop persists across screen swaps because it's the
+  // same DOM node (only its children swap). Without an explicit
+  // reset, a user who scrolled deep on one screen and then navigated
+  // to another would land with the scroll position carried over. The
+  // worst case is Detail: card would be offscreen above the visible
+  // viewport because the body scrollTop matches the previous Overview
+  // scroll. Reset to top on every screen change so each screen is
+  // entered cleanly with its primary content (card on Detail, top of
+  // grid on Overview) at the top of the visible area.
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (bodyRef.current) {
+      bodyRef.current.scrollTop = 0;
+    }
+  }, [screen]);
 
   // ─── Navigation handlers ──────────────────────────────────────────
   const goOverview = () => setScreen({ name: "overview" });
@@ -139,7 +156,7 @@ export default function Inventory({
         />
       </div>
 
-      <div className={styles.body}>
+      <div ref={bodyRef} className={styles.body}>
         {screen.name === "overview" && (
           <OverviewGrid
             inventory={inventory}

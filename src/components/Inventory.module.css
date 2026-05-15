@@ -104,10 +104,18 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  /* iOS < 13 needed `-webkit-overflow-scrolling: touch` to enable
+   * momentum scrolling inside an overflow:auto container. Modern
+   * Safari (13+) defaults to momentum scrolling and ignores this,
+   * but the property is harmless to keep around for legacy mobile
+   * webviews (Warpcast / Startale embed in particular). */
+  -webkit-overflow-scrolling: touch;
   padding: 16px;
   scroll-behavior: smooth;
-  /* Plenty of breathing room at the bottom so the last grid row isn't
-   * crowded against the viewport edge. */
+  /* Per-screen content (e.g. .detailLayout) adds its own additional
+   * padding-bottom when it needs the chrome-overlay safe buffer. The
+   * 32 px here is just routine breathing room for the more compact
+   * non-detail screens. */
   padding-bottom: 32px;
 }
 
@@ -311,13 +319,25 @@
 }
 
 /* ─── Screen 3 detail layout — single card centred, metadata panel
- *   below it, lore section below that, action row at the bottom. */
+ *   below it, lore section below that, action row at the bottom.
+ *
+ *   padding-bottom: 140px reserves a chrome-overlay safe buffer at
+ *   the foot of the scroll content. Startale Mini Apps run inside
+ *   a 424 × 695 frame and the bottom ~20 % (139 px) is liable to be
+ *   covered by the Startale App info bar. Without the buffer, a
+ *   user scrolling to the natural end of the content would have the
+ *   Share / OpenSea buttons sit at viewport-bottom — exactly where
+ *   the chrome lands — and never see them. 140 px clears the danger
+ *   zone with a hair of margin, so when the user reaches the
+ *   scroll bottom the action row is positioned just above the safe
+ *   line at 556 px (= 695 − 139). */
 .detailLayout {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 20px;
   padding-top: 8px;
+  padding-bottom: 140px;
 }
 
 /* Wrapper around the NFTCard — display:block (was inline-flex in
