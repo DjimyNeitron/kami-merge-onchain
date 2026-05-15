@@ -278,12 +278,21 @@ export default function NFTCard({
       role="img"
       aria-label={`${displayName} — ${tier} tier NFT card`}
       /* When `width` prop is provided, it overrides the .sizeSm/Md/Lg
-       * class width via inline-style specificity. Height isn't set
-       * here — CSS aspect-ratio: 5/7 on .card derives it. React only
-       * writes the keys present in this style object on each render,
-       * so the ref-based transform writes from the tilt handlers stay
-       * intact across re-renders. */
-      style={width !== undefined ? { width } : undefined}
+       * class width via inline-style specificity. CSS .card already
+       * declares aspect-ratio: 5/7 so height should derive automatic-
+       * ally — but we ALSO set it inline as belt-and-suspenders
+       * insurance against any specificity / container-collapse edge
+       * case. (PR #28 shipped width-only inline and ran into a black-
+       * Detail-screen issue where the aspect-ratio chain broke when
+       * the card was wrapped in an inline-flex container. With
+       * aspectRatio inline, the browser computes height from width
+       * without depending on the class-level rule being consulted at
+       * all.) React only writes the keys present in this style object
+       * on each render, so the ref-based transform writes from the
+       * tilt handlers stay intact. */
+      style={
+        width !== undefined ? { width, aspectRatio: "5 / 7" } : undefined
+      }
     >
       {/* The <img> is keyed on its src so swapping static ↔ animated
        *  triggers a fresh image element and lets the browser decode

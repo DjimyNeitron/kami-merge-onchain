@@ -58,7 +58,13 @@ export default function YokaiOverviewCard({
         type="button"
         onClick={onTap}
         className={styles.lockedCard}
-        style={{ width }}
+        /* aspect-ratio also declared on .lockedCard CSS, but setting
+         * it inline here is the belt-and-suspenders insurance that
+         * fixed the PR #28 "Detail black / Overview left-crop" bug:
+         * with width inline + aspect-ratio inline, the browser
+         * derives height deterministically from width without
+         * depending on the class rule being consulted at all. */
+        style={{ width, aspectRatio: "5 / 7" }}
         aria-label={ariaLabel}
       >
         <div className={styles.lockedKanji}>{KANJI[yokai]}</div>
@@ -94,7 +100,7 @@ export default function YokaiOverviewCard({
       type="button"
       onClick={onTap}
       className={styles.overviewCard}
-      style={{ width }}
+      style={{ width, aspectRatio: "5 / 7" }}
       aria-label={ariaLabel}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
