@@ -155,7 +155,13 @@
 .overviewCard {
   position: relative;
   aspect-ratio: 5 / 7;
-  border-radius: 14px;
+  /* border-radius 14 → 6 to stop CSS rounding from cutting into the
+   * asset's baked gold frame at the corners. The asset bitmap's own
+   * corner curve is ~6 px at display scale (165 px wide); matching
+   * means CSS rounds the dark background without clipping the
+   * gold frame visible inside. .lockedCard keeps 14 px because no
+   * asset sits under its rounding. */
+  border-radius: 6px;
   overflow: hidden;
   background: #0f1626;
   cursor: pointer;
