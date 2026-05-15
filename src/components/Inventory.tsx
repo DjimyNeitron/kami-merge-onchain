@@ -42,11 +42,20 @@ export type InventoryScreen =
 export interface InventoryProps {
   /** Override the initial screen — used by the dev force-screen controls. */
   initialScreen?: InventoryScreen;
-  /** Pixel width of each yokai cell in the Overview grid. Default 180 (tuned for 424 px Startale viewport: (424 - 32 padding - 12 gap) / 2 ≈ 190; 180 leaves visual breathing room). */
+  /**
+   * Pixel width of each yokai cell in the Overview grid.
+   * Default 165 — Stage 3.4 locked value.
+   */
   overviewCardWidth?: number;
-  /** Pixel width of each tier card in the Yokai screen. Default 180 (same 2-col math as overview). */
+  /**
+   * Pixel width of each tier card in the Yokai screen.
+   * Default 165 — Stage 3.4 locked value.
+   */
   tierCardWidth?: number;
-  /** Pixel width of the single card in the Card Detail screen. Default 300 (~70 % of 424 px Startale viewport). */
+  /**
+   * Pixel width of the single card in the Card Detail screen.
+   * Default 300 — Stage 3.4 locked value.
+   */
   detailCardWidth?: number;
 }
 
@@ -56,8 +65,24 @@ function toTitle(s: string): string {
 
 export default function Inventory({
   initialScreen,
-  overviewCardWidth = 180,
-  tierCardWidth = 180,
+  // ─── Stage 3.4 LOCKED production card sizes ─────────────────────
+  //
+  // Validated empirically over PRs #27–#33 against the Startale
+  // Mini App official viewport (424 × 695, per
+  // docs.startale.com/miniapps/media-specs):
+  //
+  //   Overview 165 — 11-card flex-wrap fits 2 per row with breathing
+  //                  room; "KODAMA" / "HITODAMA" baked text legible
+  //   Tier     165 — same 2-column proportion for the 4-tier 2×2 grid
+  //   Detail   300 — single centred card; metadata + lore + actions
+  //                  fit under it with 140 px scroll buffer below
+  //                  (clears Startale's bottom-20% chrome zone)
+  //
+  // The sizing playground at /dev/inventory remains available for
+  // future viewport / layout experiments — these defaults are what
+  // every PRODUCTION embed of <Inventory /> renders.
+  overviewCardWidth = 165,
+  tierCardWidth = 165,
   detailCardWidth = 300,
 }: InventoryProps) {
   const inventory = useInventory();
