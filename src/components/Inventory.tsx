@@ -42,11 +42,11 @@ export type InventoryScreen =
 export interface InventoryProps {
   /** Override the initial screen — used by the dev force-screen controls. */
   initialScreen?: InventoryScreen;
-  /** Pixel width of each yokai cell in the Overview grid. Default 198. */
+  /** Pixel width of each yokai cell in the Overview grid. Default 180 (tuned for 424 px Startale viewport: (424 - 32 padding - 12 gap) / 2 ≈ 190; 180 leaves visual breathing room). */
   overviewCardWidth?: number;
-  /** Pixel width of each tier card in the Yokai screen. Default 198. */
+  /** Pixel width of each tier card in the Yokai screen. Default 180 (same 2-col math as overview). */
   tierCardWidth?: number;
-  /** Pixel width of the single card in the Card Detail screen. Default 280. */
+  /** Pixel width of the single card in the Card Detail screen. Default 300 (~70 % of 424 px Startale viewport). */
   detailCardWidth?: number;
 }
 
@@ -56,9 +56,9 @@ function toTitle(s: string): string {
 
 export default function Inventory({
   initialScreen,
-  overviewCardWidth = 198,
-  tierCardWidth = 198,
-  detailCardWidth = 280,
+  overviewCardWidth = 180,
+  tierCardWidth = 180,
+  detailCardWidth = 300,
 }: InventoryProps) {
   const inventory = useInventory();
   const [screen, setScreen] = useState<InventoryScreen>(

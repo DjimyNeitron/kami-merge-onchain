@@ -32,21 +32,36 @@ import {
 type ViewportPreset = {
   label: string;
   width: number;
+  height: number;
 };
 
+// Viewport presets. The Startale entry (424×695) is the **official**
+// Mini App frame dimensions per docs.startale.com/miniapps/media-specs
+// — we previously guessed 440 px wide, but the real chrome is 424 wide
+// and (critically) only 695 tall. That ~205 px gap matters for any
+// Inventory screen that wants the detail card + lore + actions to fit
+// without scrolling. Defaulting the simulator to this exact preset
+// keeps the dev preview accurate to what reviewers will actually see.
 const VIEWPORTS: ViewportPreset[] = [
-  { label: "360px (iPhone SE)", width: 360 },
-  { label: "390px (iPhone 14)", width: 390 },
-  { label: "428px (iPhone Pro Max)", width: 428 },
-  { label: "440px (Mini App default)", width: 440 },
+  { label: "360 × 640 (iPhone SE)", width: 360, height: 640 },
+  { label: "390 × 844 (iPhone 14)", width: 390, height: 844 },
+  { label: "424 × 695 (Startale official)", width: 424, height: 695 },
+  { label: "428 × 926 (iPhone Pro Max)", width: 428, height: 926 },
 ];
+// Index of the Startale entry — wired to default state below and to
+// the danger-zone overlay's visibility check.
+const STARTALE_PRESET_INDEX = 2;
 
 export default function DemoClient() {
   const inventory = useInventory();
-  const [viewportWidth, setViewportWidth] = useState(440);
-  const [overviewCardWidth, setOverviewCardWidth] = useState(198);
-  const [tierCardWidth, setTierCardWidth] = useState(198);
-  const [detailCardWidth, setDetailCardWidth] = useState(280);
+  const [viewportIndex, setViewportIndex] = useState(STARTALE_PRESET_INDEX);
+  const viewport = VIEWPORTS[viewportIndex];
+  // New defaults tuned for the 424 px Startale viewport:
+  //   Overview / Tier — (424 - 32 padding - 12 gap) / 2 = 190 → 180 leaves margin
+  //   Detail          — ~70% of 424 = 297 → 300 round number
+  const [overviewCardWidth, setOverviewCardWidth] = useState(180);
+  const [tierCardWidth, setTierCardWidth] = useState(180);
+  const [detailCardWidth, setDetailCardWidth] = useState(300);
   const [forcedScreen, setForcedScreen] = useState<InventoryScreen | null>(
     null
   );
@@ -93,12 +108,12 @@ export default function DemoClient() {
           <label style={controlLabel}>
             Viewport:&nbsp;
             <select
-              value={viewportWidth}
-              onChange={(e) => setViewportWidth(Number(e.target.value))}
+              value={viewportIndex}
+              onChange={(e) => setViewportIndex(Number(e.target.value))}
               style={selectStyle}
             >
-              {VIEWPORTS.map((v) => (
-                <option key={v.width} value={v.width}>
+              {VIEWPORTS.map((v, i) => (
+                <option key={v.label} value={i}>
                   {v.label}
                 </option>
               ))}
@@ -167,18 +182,23 @@ export default function DemoClient() {
       </div>
 
       {/* ─── Sizing playground sliders ─── */}
+      {/* Slider ranges tuned for the 424 px Startale viewport. The
+       *  (container - 32 padding - 12 gap) / 2 = 190 px ceiling
+       *  drives the Overview/Tier upper bound (195 leaves a hair of
+       *  visual margin); Detail's 380 ceiling stays a hair under
+       *  full-bleed so the card never touches the frame edge. */}
       <div style={sliderBar}>
         <SliderRow
           label="Overview card"
           min={140}
-          max={210}
+          max={195}
           value={overviewCardWidth}
           onChange={setOverviewCardWidth}
         />
         <SliderRow
           label="Tier card"
-          min={150}
-          max={210}
+          min={140}
+          max={195}
           value={tierCardWidth}
           onChange={setTierCardWidth}
         />
@@ -196,7 +216,8 @@ export default function DemoClient() {
         <div
           style={{
             ...frameInner,
-            width: viewportWidth,
+            width: viewport.width,
+            height: viewport.height,
           }}
         >
           <Inventory
@@ -206,6 +227,23 @@ export default function DemoClient() {
             tierCardWidth={tierCardWidth}
             detailCardWidth={detailCardWidth}
           />
+
+          {/* Danger-zone overlay — only renders when the simulator is
+           *  set to the Startale official preset. The Startale App
+           *  may slide an info bar over the bottom ~20 % of a Mini
+           *  App's viewport (per docs.startale.com/miniapps/media-specs),
+           *  so any critical UI placed there gets occluded for real
+           *  users. The striped overlay makes the danger zone visible
+           *  during layout iteration. pointerEvents: none so the
+           *  overlay doesn't intercept taps that would otherwise hit
+           *  the Inventory beneath it. */}
+          {viewportIndex === STARTALE_PRESET_INDEX && (
+            <div style={dangerZoneStyle} aria-hidden="true">
+              <div style={dangerZoneLabelStyle}>
+                STARTALE OVERLAY ZONE (avoid critical content)
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </main>
@@ -346,12 +384,43 @@ const frameOuter: React.CSSProperties = {
   justifyContent: "center",
   padding: "0 0 32px",
 };
+// width + height now come from the active viewport preset (set inline
+// at the render site). Removed the hardcoded `height: 900` that
+// previously forced every preset to render in the same tall box.
 const frameInner: React.CSSProperties = {
-  height: 900,
   border: "2px solid #333",
   borderRadius: 24,
   overflow: "hidden",
   background: "#0a0d22",
   position: "relative",
   boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
+};
+
+// Danger-zone overlay — sits at the bottom 20 % of the Startale frame
+// preset. Diagonal red stripes (low alpha) + a dashed top border give
+// the dev a clear visual reminder that any content shown in this band
+// can be occluded by the Startale App info bar at runtime. Only
+// rendered when the simulator is on the Startale preset; other
+// viewports don't have this overlay constraint.
+const dangerZoneStyle: React.CSSProperties = {
+  position: "absolute",
+  bottom: 0,
+  left: 0,
+  right: 0,
+  height: "20%",
+  background:
+    "repeating-linear-gradient(45deg, transparent 0, transparent 8px, rgba(255, 100, 100, 0.08) 8px, rgba(255, 100, 100, 0.08) 16px)",
+  borderTop: "1px dashed rgba(255, 100, 100, 0.4)",
+  pointerEvents: "none",
+  zIndex: 1000,
+};
+
+const dangerZoneLabelStyle: React.CSSProperties = {
+  position: "absolute",
+  top: 4,
+  left: 8,
+  fontSize: 9,
+  color: "rgba(255, 100, 100, 0.8)",
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, monospace",
+  letterSpacing: 1,
 };
