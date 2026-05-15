@@ -128,6 +128,15 @@
   flex-wrap: wrap;
   gap: 12px;
   justify-content: center;
+  /* align-items: flex-start (was default `stretch`). Default stretch
+   * forces all siblings in a row to equal heights — if any one card
+   * had intrinsic content taller than its aspect-ratio-derived 5/7
+   * height (e.g. the locked-silhouette variant with its flex content)
+   * the stretched height would override aspect-ratio on the others
+   * and `object-fit: cover` on the now-too-tall <img> would crop the
+   * left/right edges of the asset bitmap. flex-start lets each card
+   * use its own aspect-ratio height independently. */
+  align-items: flex-start;
 }
 
 /* ─── YokaiOverviewCard — yokai cell on Screen 1.
@@ -241,9 +250,16 @@
 /* ─── Screen 2 tier card — owned wrapper around NFTCard. The card
  *   itself now sets its own width via the `width` prop (PR #28), so
  *   the wrapper only provides the navigation click target and the
- *   touch-action gate; no width / height / transform-scale here. */
+ *   touch-action gate; no width / height / transform-scale here.
+ *
+ *   display:block (was inline-flex in PR #27/#28) so the inner
+ *   NFTCard's aspect-ratio resolves against a normal block container
+ *   instead of an inline-flex one. inline-flex on the wrapper was
+ *   shrink-wrapping its child in a way that occasionally collapsed
+ *   the aspect-ratio chain (Detail screen rendered black, asset
+ *   <img> not visible despite being in the DOM). */
 .tierCardOwned {
-  display: inline-flex;
+  display: block;
   cursor: pointer;
   touch-action: pan-y;
 }
@@ -304,12 +320,13 @@
   padding-top: 8px;
 }
 
-/* Wrapper around the NFTCard — width still provides the card's
- * visual size hook for the playground but NFTCard's `width` prop
- * owns the actual rendering. We no longer set transform-scale or
- * a manual reserved-height; aspect-ratio: 5/7 on .card handles it. */
+/* Wrapper around the NFTCard — display:block (was inline-flex in
+ * PR #27/#28) so the inner NFTCard's aspect-ratio resolves against
+ * a normal block container. Same bug class as .tierCardOwned: with
+ * inline-flex, the Detail screen rendered the card frame but the
+ * asset <img> stayed at zero visible size. */
 .detailCardWrap {
-  display: inline-flex;
+  display: block;
 }
 
 /* ─── Lore section — sits between metadata and action row. Two

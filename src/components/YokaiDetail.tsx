@@ -81,7 +81,10 @@ export default function YokaiDetail({
           <div
             key={tier}
             className={styles.tierCardLocked}
-            style={{ width: tierCardWidth }}
+            /* aspectRatio inline alongside width — same defensive
+             * pattern as the owned NFTCard so the locked silhouette
+             * keeps 5/7 even if the flex parent tries to stretch. */
+            style={{ width: tierCardWidth, aspectRatio: "5 / 7" }}
           >
             <div className={styles.lockedTierLabel}>{tier}</div>
             <svg
