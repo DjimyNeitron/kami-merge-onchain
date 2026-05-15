@@ -33,7 +33,9 @@ import NFTCard from "@/components/NFTCard";
 import styles from "./Inventory.module.css";
 import {
   AURORA_OPACITY,
+  BASE_LORE,
   ELEMENT_MAP,
+  TIER_FLAVOR,
   TIER_ORDER,
   YOKAI_ORDER,
   type Tier,
@@ -43,12 +45,10 @@ import type { InventoryNFT } from "@/hooks/useInventory";
 
 interface CardDetailProps {
   nft: InventoryNFT;
-  /** Pixel width of the displayed card. NFTCard renders at lg (360) and we scale. */
+  /** Pixel width of the displayed card. Passed straight into NFTCard's width prop. */
   detailCardWidth: number;
   onShare?: (nft: InventoryNFT) => void;
 }
-
-const NATIVE_LG = 360;
 
 function relativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -79,7 +79,6 @@ export default function CardDetail({
   detailCardWidth,
   onShare,
 }: CardDetailProps) {
-  const scale = detailCardWidth / NATIVE_LG;
   const yokaiRank = YOKAI_ORDER.indexOf(nft.yokai) + 1;
   const tierRank = TIER_ORDER.indexOf(nft.tier) + 1;
   const auroraOp = AURORA_OPACITY[nft.tier];
@@ -100,20 +99,11 @@ export default function CardDetail({
 
   return (
     <div className={styles.detailLayout}>
-      <div
-        className={styles.detailCardWrap}
-        style={{
-          transform: `scale(${scale})`,
-          // Reserve the scaled footprint so the metadata panel below
-          // doesn't slide up into the card when we shrink.
-          width: detailCardWidth,
-          height: ((NATIVE_LG * 7) / 5) * scale,
-        }}
-      >
+      <div className={styles.detailCardWrap}>
         <NFTCard
           yokai={nft.yokai}
           tier={nft.tier}
-          size="lg"
+          width={detailCardWidth}
           interactive
         />
       </div>
@@ -153,6 +143,16 @@ export default function CardDetail({
           <span className={styles.metadataKey}>Token ID</span>
           <span className={styles.metadataVal}>{shortTokenId(nft.tokenId)}</span>
         </div>
+      </div>
+
+      {/* Lore section — base yokai story + tier-flavor coda. The
+       *  primary storytelling beat for a card the player chose to
+       *  inspect; sits between the dry metadata table and the action
+       *  row so the player reads it before they decide to Share. */}
+      <div className={styles.lore} aria-label="Yokai lore">
+        <h3 className={styles.loreHeader}>About this Yokai</h3>
+        <p className={styles.loreBase}>{BASE_LORE[nft.yokai]}</p>
+        <p className={styles.loreTier}>{TIER_FLAVOR[nft.tier]}</p>
       </div>
 
       <div className={styles.actionRow}>

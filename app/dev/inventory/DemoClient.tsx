@@ -46,7 +46,7 @@ export default function DemoClient() {
   const [viewportWidth, setViewportWidth] = useState(440);
   const [overviewCardWidth, setOverviewCardWidth] = useState(198);
   const [tierCardWidth, setTierCardWidth] = useState(198);
-  const [detailCardWidth, setDetailCardWidth] = useState(360);
+  const [detailCardWidth, setDetailCardWidth] = useState(280);
   const [forcedScreen, setForcedScreen] = useState<InventoryScreen | null>(
     null
   );
@@ -184,8 +184,8 @@ export default function DemoClient() {
         />
         <SliderRow
           label="Detail card"
-          min={280}
-          max={420}
+          min={240}
+          max={380}
           value={detailCardWidth}
           onChange={setDetailCardWidth}
         />

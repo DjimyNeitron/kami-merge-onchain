@@ -111,24 +111,23 @@
   padding-bottom: 32px;
 }
 
-/* ─── Grids: 2-column for overview + tier screens. The CSS owns gap
- *   only; card width comes from inline style on the wrapper so the
- *   dev playground sliders can drive the value. */
+/* ─── Grid container. Used by both Screen 1 (Overview, 11 yokai)
+ *   and Screen 2 (Yokai, 4 tier cards).
+ *
+ *   Implemented as flex-wrap rather than CSS Grid so the odd-count
+ *   case (Screen 1's 11th card, Amaterasu) renders at the same
+ *   width as the others. A `1fr 1fr` grid forces the singleton's
+ *   cell to shrink to `1fr` (~half the row) while the inline `width`
+ *   prop fights it — visually the card reads smaller. Flex-wrap
+ *   instead lays each card at its inline width and naturally wraps
+ *   to the next row regardless of count. justify-content: center
+ *   centres each row's contents, so the singleton sits perfectly
+ *   centred under the 5 full rows above it. */
 .grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  justify-items: center;
-}
-
-/* Centre a single odd-row item (e.g. Amaterasu, the 11th yokai sitting
- * alone in row 6). Apply with the .gridLastSingleton modifier on the
- * wrapper of the final row. */
-.gridLastSingleton {
-  grid-column: 1 / -1;
   display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
   justify-content: center;
-  margin-top: 12px;
 }
 
 /* ─── YokaiOverviewCard — yokai cell on Screen 1.
@@ -239,17 +238,13 @@
   z-index: 5;
 }
 
-/* ─── Screen 2 tier card — owned wrapper around NFTCard, with the
- *   `key` set on the wrapper so size changes from the playground
- *   don't reuse stale transform state on the inner card. */
+/* ─── Screen 2 tier card — owned wrapper around NFTCard. The card
+ *   itself now sets its own width via the `width` prop (PR #28), so
+ *   the wrapper only provides the navigation click target and the
+ *   touch-action gate; no width / height / transform-scale here. */
 .tierCardOwned {
   display: inline-flex;
-  justify-content: center;
-  align-items: center;
   cursor: pointer;
-  /* Transform-origin centre so the scale wrapper around NFTCard
-   * doesn't drift visually when the slider moves. */
-  transform-origin: top center;
   touch-action: pan-y;
 }
 
@@ -300,7 +295,7 @@
 }
 
 /* ─── Screen 3 detail layout — single card centred, metadata panel
- *   below it, action row at the bottom. */
+ *   below it, lore section below that, action row at the bottom. */
 .detailLayout {
   display: flex;
   flex-direction: column;
@@ -309,11 +304,51 @@
   padding-top: 8px;
 }
 
+/* Wrapper around the NFTCard — width still provides the card's
+ * visual size hook for the playground but NFTCard's `width` prop
+ * owns the actual rendering. We no longer set transform-scale or
+ * a manual reserved-height; aspect-ratio: 5/7 on .card handles it. */
 .detailCardWrap {
-  /* Transform-origin top so scale shrinks toward the upper edge
-   * rather than centre — keeps the top of the card aligned with
-   * the header divider for visual rhythm. */
-  transform-origin: top center;
+  display: inline-flex;
+}
+
+/* ─── Lore section — sits between metadata and action row. Two
+ *   stacked paragraphs: BASE_LORE[yokai] (full description) and
+ *   TIER_FLAVOR[tier] (italic, slightly cooler tone). Light gold
+ *   border ties it back to the card frame palette. */
+.lore {
+  width: 100%;
+  background: rgba(15, 22, 38, 0.4);
+  border: 1px solid rgba(255, 218, 110, 0.15);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.loreHeader {
+  margin: 0 0 12px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: rgba(255, 218, 110, 0.6);
+}
+
+.loreBase {
+  margin: 0 0 12px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 13px;
+  line-height: 1.65;
+  color: rgba(245, 230, 200, 0.88);
+}
+
+.loreTier {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.55;
+  color: rgba(180, 200, 255, 0.7);
 }
 
 .metadata {
