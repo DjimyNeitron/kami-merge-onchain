@@ -10,11 +10,14 @@
 // tier label and an unlock hint.
 //
 // Width is driven by the parent (dev playground or 198 px default).
-// Because NFTCard's `size` prop only supports the three discrete
-// presets sm (160) / md (240) / lg (360), we scale the NFTCard
-// container via CSS transform to hit arbitrary widths between them.
-// Aspect ratio and 3-D tilt origins compose correctly under uniform
-// transform-scale, so the visual result matches a native-width card.
+// NFTCard now takes a `width` prop (PR #28) so we pass that directly
+// — no transform: scale wrapper, no manual height reservation. This
+// fixes the visible top-crop and bottom-empty-space glitch we shipped
+// in PR #27 where scaling a 240 px native card to 198 px via
+// `transform: scale(0.825)` made the asset's text content drift
+// off the wrapper's centre. With native width, aspect-ratio: 5/7 on
+// .card derives the height automatically and content stays where the
+// asset bitmap put it.
 
 import NFTCard from "@/components/NFTCard";
 import styles from "./Inventory.module.css";
@@ -28,26 +31,21 @@ interface YokaiDetailProps {
   yokai: YokaiName;
   /** Which tiers are owned. Closed shape per Tier. */
   ownedTiers: Record<Tier, boolean>;
-  /** Pixel width per tier card. Drives CSS scale of NFTCard. */
+  /** Pixel width per tier card. Passed straight into NFTCard's width prop. */
   tierCardWidth: number;
   /** Mapping yokai+tier → tokenId, used by the tap handler. */
   tokenIdFor: (yokai: YokaiName, tier: Tier) => string | null;
   onSelectTier: (tier: Tier, tokenId: string) => void;
 }
 
-// Threshold copy for the unlock hint. These are placeholder values
-// for the demo — Stage 7 will swap to real scoring criteria.
+// Threshold copy for the unlock hint. Placeholder values for the
+// demo — Stage 7 will swap to real scoring criteria.
 const UNLOCK_HINT: Record<Tier, string> = {
   common: "Drop your first to unlock",
   rare: "Score ≥ 500 to unlock",
   epic: "Score ≥ 1,500 to unlock",
   legendary: "Score ≥ 5,000 to unlock",
 };
-
-// NFTCard's native size for the size="md" preset. We scale from this
-// value to whatever tierCardWidth requests so the tilt math + aspect
-// ratio stay consistent.
-const NATIVE_MD = 240;
 
 export default function YokaiDetail({
   yokai,
@@ -56,8 +54,6 @@ export default function YokaiDetail({
   tokenIdFor,
   onSelectTier,
 }: YokaiDetailProps) {
-  const scale = tierCardWidth / NATIVE_MD;
-
   return (
     <div className={styles.grid}>
       {TIER_ORDER.map((tier) => {
@@ -68,30 +64,16 @@ export default function YokaiDetail({
             <div
               key={tier}
               className={styles.tierCardOwned}
-              style={{
-                // The wrapper preserves the SCALED footprint so the
-                // grid spacing accounts for the visible card size,
-                // not NFTCard's native 240 px. Without this the
-                // grid layout would think each cell is 240 px and
-                // produce mis-aligned rows.
-                width: tierCardWidth,
-                height: (NATIVE_MD * 7) / 5 * scale,
-              }}
               onClick={() => {
                 if (tokenId) onSelectTier(tier, tokenId);
               }}
             >
-              <div
-                className={styles.detailCardWrap}
-                style={{ transform: `scale(${scale})` }}
-              >
-                <NFTCard
-                  yokai={yokai}
-                  tier={tier}
-                  size="md"
-                  interactive
-                />
-              </div>
+              <NFTCard
+                yokai={yokai}
+                tier={tier}
+                width={tierCardWidth}
+                interactive
+              />
             </div>
           );
         }

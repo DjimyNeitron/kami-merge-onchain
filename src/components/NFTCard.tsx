@@ -64,6 +64,17 @@ export interface NFTCardProps {
   tier: Tier;
   /** Pixel-width preset. Aspect-ratio (5:7) is fixed in CSS. Default 'md' (240px). */
   size?: "sm" | "md" | "lg";
+  /**
+   * Explicit pixel width that overrides the discrete `size` preset.
+   * Aspect-ratio (5:7) is still owned by CSS, so passing `width` is
+   * enough — height is derived automatically. Used by Inventory's
+   * sizing playground + the live production grid where the three
+   * presets don't land at the desired final pixel size. When
+   * undefined, `size` falls through to one of the .sizeSm/Md/Lg CSS
+   * classes. Inline style beats class specificity, so an explicit
+   * width always wins.
+   */
+  width?: number;
   /** When false: disables tilt + hover-swap, renders flat static-only card. Default true. */
   interactive?: boolean;
   /** When true: render translucent bottom overlay with `BASE_LORE[yokai] + TIER_FLAVOR[tier]`. Default false. */
@@ -85,6 +96,7 @@ export default function NFTCard({
   yokai,
   tier,
   size = "md",
+  width,
   interactive = true,
   showLore = false,
   className,
@@ -265,6 +277,13 @@ export default function NFTCard({
       data-yokai={yokai}
       role="img"
       aria-label={`${displayName} — ${tier} tier NFT card`}
+      /* When `width` prop is provided, it overrides the .sizeSm/Md/Lg
+       * class width via inline-style specificity. Height isn't set
+       * here — CSS aspect-ratio: 5/7 on .card derives it. React only
+       * writes the keys present in this style object on each render,
+       * so the ref-based transform writes from the tilt handlers stay
+       * intact across re-renders. */
+      style={width !== undefined ? { width } : undefined}
     >
       {/* The <img> is keyed on its src so swapping static ↔ animated
        *  triggers a fresh image element and lets the browser decode

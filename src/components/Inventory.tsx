@@ -46,7 +46,7 @@ export interface InventoryProps {
   overviewCardWidth?: number;
   /** Pixel width of each tier card in the Yokai screen. Default 198. */
   tierCardWidth?: number;
-  /** Pixel width of the single card in the Card Detail screen. Default 360. */
+  /** Pixel width of the single card in the Card Detail screen. Default 280. */
   detailCardWidth?: number;
 }
 
@@ -58,7 +58,7 @@ export default function Inventory({
   initialScreen,
   overviewCardWidth = 198,
   tierCardWidth = 198,
-  detailCardWidth = 360,
+  detailCardWidth = 280,
 }: InventoryProps) {
   const inventory = useInventory();
   const [screen, setScreen] = useState<InventoryScreen>(
@@ -218,12 +218,13 @@ function OverviewGrid({
     );
   }
 
-  // 11 yokai → 5 rows of 2 + 1 singleton (Amaterasu) on the last row.
-  // Render the first 10 in the main grid, then Amaterasu in a
-  // centred wrapper below.
-  const main = YOKAI_ORDER.slice(0, 10);
-  const last = YOKAI_ORDER[10];
-
+  // 11 yokai in a flex-wrap grid. The previous implementation split
+  // the array into "first 10" + "11th singleton" because CSS Grid
+  // `1fr 1fr` made the lone Amaterasu shrink to the cell width
+  // instead of keeping parity with the rest. Flex-wrap renders each
+  // card at its inline width regardless of row position, and the
+  // CSS `justify-content: center` on .grid centres the last partial
+  // row (the singleton sits exactly under the column gap above it).
   const renderCell = (yokai: YokaiName) => {
     const owned = inventory.byYokai[yokai];
     return (
@@ -238,12 +239,7 @@ function OverviewGrid({
     );
   };
 
-  return (
-    <>
-      <div className={styles.grid}>{main.map(renderCell)}</div>
-      <div className={styles.gridLastSingleton}>{renderCell(last)}</div>
-    </>
-  );
+  return <div className={styles.grid}>{YOKAI_ORDER.map(renderCell)}</div>;
 }
 
 // Re-export for callers that need the InventoryNFT shape (e.g. dev
