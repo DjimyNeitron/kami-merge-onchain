@@ -56,11 +56,13 @@ export default function DemoClient() {
   const inventory = useInventory();
   const [viewportIndex, setViewportIndex] = useState(STARTALE_PRESET_INDEX);
   const viewport = VIEWPORTS[viewportIndex];
-  // New defaults tuned for the 424 px Startale viewport:
-  //   Overview / Tier — (424 - 32 padding - 12 gap) / 2 = 190 → 180 leaves margin
-  //   Detail          — ~70% of 424 = 297 → 300 round number
-  const [overviewCardWidth, setOverviewCardWidth] = useState(180);
-  const [tierCardWidth, setTierCardWidth] = useState(180);
+  // Initial values mirror the Stage 3.4 locked production defaults
+  // (Inventory.tsx — 165 / 165 / 300). Sliders remain so future
+  // viewport / layout experiments can explore beyond these, but on
+  // first load the playground reflects exactly what every production
+  // embed of <Inventory /> will render.
+  const [overviewCardWidth, setOverviewCardWidth] = useState(165);
+  const [tierCardWidth, setTierCardWidth] = useState(165);
   const [detailCardWidth, setDetailCardWidth] = useState(300);
   const [forcedScreen, setForcedScreen] = useState<InventoryScreen | null>(
     null
@@ -182,23 +184,25 @@ export default function DemoClient() {
       </div>
 
       {/* ─── Sizing playground sliders ─── */}
-      {/* Slider ranges tuned for the 424 px Startale viewport. The
-       *  (container - 32 padding - 12 gap) / 2 = 190 px ceiling
-       *  drives the Overview/Tier upper bound (195 leaves a hair of
-       *  visual margin); Detail's 380 ceiling stays a hair under
-       *  full-bleed so the card never touches the frame edge. */}
+      {/* Stage 3.4 locked production sizes are 165 / 165 / 300, but
+       *  the slider ranges intentionally extend past the 2-column
+       *  ceiling at 424 px viewport (190 px) so future experiments
+       *  can explore wider single-column or larger-viewport layouts.
+       *  Going past 195 on Overview/Tier wraps the grid to 1-per-row
+       *  in the simulator — that's a valid layout to explore, not a
+       *  bug. */}
       <div style={sliderBar}>
         <SliderRow
           label="Overview card"
           min={140}
-          max={195}
+          max={210}
           value={overviewCardWidth}
           onChange={setOverviewCardWidth}
         />
         <SliderRow
           label="Tier card"
-          min={140}
-          max={195}
+          min={150}
+          max={210}
           value={tierCardWidth}
           onChange={setTierCardWidth}
         />
