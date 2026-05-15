@@ -165,7 +165,13 @@
    * being intercepted by tap-to-navigate. */
   touch-action: pan-y;
   transition: transform 120ms ease-out;
-  border: 1px solid rgba(232, 200, 130, 0.12);
+  /* No CSS border on the owned variant — the asset PNG already has
+   * a gold frame baked into the bitmap (verified visually for all
+   * 44 assets). A 1px CSS border on top produced a faint "ghost
+   * outline" alongside the asset's own frame at the corners, which
+   * read as a double-frame on close inspection. The locked variant
+   * still has a CSS border (.lockedCard below) because it renders
+   * no asset image and needs the visual containment. */
 }
 .overviewCard:hover,
 .overviewCard:active {
