@@ -1,0 +1,402 @@
+/*
+ * Inventory.module.css — shared styles for the 3-screen inventory
+ * architecture (Overview → Yokai Detail → Card Detail). Designed for
+ * the Farcaster Mini App viewport (~440 px wide), so we use compact
+ * spacing and lean on the asset bitmap for visual richness instead
+ * of stacking CSS gloss layers.
+ *
+ * All inner card sizing is driven by inline width via the playground
+ * sliders in DemoClient (or via the production defaults from
+ * Inventory.tsx props). CSS only owns layout — gap, padding, the
+ * progress bar gradient, and the lock-state silhouette.
+ */
+
+/* ─── Root frame: fills its parent (the Mini App modal or the dev
+ *   viewport simulator). flex-column so header is sticky at top
+ *   while content scrolls. */
+.root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #0a0d22;
+  color: #e8c882;
+  font-family: Georgia, "Times New Roman", serif;
+  overflow: hidden;
+}
+
+/* ─── Header row: back arrow (left) + title (centre) + count badge
+ *   (right). Position sticky inside .root so the player always sees
+ *   where they are while scrolling a long grid. */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px 8px;
+  border-bottom: 1px solid rgba(232, 200, 130, 0.15);
+  background: rgba(10, 13, 34, 0.92);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  flex-shrink: 0;
+}
+
+.backBtn {
+  font-size: 22px;
+  line-height: 1;
+  color: #e8c882;
+  background: transparent;
+  border: 1px solid rgba(232, 200, 130, 0.3);
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+.backBtn:hover,
+.backBtn:active {
+  background: rgba(232, 200, 130, 0.08);
+}
+
+.title {
+  flex: 1;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-align: center;
+  color: #f5e6c8;
+}
+
+.headerSpacer {
+  /* Mirrors backBtn width so .title stays centred when back is hidden. */
+  width: 32px;
+}
+
+.countBadge {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: rgba(232, 200, 130, 0.85);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ─── Progress bar: gradient indigo → gold, fill % = count/44. */
+.progressTrack {
+  height: 4px;
+  background: rgba(232, 200, 130, 0.12);
+  flex-shrink: 0;
+}
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, rgb(49, 46, 129), rgb(232, 200, 130));
+  transition: width 240ms ease-out;
+}
+
+/* ─── Scroll body: holds the grid for each screen. Scrolls within
+ *   the .root frame so the header stays in place. */
+.body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px;
+  scroll-behavior: smooth;
+  /* Plenty of breathing room at the bottom so the last grid row isn't
+   * crowded against the viewport edge. */
+  padding-bottom: 32px;
+}
+
+/* ─── Grids: 2-column for overview + tier screens. The CSS owns gap
+ *   only; card width comes from inline style on the wrapper so the
+ *   dev playground sliders can drive the value. */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  justify-items: center;
+}
+
+/* Centre a single odd-row item (e.g. Amaterasu, the 11th yokai sitting
+ * alone in row 6). Apply with the .gridLastSingleton modifier on the
+ * wrapper of the final row. */
+.gridLastSingleton {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+/* ─── YokaiOverviewCard — yokai cell on Screen 1.
+ *   Owned variant: asset image + progress badge + subtle tier-coloured
+ *   border.
+ *   Locked variant: dark slab with kanji watermark + lock icon.
+ *   Width applied inline; aspect ratio fixed 5:7. */
+.overviewCard {
+  position: relative;
+  aspect-ratio: 5 / 7;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #0f1626;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  /* pan-y so a vertical swipe scrolls the parent grid rather than
+   * being intercepted by tap-to-navigate. */
+  touch-action: pan-y;
+  transition: transform 120ms ease-out;
+  border: 1px solid rgba(232, 200, 130, 0.12);
+}
+.overviewCard:hover,
+.overviewCard:active {
+  transform: scale(1.02);
+}
+
+.overviewArt {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+
+.lockedCard {
+  /* Same shell as .overviewCard but no <img> — render the kanji
+   * watermark + lock icon centrally. */
+  position: relative;
+  aspect-ratio: 5 / 7;
+  border-radius: 14px;
+  background: linear-gradient(
+    140deg,
+    rgba(15, 22, 38, 0.95),
+    rgba(15, 22, 38, 0.7)
+  );
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-y;
+  border: 1px solid rgba(232, 200, 130, 0.1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: transform 120ms ease-out;
+}
+.lockedCard:hover,
+.lockedCard:active {
+  transform: scale(1.02);
+  border-color: rgba(232, 200, 130, 0.25);
+}
+
+.lockedKanji {
+  font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", serif;
+  font-size: 48px;
+  color: rgba(232, 200, 130, 0.18);
+  line-height: 1;
+  margin-bottom: 8px;
+  pointer-events: none;
+}
+.lockedRomaji {
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: rgba(232, 200, 130, 0.4);
+  margin-bottom: 14px;
+  pointer-events: none;
+}
+
+.lockIcon {
+  width: 22px;
+  height: 22px;
+  color: rgba(232, 200, 130, 0.55);
+  pointer-events: none;
+}
+
+/* Progress badge — top-right of overview card. Pill shape. */
+.progressBadge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: rgba(10, 13, 34, 0.85);
+  border: 1px solid rgba(232, 200, 130, 0.5);
+  border-radius: 10px;
+  padding: 2px 7px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: #e8c882;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 5;
+}
+
+/* ─── Screen 2 tier card — owned wrapper around NFTCard, with the
+ *   `key` set on the wrapper so size changes from the playground
+ *   don't reuse stale transform state on the inner card. */
+.tierCardOwned {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  /* Transform-origin centre so the scale wrapper around NFTCard
+   * doesn't drift visually when the slider moves. */
+  transform-origin: top center;
+  touch-action: pan-y;
+}
+
+.tierCardLocked {
+  position: relative;
+  aspect-ratio: 5 / 7;
+  border-radius: 14px;
+  background: linear-gradient(
+    140deg,
+    rgba(15, 22, 38, 0.95),
+    rgba(15, 22, 38, 0.65)
+  );
+  border: 1px solid rgba(232, 200, 130, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-y;
+  overflow: hidden;
+}
+
+.lockedTierLabel {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: rgba(232, 200, 130, 0.6);
+  font-family: Georgia, serif;
+  pointer-events: none;
+}
+
+.lockedHint {
+  position: absolute;
+  bottom: 14px;
+  left: 12px;
+  right: 12px;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-align: center;
+  color: rgba(232, 200, 130, 0.55);
+  font-family: ui-monospace, monospace;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+/* ─── Screen 3 detail layout — single card centred, metadata panel
+ *   below it, action row at the bottom. */
+.detailLayout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding-top: 8px;
+}
+
+.detailCardWrap {
+  /* Transform-origin top so scale shrinks toward the upper edge
+   * rather than centre — keeps the top of the card aligned with
+   * the header divider for visual rhythm. */
+  transform-origin: top center;
+}
+
+.metadata {
+  width: 100%;
+  background: rgba(15, 22, 38, 0.6);
+  border: 1px solid rgba(232, 200, 130, 0.18);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.metadataRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 11px;
+  line-height: 1.7;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid rgba(232, 200, 130, 0.06);
+  padding: 4px 0;
+}
+.metadataRow:last-child {
+  border-bottom: none;
+}
+
+.metadataKey {
+  color: rgba(232, 200, 130, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 9px;
+}
+.metadataVal {
+  color: #f5e6c8;
+  font-weight: 500;
+}
+
+.actionRow {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.actionBtn {
+  flex: 1;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #e8c882;
+  background: rgba(15, 22, 38, 0.7);
+  border: 1px solid rgba(232, 200, 130, 0.4);
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: Georgia, serif;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.actionBtn:hover {
+  background: rgba(232, 200, 130, 0.08);
+}
+.actionBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ─── Empty state — Inventory with zero NFTs. */
+.empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px 24px;
+  text-align: center;
+  color: rgba(232, 200, 130, 0.7);
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  line-height: 1.6;
+}
+.emptyHint {
+  font-size: 11px;
+  color: rgba(232, 200, 130, 0.5);
+}
