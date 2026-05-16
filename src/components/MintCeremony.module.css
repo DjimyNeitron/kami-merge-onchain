@@ -1,14 +1,14 @@
 /*
  * MintCeremony.module.css — phase-driven NFT reveal ceremony.
  *
- * The component flips a CeremonyPhase; every fade / scale / cycle
- * below is CSS so motion runs compositor-side. Phase-conditional
- * rules key off the `data-phase` attribute on the .ceremony root.
- * Layout target: Startale 424×695 viewport — centred flex column,
- * no scroll.
+ * The component flips a CeremonyPhase + a drum index; every fade /
+ * scale / slide here is CSS so motion runs compositor-side. Phase-
+ * conditional rules key off the `data-phase` attribute on the
+ * .ceremony root. Layout target: Startale 424×695 viewport.
  */
 
 .ceremony {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -26,7 +26,6 @@
 .header {
   transition: transform 400ms ease-out;
 }
-
 .runComplete {
   margin: 0;
   font-size: 14px;
@@ -36,7 +35,6 @@
   opacity: 0;
   animation: fade-in 300ms ease-out 0ms forwards;
 }
-
 .score {
   margin: 4px 0 0;
   font-size: 32px;
@@ -46,8 +44,6 @@
   opacity: 0;
   animation: fade-in 300ms ease-out 300ms forwards;
 }
-
-/* Past intro the header shrinks to a compact score line. */
 .ceremony:not([data-phase="intro"]) .score {
   font-size: 20px;
 }
@@ -69,7 +65,7 @@
   pointer-events: none;
 }
 
-/* ─── Stage: empty frame OR revealed card ────────────────────────── */
+/* ─── Stage: silhouette card OR revealed card ────────────────────── */
 .stage {
   position: relative;
   margin-top: 24px;
@@ -78,9 +74,12 @@
   justify-content: center;
 }
 
-/* Empty 5:7 slab — placeholder kanji + cycling tier indicator. */
-.emptyFrame {
+/* Silhouette — placeholder kanji + slot drum. Fixed via the stage's
+ * inline width + aspect-ratio so it never bounces when the drum text
+ * changes length. data-tier drives the per-tier frame border. */
+.silhouetteCard {
   position: relative;
+  width: 100%;
   aspect-ratio: 5 / 7;
   border-radius: 8px;
   background: linear-gradient(160deg, #141a2e 0%, #0a0d22 100%);
@@ -90,7 +89,32 @@
   align-items: center;
   justify-content: center;
   gap: 18px;
-  transition: opacity 300ms ease-out;
+  transition:
+    opacity 300ms ease-out,
+    border-color 120ms linear,
+    box-shadow 200ms ease-out;
+}
+.silhouetteCard[data-tier="common"] {
+  border-color: #a89060;
+  border-width: 1px;
+}
+.silhouetteCard[data-tier="rare"] {
+  border-color: #c5b583;
+  border-width: 1.5px;
+}
+.silhouetteCard[data-tier="epic"] {
+  border-color: #e8c840;
+  border-width: 2px;
+}
+.silhouetteCard[data-tier="legendary"] {
+  border-color: #ffd700;
+  border-width: 2.5px;
+  box-shadow: 0 0 16px rgba(255, 215, 0, 0.3);
+}
+/* Once the real card materialises, the silhouette fades away. */
+.ceremony:not([data-phase="intro"]):not([data-phase="spinning"])
+  .silhouetteCard {
+  opacity: 0;
 }
 
 .placeholderKanji {
@@ -101,8 +125,62 @@
   animation: kanji-pulse 2s ease-in-out infinite;
 }
 
-/* Revealed NFTCard — cross-fades + scales 0.85→1.0 on entry. Visible
- * from `revealing` onward (every phase except intro + spinning). */
+/* ─── Slot drum — fixed-width window, 4 stacked tier labels ──────── */
+.tierDrum {
+  position: relative;
+  height: 24px;
+  width: 140px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.3);
+  border-top: 1px solid rgba(197, 164, 93, 0.3);
+  border-bottom: 1px solid rgba(197, 164, 93, 0.3);
+}
+.tierDrumInner {
+  display: flex;
+  flex-direction: column;
+  transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.tierSlot {
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+.tierSlot:nth-child(1) {
+  color: #a89060;
+}
+.tierSlot:nth-child(2) {
+  color: #c5b583;
+}
+.tierSlot:nth-child(3) {
+  color: #e8c840;
+}
+.tierSlot:nth-child(4) {
+  background: linear-gradient(
+    90deg,
+    #ffd700,
+    #ffa500,
+    #ff69b4,
+    #9370db,
+    #ffd700
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: legendary-shimmer 2s linear infinite;
+}
+
+/* ─── Revealed NFTCard — 3-beat reveal ───────────────────────────── */
+/* Default = pre-reveal. card-materializing sharpens it but keeps it
+ * matte (low saturate). aurora-rising lifts saturation → the holo
+ * "awakens". The NFTCard itself is untouched — this is all a
+ * wrapper-level filter. */
 .revealCard {
   position: absolute;
   inset: 0;
@@ -111,28 +189,50 @@
   justify-content: center;
   opacity: 0;
   transform: scale(0.85);
+  filter: blur(8px) saturate(0.55) brightness(0.9);
   transition:
-    opacity 300ms ease-out,
-    transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+    opacity 500ms ease-out,
+    transform 500ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 550ms ease-out;
 }
-.ceremony:not([data-phase="intro"]):not([data-phase="spinning"]) .revealCard {
+.ceremony[data-phase="card-materializing"] .revealCard {
   opacity: 1;
   transform: scale(1);
+  filter: blur(0) saturate(0.55) brightness(0.9);
 }
-.ceremony:not([data-phase="intro"]):not([data-phase="spinning"]) .emptyFrame {
-  opacity: 0;
+.ceremony[data-phase="aurora-rising"] .revealCard,
+.ceremony[data-phase="tier-banner"] .revealCard,
+.ceremony[data-phase="mint-ready"] .revealCard,
+.ceremony[data-phase="minting"] .revealCard,
+.ceremony[data-phase="success"] .revealCard {
+  opacity: 1;
+  transform: scale(1);
+  filter: blur(0) saturate(1) brightness(1);
+}
+/* Card pulse at the mint-success moment. */
+.ceremony[data-phase="success"] .revealCard {
+  animation: success-pulse 600ms ease-out;
 }
 
-/* ─── Tier indicator (cycles during spin) ────────────────────────── */
-.tierIndicator {
-  font-size: 15px;
+/* ─── Tier banner under the revealed card ────────────────────────── */
+.tierBanner {
+  margin-top: 16px;
+  font-size: 16px;
   font-weight: 700;
-  letter-spacing: 0.32em;
+  letter-spacing: 0.3em;
   text-transform: uppercase;
-  padding: 4px 0;
-  border-top: 2px solid currentColor;
-  min-width: 96px;
-  transition: color 60ms linear;
+  opacity: 0;
+  transform: translateY(6px) scale(0.9);
+  transition:
+    opacity 250ms ease-out,
+    transform 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.ceremony[data-phase="tier-banner"] .tierBanner,
+.ceremony[data-phase="mint-ready"] .tierBanner,
+.ceremony[data-phase="minting"] .tierBanner,
+.ceremony[data-phase="success"] .tierBanner {
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 .tierCommon {
   color: #a89060;
@@ -143,7 +243,6 @@
 .tierEpic {
   color: #e8c840;
 }
-/* Legendary: animated rainbow sweep instead of a flat colour. */
 .tierLegendary {
   color: transparent;
   background: linear-gradient(
@@ -159,30 +258,11 @@
   -webkit-background-clip: text;
   background-clip: text;
   animation: rainbow-sweep 1.4s linear infinite;
-  border-image: linear-gradient(90deg, #e8c840, #9be8c8, #8fb8ff, #c89bff) 1;
 }
 
-/* Tier banner under the revealed card — same reveal gate as the card. */
-.tierBanner {
-  margin-top: 16px;
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  opacity: 0;
-  transform: translateY(6px);
-  transition:
-    opacity 300ms ease-out,
-    transform 300ms ease-out;
-}
-.ceremony:not([data-phase="intro"]):not([data-phase="spinning"]) .tierBanner {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* ─── Mint button — shown from `mint-ready` onward ───────────────── */
+/* ─── Mint button + sub-copy — from mint-ready onward ────────────── */
 .actions {
-  margin-top: 20px;
+  margin-top: 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -201,7 +281,6 @@
   transform: translateY(0);
   pointer-events: auto;
 }
-
 .mintButton {
   font-family: inherit;
   font-size: 15px;
@@ -221,15 +300,12 @@
   animation: none;
   opacity: 0.85;
 }
-
 .mintSub {
-  margin: 0;
-  font-size: 11px;
-  color: rgba(232, 200, 130, 0.55);
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
   letter-spacing: 0.04em;
 }
-
-/* Inline spinner inside the button during the minting phase. */
 .spinner {
   display: inline-block;
   width: 13px;
@@ -242,48 +318,67 @@
   animation: spin 600ms linear infinite;
 }
 
-/* ─── Success toast + confetti ───────────────────────────────────── */
-.toast {
+/* ─── Success banner — large centred announcement ────────────────── */
+/* Hidden until success, then a spring scale-pop, then auto-dismiss
+ * after 1.5 s (chained animations). */
+.successBanner {
   position: absolute;
-  top: 16px;
+  top: 50%;
   left: 50%;
-  transform: translate(-50%, -16px);
-  background: rgba(20, 28, 48, 0.96);
-  border: 1px solid rgba(232, 200, 130, 0.4);
-  border-radius: 8px;
-  padding: 10px 20px;
-  font-size: 13px;
-  letter-spacing: 0.05em;
-  color: #f5e6c8;
-  opacity: 0;
-  transition:
-    opacity 300ms ease-out,
-    transform 300ms ease-out;
-  z-index: 20;
+  transform: translate(-50%, -50%) scale(0);
+  background: linear-gradient(
+    135deg,
+    rgba(232, 200, 110, 0.96),
+    rgba(255, 215, 0, 0.96)
+  );
+  color: #1a1a2e;
+  padding: 20px 32px;
+  border-radius: 12px;
+  text-align: center;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(255, 215, 0, 0.4);
+  pointer-events: none;
 }
-.ceremony[data-phase="success"] .toast {
-  opacity: 1;
-  transform: translate(-50%, 0);
+.ceremony[data-phase="success"] .successBanner {
+  animation:
+    success-pop 500ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
+    success-dismiss 400ms ease-in 1500ms forwards;
+}
+.successIcon {
+  font-size: 32px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.successText {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+.successSubtext {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-top: 4px;
+  letter-spacing: 0.08em;
 }
 
-/* Confetti — ~14 bits, success only; per-bit left/colour/delay set
- * inline so they don't fall in lockstep. */
+/* ─── Confetti — 40 bits, success only ───────────────────────────── */
 .confetti {
   position: absolute;
   inset: 0;
   pointer-events: none;
   overflow: hidden;
-  z-index: 15;
+  z-index: 90;
 }
 .confettiBit {
   position: absolute;
-  top: -12px;
-  width: 7px;
-  height: 7px;
+  top: -14px;
+  width: 8px;
+  height: 8px;
+  border-radius: 1px;
   opacity: 0;
 }
 .ceremony[data-phase="success"] .confettiBit {
-  animation: confetti-fall 2200ms ease-in forwards;
+  animation: confetti-fall 2400ms ease-in forwards;
 }
 
 /* ─── Keyframes ──────────────────────────────────────────────────── */
@@ -293,6 +388,9 @@
 @keyframes kanji-pulse {
   0%, 100% { opacity: 0.4; transform: scale(1); }
   50% { opacity: 0.65; transform: scale(1.05); }
+}
+@keyframes legendary-shimmer {
+  to { background-position: 200% auto; }
 }
 @keyframes rainbow-sweep {
   to { background-position: 300% 0; }
@@ -304,15 +402,28 @@
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+@keyframes success-pulse {
+  0% { transform: scale(1); filter: blur(0) saturate(1) brightness(1); }
+  40% { transform: scale(1.05); filter: blur(0) saturate(1) brightness(1.2); }
+  100% { transform: scale(1); filter: blur(0) saturate(1) brightness(1); }
+}
+@keyframes success-pop {
+  0% { transform: translate(-50%, -50%) scale(0); }
+  60% { transform: translate(-50%, -50%) scale(1.1); }
+  100% { transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes success-dismiss {
+  to { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+}
 @keyframes confetti-fall {
   0% { opacity: 1; transform: translateY(0) rotate(0deg); }
-  100% { opacity: 0; transform: translateY(440px) rotate(540deg); }
+  100% { opacity: 0; transform: translateY(460px) rotate(560deg); }
 }
 
-/* Reduced-motion: drop looping animations + entry scale. Phase fades
- * stay — brief and informative, not decorative. */
+/* Reduced-motion: drop looping + spring animations. Phase fades stay. */
 @media (prefers-reduced-motion: reduce) {
   .placeholderKanji,
+  .tierSlot:nth-child(4),
   .tierLegendary,
   .mintButton,
   .spinner,
@@ -322,5 +433,15 @@
   .revealCard {
     transition: opacity 300ms ease-out;
     transform: none !important;
+  }
+  .ceremony[data-phase="success"] .revealCard {
+    animation: none !important;
+  }
+  .successBanner {
+    transition: opacity 300ms ease-out;
+  }
+  .ceremony[data-phase="success"] .successBanner {
+    animation: none !important;
+    transform: translate(-50%, -50%) scale(1);
   }
 }

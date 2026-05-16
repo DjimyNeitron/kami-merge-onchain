@@ -2,37 +2,41 @@
 
 // MintCeremony — post-run NFT reveal ceremony.
 //
-// Sequence (Brief v13 locked): a short intro, a decelerating tier
-// "slot machine" spin, a card reveal with aurora, then a mock mint.
-// The long anticipation phase (≈1.8 s of spinning) is deliberate —
-// gacha research puts the dopamine peak in the anticipation, not the
-// outcome, so the spin earns its length.
+// Sequence (Brief v13 locked, refined by Stage 3.5 polish): intro →
+// decelerating tier slot-drum spin → a 3-beat reveal (card
+// materialises matte → aurora rises → tier banner) → mock mint. The
+// long anticipation (~2.16 s of spinning) is deliberate gacha pacing.
 //
 // State machine: a CeremonyPhase drives everything. JS only flips the
-// phase; every fade / scale / cycle is a CSS transition or keyframe in
-// MintCeremony.module.css (compositor-driven, survives a busy main
-// thread). The timeline is entirely mount-driven — to replay, the
-// caller remounts the component with a fresh key (see the dev route).
+// phase + (on each spin step) the drum index; every fade / scale /
+// slide is CSS (MintCeremony.module.css). The timeline is mount-
+// driven — to replay, the caller remounts with a fresh key.
 //
-// Reuse: the revealed card is the Stage 3.3 NFTCard via its `width`
-// prop. NFTCard / NFTCardProps / yokai.ts / useInventory.ts are all
-// consumed read-only — none are modified (Stage 3.5 constraint).
+// The reveal is intentionally split into three phases so the player
+// reads three distinct beats: "card revealed → magic awakens → tier
+// confirmed". The card is the Stage 3.3 NFTCard (interactive=false,
+// holo always on); the matte→full transition is a CSS saturate()
+// filter on the wrapper, so the NFTCard itself is untouched.
 //
-// Mint is mocked: a 2 s delay then `useInventory._devAddMock`. Real
-// wagmi contract writes are Stage 7.
+// Sound: three procedural Web Audio cues (see src/lib/ceremonySound).
+// Gated on the soundEnabled prop. Mint is mocked via
+// useInventory._devAddMock; real wagmi writes are Stage 7.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import NFTCard from "@/components/NFTCard";
 import styles from "./MintCeremony.module.css";
 import { TIER_ORDER, type Tier, type YokaiName } from "@/config/yokai";
 import { useInventory, type InventoryNFT } from "@/hooks/useInventory";
+import { playTick, playChime, playMintSuccess } from "@/lib/ceremonySound";
 
 export type CeremonyPhase =
-  | "intro" // 0.0–1.5 s — header + "you earned an NFT" text
-  | "spinning" // tier slot animation
-  | "revealing" // NFT card materialises with aurora
+  | "intro" // 0.0–1.5 s — header + "you earned an NFT"
+  | "spinning" // ~2.16 s — tier slot drum
+  | "card-materializing" // 0.5 s — card fades/unblurs in, still matte
+  | "aurora-rising" // 0.6 s — saturation rises, holo "awakens"
+  | "tier-banner" // 0.25 s — tier banner snaps in
   | "mint-ready" // mint button available
-  | "minting" // user tapped, mock tx in flight
+  | "minting" // mock tx in flight
   | "success"; // mint complete
 
 interface MintCeremonyProps {
@@ -45,24 +49,33 @@ interface MintCeremonyProps {
   onClose?: () => void;
   /** Revealed-card pixel width. Default 280. */
   cardWidth?: number;
+  /** Ceremony sound cues. Default true. */
+  soundEnabled?: boolean;
   /** Dev-route hook — fires on every phase transition for the inspector. */
   onPhaseChange?: (phase: CeremonyPhase) => void;
 }
 
 // ─── Timing constants (ms) ──────────────────────────────────────────
 const INTRO_MS = 1500;
-const REVEAL_TO_MINT_MS = 1000;
+const MATERIALIZE_MS = 500;
+const AURORA_MS = 600;
+const BANNER_MS = 250;
 const MINT_MOCK_MS = 2000;
 const SUCCESS_HOLD_MS = 2000;
 
-// Spin sequence: [tierIndex, durationMs] pairs. 15 fast cycles, then
-// 4 decelerating steps, then a 400 ms landing on the real tier.
+// Drum geometry — one slot tall window, slots stacked inside.
+const SLOT_H = 24;
+
+// Spin sequence: [tierIndex, durationMs]. 12 fast cycles, 4
+// decelerating steps, then a 500 ms landing on the real tier.
+// Total ≈ 840 + 820 + 500 = 2160 ms (Stage 3.5 polish: ~20 % slower
+// than the original 1.78 s).
 function buildSpinSequence(target: Tier): Array<[number, number]> {
   const targetIdx = TIER_ORDER.indexOf(target);
   const seq: Array<[number, number]> = [];
-  for (let i = 0; i < 15; i++) seq.push([i % 4, 50]);
-  seq.push([0, 80], [1, 120], [2, 180], [3, 250]);
-  seq.push([targetIdx, 400]);
+  for (let i = 0; i < 12; i++) seq.push([i % 4, 70]);
+  seq.push([0, 110], [1, 160], [2, 230], [3, 320]);
+  seq.push([targetIdx, 500]);
   return seq;
 }
 
@@ -72,7 +85,6 @@ const TIER_LABEL: Record<Tier, string> = {
   epic: "Epic",
   legendary: "Legendary",
 };
-
 const TIER_CLASS: Record<Tier, string> = {
   common: styles.tierCommon,
   rare: styles.tierRare,
@@ -80,8 +92,15 @@ const TIER_CLASS: Record<Tier, string> = {
   legendary: styles.tierLegendary,
 };
 
-const CONFETTI_COLORS = ["#e8c840", "#9be8c8", "#8fb8ff", "#c89bff", "#f5d76e"];
-const CONFETTI_COUNT = 14;
+const CONFETTI_COLORS = [
+  "#ffd700",
+  "#e8c840",
+  "#ffa500",
+  "#7f77dd",
+  "#5dcaa5",
+  "#ff6b9d",
+];
+const CONFETTI_COUNT = 40;
 
 export default function MintCeremony({
   yokai,
@@ -90,16 +109,19 @@ export default function MintCeremony({
   onMintComplete,
   onClose,
   cardWidth = 280,
+  soundEnabled = true,
   onPhaseChange,
 }: MintCeremonyProps) {
   const [phase, setPhase] = useState<CeremonyPhase>("intro");
-  // Which tier index the slot indicator is currently showing.
   const [spinIdx, setSpinIdx] = useState(0);
-  // Every setTimeout id, so unmount / remount cancels cleanly.
   const timers = useRef<number[]>([]);
   const inventory = useInventory();
 
-  // Surface phase changes to the dev inspector.
+  // soundEnabled read through a ref so toggling it mid-ceremony
+  // doesn't restart the mount-driven timeline effect.
+  const soundRef = useRef(soundEnabled);
+  soundRef.current = soundEnabled;
+
   useEffect(() => {
     onPhaseChange?.(phase);
   }, [phase, onPhaseChange]);
@@ -111,23 +133,28 @@ export default function MintCeremony({
       ids.push(window.setTimeout(fn, ms));
     };
 
-    // Walk the spin sequence with a chain of variable-delay timeouts
-    // (setInterval can't vary its interval mid-run).
     const runSpin = () => {
       const seq = buildSpinSequence(tier);
       let i = 0;
       const step = () => {
         if (i >= seq.length) {
-          setPhase("revealing");
-          // Subtle landing haptic where supported.
+          // Spin landed — kick off the 3-beat reveal.
           if (typeof navigator !== "undefined" && navigator.vibrate) {
             navigator.vibrate(30);
           }
-          at(() => setPhase("mint-ready"), REVEAL_TO_MINT_MS);
+          if (soundRef.current) playChime(tier);
+          setPhase("card-materializing");
+          at(() => setPhase("aurora-rising"), MATERIALIZE_MS);
+          at(() => setPhase("tier-banner"), MATERIALIZE_MS + AURORA_MS);
+          at(
+            () => setPhase("mint-ready"),
+            MATERIALIZE_MS + AURORA_MS + BANNER_MS
+          );
           return;
         }
         const [tierIdx, dur] = seq[i];
         setSpinIdx(tierIdx);
+        if (soundRef.current) playTick();
         i += 1;
         ids.push(window.setTimeout(step, dur));
       };
@@ -149,8 +176,6 @@ export default function MintCeremony({
     if (phase !== "mint-ready") return;
     setPhase("minting");
     const id = window.setTimeout(() => {
-      // Mock the chain write — persist to the localStorage-backed
-      // inventory. Real wagmi mint lands in Stage 7.
       inventory._devAddMock(yokai, tier, score);
       const nft: InventoryNFT = {
         tokenId: `mock_${yokai}_${tier}_${Date.now()}`,
@@ -159,6 +184,7 @@ export default function MintCeremony({
         mintedAt: Date.now(),
         score,
       };
+      if (soundRef.current) playMintSuccess();
       setPhase("success");
       const holdId = window.setTimeout(() => {
         onMintComplete?.(nft);
@@ -176,14 +202,14 @@ export default function MintCeremony({
     }
   };
 
-  // Confetti bits — positions / colours / delays randomised once so
-  // they don't fall in lockstep, and stable across re-renders.
+  // Confetti — positions / colours / delays randomised once, stable
+  // across re-renders.
   const confetti = useMemo(
     () =>
       Array.from({ length: CONFETTI_COUNT }, (_, i) => ({
         key: i,
         left: Math.random() * 100,
-        delay: Math.random() * 500,
+        delay: Math.random() * 600,
         color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
       })),
     []
@@ -201,19 +227,32 @@ export default function MintCeremony({
       <p className={styles.earned}>You earned an NFT</p>
 
       <div className={styles.stage} style={{ width: cardWidth }}>
-        {/* Empty frame — placeholder kanji + cycling tier indicator.
-         *  Cross-fades out when the real card reveals. */}
-        <div className={styles.emptyFrame}>
+        {/* Silhouette card — placeholder kanji + the slot drum. The
+         *  data-tier attribute drives the per-tier frame border so the
+         *  silhouette gives visual feedback as the drum cycles. */}
+        <div className={styles.silhouetteCard} data-tier={shownTier}>
           <span className={styles.placeholderKanji}>神</span>
-          <div className={`${styles.tierIndicator} ${TIER_CLASS[shownTier]}`}>
-            {TIER_LABEL[shownTier]}
+          {/* Slot drum — 4 stacked tier labels, one visible at a time.
+           *  translateY slides the inner stack; CSS transition gives
+           *  the mechanical slot feel during deceleration. */}
+          <div className={styles.tierDrum}>
+            <div
+              className={styles.tierDrumInner}
+              style={{ transform: `translateY(${-spinIdx * SLOT_H}px)` }}
+            >
+              {TIER_ORDER.map((t) => (
+                <div key={t} className={styles.tierSlot}>
+                  {TIER_LABEL[t]}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* The revealed NFT card. interactive=false → static art with
-         *  the holo always on (NFTCard seeds isInteracting=true), so
-         *  the aurora is visible at its tier-scaled opacity for the
-         *  reveal without needing a hover. */}
+        {/* Revealed NFTCard. interactive=false → static art, holo on.
+         *  The matte→full transition is a saturate() filter on this
+         *  wrapper (see .revealCard in the CSS module) — the NFTCard
+         *  itself is untouched. */}
         <div className={styles.revealCard}>
           <NFTCard
             yokai={yokai}
@@ -249,7 +288,13 @@ export default function MintCeremony({
         <p className={styles.mintSub}>Free mint · gas ~$0.001</p>
       </div>
 
-      <div className={styles.toast}>NFT minted!</div>
+      {/* Success banner — large centred announcement, scale-pops in
+       *  then auto-dismisses after 1.5 s (CSS chained animation). */}
+      <div className={styles.successBanner}>
+        <div className={styles.successIcon}>✓</div>
+        <div className={styles.successText}>NFT MINTED</div>
+        <div className={styles.successSubtext}>Added to your collection</div>
+      </div>
 
       <div className={styles.confetti} aria-hidden="true">
         {confetti.map((c) => (
