@@ -1,8 +1,16 @@
 /*
  * MintCeremony.module.css — phase-driven NFT reveal ceremony.
  *
+ * Stage 3.5 design-alignment: this stylesheet now pulls from the
+ * game's existing design tokens (globals.css :root) — parchment
+ * gold, wood, the --tier-* accents — so the ceremony reads as part
+ * of the same game as the Settings modal and the inventory cards,
+ * not a bolted-on screen. Fonts are inline literals (Georgia serif,
+ * Hiragino Mincho for CJK) matching the rest of the project; there
+ * are no --font-* tokens.
+ *
  * The component flips a CeremonyPhase + a drum index; every fade /
- * scale / slide here is CSS so motion runs compositor-side. Phase-
+ * scale / slide is CSS so motion runs compositor-side. Phase-
  * conditional rules key off the `data-phase` attribute on the
  * .ceremony root. Layout target: Startale 424×695 viewport.
  */
@@ -14,12 +22,22 @@
   align-items: center;
   width: 100%;
   min-height: 100%;
-  padding: 32px 20px 0;
+  /* Dynamic Island clearance up top, Startale chrome-overlay buffer
+   * at the foot (the bottom ~20 % / ~139 px can be occluded). */
+  padding: max(32px, env(safe-area-inset-top)) 20px 140px;
   box-sizing: border-box;
   text-align: center;
   font-family: Georgia, "Times New Roman", serif;
-  color: #f5e6c8;
+  color: var(--gold-50);
   user-select: none;
+  /* Dark indigo base (not black) + a faint parchment bloom. */
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(245, 230, 200, 0.04) 0%,
+      transparent 70%
+    ),
+    var(--bg-base);
 }
 
 /* ─── Header: "Run complete" + score ─────────────────────────────── */
@@ -28,19 +46,19 @@
 }
 .runComplete {
   margin: 0;
-  font-size: 14px;
-  letter-spacing: 0.12em;
+  font-size: 13px;
+  letter-spacing: var(--tracking-spaced);
   text-transform: uppercase;
-  color: rgba(232, 200, 130, 0.65);
+  color: var(--gold-200);
   opacity: 0;
   animation: fade-in 300ms ease-out 0ms forwards;
 }
 .score {
-  margin: 4px 0 0;
+  margin: 8px 0 0;
   font-size: 32px;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.02em;
-  color: #e8c840;
+  color: var(--gold-50);
   opacity: 0;
   animation: fade-in 300ms ease-out 300ms forwards;
 }
@@ -51,11 +69,12 @@
   font-size: 11px;
 }
 
-/* "You earned an NFT" — intro only. */
+/* "You earned an NFT" — intro only, serif italic. */
 .earned {
   margin: 20px 0 0;
-  font-size: 18px;
-  color: rgba(245, 230, 200, 0.92);
+  font-size: 16px;
+  font-style: italic;
+  color: var(--gold-50);
   opacity: 0;
   animation: fade-in 500ms ease-out 500ms forwards;
   transition: opacity 300ms ease-out;
@@ -74,42 +93,28 @@
   justify-content: center;
 }
 
-/* Silhouette — placeholder kanji + slot drum. Fixed via the stage's
- * inline width + aspect-ratio so it never bounces when the drum text
- * changes length. data-tier drives the per-tier frame border. */
+/* Silhouette — dark elevated frame with a gold-700 border + an inset
+ * parchment panel that holds the slot drum. Sized by the stage's
+ * inline width + aspect-ratio so it never bounces. */
 .silhouetteCard {
   position: relative;
   width: 100%;
   aspect-ratio: 5 / 7;
-  border-radius: 8px;
-  background: linear-gradient(160deg, #141a2e 0%, #0a0d22 100%);
-  border: 1px solid rgba(232, 200, 130, 0.18);
+  background: var(--bg-elev);
+  border: 2px solid var(--gold-700);
+  border-radius: 6px;
+  transition: opacity 300ms ease-out;
+}
+.silhouetteInner {
+  position: absolute;
+  inset: 12px;
+  background: var(--gold-50);
+  border: 1px solid rgba(var(--wood-rgb) / 0.4);
+  border-radius: 4px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
-  transition:
-    opacity 300ms ease-out,
-    border-color 120ms linear,
-    box-shadow 200ms ease-out;
-}
-.silhouetteCard[data-tier="common"] {
-  border-color: #a89060;
-  border-width: 1px;
-}
-.silhouetteCard[data-tier="rare"] {
-  border-color: #c5b583;
-  border-width: 1.5px;
-}
-.silhouetteCard[data-tier="epic"] {
-  border-color: #e8c840;
-  border-width: 2px;
-}
-.silhouetteCard[data-tier="legendary"] {
-  border-color: #ffd700;
-  border-width: 2.5px;
-  box-shadow: 0 0 16px rgba(255, 215, 0, 0.3);
 }
 /* Once the real card materialises, the silhouette fades away. */
 .ceremony:not([data-phase="intro"]):not([data-phase="spinning"])
@@ -117,23 +122,15 @@
   opacity: 0;
 }
 
-.placeholderKanji {
-  font-size: 64px;
-  color: rgba(232, 200, 130, 0.5);
-  font-family:
-    "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", serif;
-  animation: kanji-pulse 2s ease-in-out infinite;
-}
-
-/* ─── Slot drum — fixed-width window, 4 stacked tier labels ──────── */
+/* ─── Slot drum — fixed-size window, 4 stacked tier labels ───────── */
 .tierDrum {
   position: relative;
-  height: 24px;
-  width: 140px;
+  height: 56px;
+  width: 160px;
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.3);
-  border-top: 1px solid rgba(197, 164, 93, 0.3);
-  border-bottom: 1px solid rgba(197, 164, 93, 0.3);
+  background: rgba(var(--wood-rgb) / 0.15);
+  border-top: 1px solid var(--gold-700);
+  border-bottom: 1px solid var(--gold-700);
 }
 .tierDrumInner {
   display: flex;
@@ -141,32 +138,42 @@
   transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 .tierSlot {
-  height: 24px;
+  height: 56px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+}
+.tierSlotKanji {
+  font-family:
+    "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", serif;
+  font-size: 18px;
+  margin-bottom: 2px;
+  opacity: 0.85;
+}
+.tierSlotEnglish {
   font-size: 13px;
   font-weight: 500;
-  letter-spacing: 3px;
+  letter-spacing: var(--tracking-spaced);
   text-transform: uppercase;
 }
 .tierSlot:nth-child(1) {
-  color: #a89060;
+  color: var(--tier-common);
 }
 .tierSlot:nth-child(2) {
-  color: #c5b583;
+  color: var(--tier-rare);
 }
 .tierSlot:nth-child(3) {
-  color: #e8c840;
+  color: var(--tier-epic);
 }
+/* Legendary slot — animated gold→parchment shimmer across both lines. */
 .tierSlot:nth-child(4) {
   background: linear-gradient(
     90deg,
-    #ffd700,
-    #ffa500,
-    #ff69b4,
-    #9370db,
-    #ffd700
+    var(--tier-legendary),
+    var(--gold-50),
+    var(--tier-epic),
+    var(--tier-legendary)
   );
   background-size: 200% auto;
   -webkit-background-clip: text;
@@ -178,9 +185,9 @@
 
 /* ─── Revealed NFTCard — 3-beat reveal ───────────────────────────── */
 /* Default = pre-reveal. card-materializing sharpens it but keeps it
- * matte (low saturate). aurora-rising lifts saturation → the holo
- * "awakens". The NFTCard itself is untouched — this is all a
- * wrapper-level filter. */
+ * matte (low saturate). aurora-rising lifts saturation → the art
+ * "awakens". interactive=true on the NFTCard means the player can
+ * also touch-drag it for tilt + holo once revealed. */
 .revealCard {
   position: absolute;
   inset: 0;
@@ -209,18 +216,19 @@
   transform: scale(1);
   filter: blur(0) saturate(1) brightness(1);
 }
-/* Card pulse at the mint-success moment. */
+/* Brief scale + brightness pulse at the mint-success moment. */
 .ceremony[data-phase="success"] .revealCard {
   animation: success-pulse 600ms ease-out;
 }
 
 /* ─── Tier banner under the revealed card ────────────────────────── */
+/* --tier-current is set inline by the component to the tier accent. */
 .tierBanner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
   margin-top: 16px;
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
   opacity: 0;
   transform: translateY(6px) scale(0.9);
   transition:
@@ -234,39 +242,35 @@
   opacity: 1;
   transform: translateY(0) scale(1);
 }
-.tierCommon {
-  color: #a89060;
+.tierBanner::before,
+.tierBanner::after {
+  content: "—";
+  color: var(--gold-700);
 }
-.tierRare {
-  color: #c5b583;
+.tierBannerKanji {
+  font-family:
+    "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", serif;
+  font-size: 22px;
+  color: var(--tier-current, var(--gold-200));
 }
-.tierEpic {
-  color: #e8c840;
-}
-.tierLegendary {
-  color: transparent;
-  background: linear-gradient(
-    90deg,
-    #e8c840,
-    #f5d76e,
-    #9be8c8,
-    #8fb8ff,
-    #c89bff,
-    #e8c840
-  );
-  background-size: 300% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  animation: rainbow-sweep 1.4s linear infinite;
+.tierBannerText {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: var(--tracking-spaced);
+  text-transform: uppercase;
+  color: var(--tier-current, var(--gold-200));
 }
 
-/* ─── Mint button + sub-copy — from mint-ready onward ────────────── */
+/* ─── Mint button — reuses the global .wood-btn look ─────────────── */
+/* .wood-btn (globals.css) provides the wood gradient / border /
+ * bevel. This module class only adds layout + the pulsing glow,
+ * which lives on a ::after overlay so it never fights .wood-btn's
+ * own box-shadow / hover-active filters. */
 .actions {
   margin-top: 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
   opacity: 0;
   transform: translateY(8px);
   transition:
@@ -282,29 +286,37 @@
   pointer-events: auto;
 }
 .mintButton {
-  font-family: inherit;
+  position: relative;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 15px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: var(--tracking-extra);
   text-transform: uppercase;
-  color: #0a0d22;
-  background: linear-gradient(135deg, #f5d76e, #e8c840);
-  border: none;
-  border-radius: 8px;
   padding: 13px 32px;
+  border-radius: 6px;
   cursor: pointer;
-  animation: mint-pulse 2s ease-in-out infinite;
+}
+.mintButton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: mint-pulse 2.4s ease-in-out infinite;
 }
 .mintButton:disabled {
   cursor: wait;
+}
+.mintButton:disabled::after {
   animation: none;
-  opacity: 0.85;
 }
 .mintSub {
   margin: 12px 0 0;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.6);
-  letter-spacing: 0.04em;
+  color: var(--gold-50);
+  opacity: 0.6;
+  letter-spacing: var(--tracking-extra);
 }
 .spinner {
   display: inline-block;
@@ -312,31 +324,26 @@
   height: 13px;
   margin-right: 8px;
   vertical-align: -1px;
-  border: 2px solid rgba(10, 13, 34, 0.35);
-  border-top-color: #0a0d22;
+  border: 2px solid rgba(var(--wood-rgb) / 0.4);
+  border-top-color: var(--gold-200);
   border-radius: 50%;
   animation: spin 600ms linear infinite;
 }
 
-/* ─── Success banner — large centred announcement ────────────────── */
-/* Hidden until success, then a spring scale-pop, then auto-dismiss
- * after 1.5 s (chained animations). */
+/* ─── Success banner — parchment paper card ──────────────────────── */
 .successBanner {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%) scale(0);
-  background: linear-gradient(
-    135deg,
-    rgba(232, 200, 110, 0.96),
-    rgba(255, 215, 0, 0.96)
-  );
-  color: #1a1a2e;
+  background: var(--gold-50);
+  color: var(--wood-dark);
   padding: 20px 32px;
-  border-radius: 12px;
+  border: 2px solid var(--gold-700);
+  border-radius: 6px;
   text-align: center;
   z-index: 100;
-  box-shadow: 0 8px 32px rgba(255, 215, 0, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
   pointer-events: none;
 }
 .ceremony[data-phase="success"] .successBanner {
@@ -344,63 +351,63 @@
     success-pop 500ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
     success-dismiss 400ms ease-in 1500ms forwards;
 }
-.successIcon {
+.successKanji {
+  font-family:
+    "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", serif;
   font-size: 32px;
-  font-weight: 500;
-  margin-bottom: 4px;
+  color: var(--torii-red);
+  margin-bottom: 6px;
 }
 .successText {
-  font-size: 18px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 16px;
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: var(--tracking-spaced);
+  color: var(--wood-dark);
 }
 .successSubtext {
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 11px;
-  opacity: 0.7;
+  color: var(--wood-light);
+  opacity: 0.75;
   margin-top: 4px;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--tracking-extra);
 }
 
-/* ─── Confetti — 40 bits, success only ───────────────────────────── */
-.confetti {
+/* ─── Sakura petals — success only ───────────────────────────────── */
+.sakuraContainer {
   position: absolute;
   inset: 0;
   pointer-events: none;
   overflow: hidden;
   z-index: 90;
 }
-.confettiBit {
+.sakuraPetal {
   position: absolute;
-  top: -14px;
-  width: 8px;
-  height: 8px;
-  border-radius: 1px;
-  opacity: 0;
+  top: -20px;
+  width: 16px;
+  height: 16px;
+  animation: sakura-fall var(--duration, 4s) var(--delay, 0s) linear forwards;
 }
-.ceremony[data-phase="success"] .confettiBit {
-  animation: confetti-fall 2400ms ease-in forwards;
+.sakuraPetalInner {
+  width: 100%;
+  height: 100%;
+  animation: sakura-spin 1.8s linear infinite;
 }
 
 /* ─── Keyframes ──────────────────────────────────────────────────── */
 @keyframes fade-in {
   to { opacity: 1; }
 }
-@keyframes kanji-pulse {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 0.65; transform: scale(1.05); }
-}
 @keyframes legendary-shimmer {
   to { background-position: 200% auto; }
 }
-@keyframes rainbow-sweep {
-  to { background-position: 300% 0; }
-}
-@keyframes mint-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 215, 110, 0.5); }
-  50% { box-shadow: 0 0 22px 4px rgba(245, 215, 110, 0.35); }
-}
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+@keyframes mint-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 218, 110, 0); }
+  50% { box-shadow: 0 0 16px 2px rgba(255, 218, 110, 0.4); }
 }
 @keyframes success-pulse {
   0% { transform: scale(1); filter: blur(0) saturate(1) brightness(1); }
@@ -415,19 +422,24 @@
 @keyframes success-dismiss {
   to { transform: translate(-50%, -50%) scale(0); opacity: 0; }
 }
-@keyframes confetti-fall {
-  0% { opacity: 1; transform: translateY(0) rotate(0deg); }
-  100% { opacity: 0; transform: translateY(460px) rotate(560deg); }
+@keyframes sakura-fall {
+  0% { transform: translateY(0) translateX(0); opacity: 0; }
+  10% { opacity: 0.9; }
+  100% {
+    transform: translateY(700px) translateX(var(--drift, 0));
+    opacity: 0;
+  }
+}
+@keyframes sakura-spin {
+  to { transform: rotate(360deg); }
 }
 
 /* Reduced-motion: drop looping + spring animations. Phase fades stay. */
 @media (prefers-reduced-motion: reduce) {
-  .placeholderKanji,
   .tierSlot:nth-child(4),
-  .tierLegendary,
-  .mintButton,
   .spinner,
-  .confettiBit {
+  .sakuraPetalInner,
+  .mintButton::after {
     animation: none !important;
   }
   .revealCard {
@@ -437,11 +449,11 @@
   .ceremony[data-phase="success"] .revealCard {
     animation: none !important;
   }
-  .successBanner {
-    transition: opacity 300ms ease-out;
-  }
   .ceremony[data-phase="success"] .successBanner {
     animation: none !important;
     transform: translate(-50%, -50%) scale(1);
+  }
+  .sakuraPetal {
+    animation-duration: 4s;
   }
 }
