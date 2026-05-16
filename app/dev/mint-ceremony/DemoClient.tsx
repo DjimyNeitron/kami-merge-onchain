@@ -45,6 +45,7 @@ export default function DemoClient() {
   const [score, setScore] = useState(2847);
   const [tierOverride, setTierOverride] = useState(false);
   const [overrideTier, setOverrideTier] = useState<Tier>("epic");
+  const [soundEnabled, setSoundEnabled] = useState(true);
 
   // Bumped by Replay — keys the MintCeremony so it remounts (its
   // timeline is mount-driven) AND re-seeds the derived-tier memo.
@@ -140,6 +141,15 @@ export default function DemoClient() {
           </label>
         )}
 
+        <label style={controlLabel}>
+          <input
+            type="checkbox"
+            checked={soundEnabled}
+            onChange={(e) => setSoundEnabled(e.target.checked)}
+          />
+          &nbsp;sound
+        </label>
+
         <button type="button" style={replayBtn} onClick={replay}>
           ↻ Replay
         </button>
@@ -197,6 +207,7 @@ export default function DemoClient() {
               tier={effectiveTier}
               score={score}
               cardWidth={280}
+              soundEnabled={soundEnabled}
               onPhaseChange={handlePhaseChange}
             />
           ) : (
