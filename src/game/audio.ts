@@ -612,6 +612,31 @@ export class AudioManager {
     source.start(t);
   }
 
+  /**
+   * Play one merge-sample buffer by numeric index (0–4 → C5 D5 E5 G5
+   * A5). Lets non-game surfaces — the MintCeremony in particular —
+   * reuse the marimba palette for their own cues without going
+   * through the engine's pentatonic combo state. Lazily unlocks the
+   * context on first call: the ceremony runs on its own AudioManager
+   * instance (see the `audioManager` singleton below) which has no
+   * game loop calling unlock() for it. Out-of-range index or a
+   * not-yet-decoded buffer simply emits silence.
+   */
+  playSampleAt(index: number, opts: { volume?: number } = {}): void {
+    if (!this.unlocked) this.unlock();
+    const ctx = this.canPlay();
+    if (!ctx) return;
+    const buffer = this.mergeBuffers[index];
+    if (!buffer) return;
+    const t = ctx.currentTime;
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(opts.volume ?? 0.5, t);
+    source.connect(gain).connect(this.sfxGain!);
+    source.start(t);
+  }
+
   // ==============================================================
   // GAME OVER — pre-rendered 4-note minor cadence (~4.8s).
   // The asset already bakes in the loudness emphasis vs merge SFX,
@@ -636,3 +661,13 @@ export class AudioManager {
   // any bounce SFX from its collisionStart handler.
   // ==============================================================
 }
+
+// Shared AudioManager instance for non-game UI surfaces (the
+// MintCeremony, via src/lib/ceremonySound.ts). The game engine keeps
+// its OWN private instance — these stay separate on purpose: the
+// engine's combo / BGM state shouldn't be entangled with a one-off
+// ceremony. The AudioManager constructor has no side effects (it only
+// initialises fields; the AudioContext + sample decode are deferred
+// to the first unlock()/play call), so this eager instantiation is
+// free until the ceremony actually fires a cue.
+export const audioManager = new AudioManager();

@@ -18,6 +18,14 @@
   --wood-light: #5c3a1e;
   --wood-dark:  #3d2510;
 
+  /* ─── NFT tier accents — ascending gold warmth, common → legendary.
+   *   Consumed by the MintCeremony slot drum + tier banner (Stage 3.5)
+   *   and available to any future tier-coloured UI. */
+  --tier-common:    #b49656;
+  --tier-rare:      #d2a769;
+  --tier-epic:      #ebc36e;
+  --tier-legendary: #ffda6e;
+
   /* ─── Cultural / accent ─── */
   --torii-red:  #c0392b;     /* sacred gate red — cultural accent, NOT semantic danger */
 
