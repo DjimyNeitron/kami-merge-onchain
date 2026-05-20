@@ -17,45 +17,52 @@ import { audioManager } from "@/game/audio";
 import { type Tier } from "@/config/yokai";
 
 /**
- * Spinning tick — the lowest marimba note (C5), quiet. Fired once per
- * tier change while the slot drum spins.
+ * Spinning tick — the lowest marimba note (C5), very quiet. Fired once
+ * per tier change while the slot drum spins. Stage 3.5c dropped this
+ * from 0.15 → 0.08 so rapid ticks during the spin no longer dominate.
  */
 export function playTick(): void {
-  audioManager.playSampleAt(0, { volume: 0.15 });
+  audioManager.playSampleAt(0, { volume: 0.08 });
 }
 
 // Tier chord — note count scales with rarity, so the ear hears how
 // rare the result is. Common = a 2-note interval, Legendary = the
-// full 5-note pentatonic stack. Indices reference the C5–A5 buffers.
+// full 5-note pentatonic stack. Stage 3.5c simplified: every sequence
+// now starts on C5 (no skipping to E5/A5 for common/rare) so the chord
+// feels grounded; legendary uses the full pentatonic with no octave
+// jumps. Indices reference the C5–A5 buffers.
 const CHIME_SEQUENCES: Record<Tier, number[]> = {
-  common: [2, 4], // E5 A5
-  rare: [2, 3, 4], // E5 G5 A5
+  common: [0, 2], // C5 E5 — gentle 2-note
+  rare: [0, 2, 3], // C5 E5 G5 — triad
   epic: [0, 2, 3, 4], // C5 E5 G5 A5
-  legendary: [0, 1, 2, 3, 4], // C5 D5 E5 G5 A5 — full
+  legendary: [0, 1, 2, 3, 4], // C5 D5 E5 G5 A5 — full pentatonic
 };
 
 /**
  * Final-stop chime — fired the moment the spin lands. Notes stagger
- * 80 ms apart into a rising marimba figure; richer = rarer tier.
+ * 120 ms apart (was 80 ms) at volume 0.30 (was 0.50) — wider breathing
+ * room, gentler attack.
  */
 export function playChime(tier: Tier): void {
   CHIME_SEQUENCES[tier].forEach((index, i) => {
     window.setTimeout(
-      () => audioManager.playSampleAt(index, { volume: 0.5 }),
-      i * 80
+      () => audioManager.playSampleAt(index, { volume: 0.3 }),
+      i * 120
     );
   });
 }
 
 /**
  * Mint-success cascade — fired when the mock mint completes. An
- * ascending C5-E5-G5-A5 marimba run.
+ * ascending C5-E5-G5-A5 marimba run at 150 ms spacing (was 100 ms),
+ * volume 0.28 (was 0.40). Soft and patient rather than triumphant
+ * fanfare — the success banner provides the visual punctuation.
  */
 export function playMintSuccess(): void {
   [0, 2, 3, 4].forEach((index, i) => {
     window.setTimeout(
-      () => audioManager.playSampleAt(index, { volume: 0.4 }),
-      i * 100
+      () => audioManager.playSampleAt(index, { volume: 0.28 }),
+      i * 150
     );
   });
 }

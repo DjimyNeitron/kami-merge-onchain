@@ -1,14 +1,11 @@
 "use client";
 
-// MintCeremony — Stage 3.5b moonlit reveal scene.
-//
-// Same 8-phase CeremonyPhase state machine, timeline, audio cues, and
-// dev controls as PR #37 — only the visual layer changes. The
-// parchment modal becomes a layered atmospheric scene: void + stars
-// + distant torii + aurora ribbons + moon halo + magic circle with
-// kanji runes + light beam + radial rays + core pulse +
-// kanji-cycling silhouette → revealed NFTCard + sakura drift + gold
-// fireflies + bilingual text overlays.
+// MintCeremony — Stage 3.5c warm moonlit reveal scene. Same 8-phase
+// state machine + timeline + audio cues + dev controls as PR #38;
+// palette refined to match the game's warm-navy + amber-lantern world.
+// Cold aurora ribbons removed; 4 amber corner lantern glows, denser
+// gold/amber fireflies, and cool blue-white moonlight provide the new
+// atmospheric balance.
 //
 // During the spin the silhouette displays the current tier's kanji
 // full-card-size; after the land, NFTCard fades in with
@@ -100,8 +97,8 @@ const RUNES = ([
   return { kanji: r.kanji, leftPct: (x / VIEW_W) * 100, topPct: (y / VIEW_H) * 100, delay: i * 0.4 };
 });
 
-// 10 fixed background stars + 8 gold fireflies — positions in scene %.
-// Fireflies also carry a per-instance pulse delay.
+// 10 fixed background stars + 14 fireflies (mix of gold + amber for
+// warm-world consistency). Fireflies carry tone + pulse delay.
 // prettier-ignore
 const STARS = [
   { x: 8, y: 6, size: 2 }, { x: 28, y: 4, size: 1.5 }, { x: 56, y: 7, size: 1.5 },
@@ -109,12 +106,16 @@ const STARS = [
   { x: 50, y: 12, size: 1.2 }, { x: 80, y: 18, size: 1.6 }, { x: 6, y: 20, size: 1.3 },
   { x: 94, y: 22, size: 1.1 },
 ];
+type FireflyTone = "gold" | "amber";
 // prettier-ignore
-const FIREFLIES = [
-  { x: 18, y: 22, size: 1.5, delay: 0 }, { x: 82, y: 25, size: 1.3, delay: 0.5 },
-  { x: 15, y: 38, size: 1.2, delay: 1 }, { x: 86, y: 40, size: 1.6, delay: 1.5 },
-  { x: 22, y: 50, size: 1.1, delay: 2 }, { x: 80, y: 53, size: 1.4, delay: 2.5 },
-  { x: 15, y: 65, size: 1.3, delay: 3 }, { x: 85, y: 68, size: 1.2, delay: 3.5 },
+const FIREFLIES: Array<{ x: number; y: number; size: number; delay: number; tone: FireflyTone }> = [
+  { x: 18, y: 22, size: 1.5, delay: 0,   tone: "gold"  }, { x: 82, y: 25, size: 1.3, delay: 0.5, tone: "gold"  },
+  { x: 15, y: 38, size: 1.2, delay: 1,   tone: "amber" }, { x: 86, y: 40, size: 1.6, delay: 1.5, tone: "gold"  },
+  { x: 22, y: 50, size: 1.1, delay: 2,   tone: "amber" }, { x: 80, y: 53, size: 1.4, delay: 2.5, tone: "gold"  },
+  { x: 15, y: 65, size: 1.3, delay: 3,   tone: "amber" }, { x: 85, y: 68, size: 1.2, delay: 3.5, tone: "gold"  },
+  { x: 35, y: 30, size: 1.0, delay: 0.8, tone: "amber" }, { x: 68, y: 32, size: 0.9, delay: 1.3, tone: "amber" },
+  { x: 30, y: 58, size: 1.1, delay: 1.8, tone: "gold"  }, { x: 72, y: 60, size: 1.0, delay: 2.3, tone: "amber" },
+  { x: 40, y: 75, size: 0.8, delay: 2.8, tone: "amber" }, { x: 65, y: 78, size: 0.9, delay: 3.3, tone: "gold"  },
 ];
 
 // Improved sakura — individual teardrop with a soft inner highlight
@@ -142,17 +143,6 @@ const TORII_SVG = (
     <rect x="48" y="42" width="14" height="158" fill="#0a0816" />
     <rect x="218" y="42" width="14" height="158" fill="#0a0816" />
     <rect x="136" y="42" width="6" height="158" fill="#06040d" opacity="0.7" />
-  </svg>
-);
-
-// Aurora ribbons — `slice` keeps the curves flowing past viewport edges
-// when the scene aspect ratio drifts (iPhone SE / Pro Max).
-const AURORA_SVG = (
-  <svg className={styles.aurora} viewBox="0 0 424 695" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-    <path d="M -20 380 Q 100 340 212 365 T 444 350" stroke="#5dcaa5" strokeWidth="3" fill="none" strokeLinecap="round" />
-    <path d="M -20 410 Q 130 365 212 390 T 444 380" stroke="#7f77dd" strokeWidth="2.5" fill="none" strokeLinecap="round" opacity="0.9" />
-    <path d="M -20 440 Q 100 400 212 420 T 444 410" stroke="#5dcaa5" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.7" />
-    <path d="M -20 470 Q 130 425 212 445 T 444 435" stroke="#ffb0c8" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0.6" />
   </svg>
 );
 
@@ -337,9 +327,14 @@ export default function MintCeremony({
         ))}
       </div>
 
-      {/* 3 / 4 — distant torii silhouette + aurora ribbons */}
+      {/* 3 — distant torii silhouette */}
       {TORII_SVG}
-      {AURORA_SVG}
+
+      {/* 4 — warm amber lantern corner glows (replace PR #38 aurora ribbons) */}
+      <div className={`${styles.lanternGlow} ${styles.lanternBottomLeft}`} aria-hidden="true" />
+      <div className={`${styles.lanternGlow} ${styles.lanternBottomRight}`} aria-hidden="true" />
+      <div className={`${styles.lanternGlow} ${styles.lanternTopLeft}`} aria-hidden="true" />
+      <div className={`${styles.lanternGlow} ${styles.lanternTopRight}`} aria-hidden="true" />
 
       {/* 5 — moon halo (5 concentric layers) */}
       <div className={styles.moonHalo} aria-hidden="true">
@@ -412,25 +407,31 @@ export default function MintCeremony({
         </div>
       )}
 
-      {/* 11b — gold fireflies */}
+      {/* 11b — 14 warm fireflies (gold + amber tones) */}
       <div className={styles.firefliesContainer} aria-hidden="true">
-        {FIREFLIES.map((f, i) => (
-          <div
-            key={i}
-            className={styles.firefly}
-            style={
-              {
-                left: `${f.x}%`,
-                top: `${f.y}%`,
-                ["--size"]: `${f.size}`,
-                animationDelay: `${f.delay}s`,
-              } as React.CSSProperties
-            }
-          >
-            <div className={styles.fireflyHalo} />
-            <div className={styles.fireflyCore} />
-          </div>
-        ))}
+        {FIREFLIES.map((f, i) => {
+          const haloClass =
+            f.tone === "gold" ? styles.fireflyHaloGold : styles.fireflyHaloAmber;
+          const coreClass =
+            f.tone === "gold" ? styles.fireflyCoreGold : styles.fireflyCoreAmber;
+          return (
+            <div
+              key={i}
+              className={styles.firefly}
+              style={
+                {
+                  left: `${f.x}%`,
+                  top: `${f.y}%`,
+                  ["--size"]: `${f.size}`,
+                  animationDelay: `${f.delay}s`,
+                } as React.CSSProperties
+              }
+            >
+              <div className={`${styles.fireflyHalo} ${haloClass}`} />
+              <div className={`${styles.fireflyCore} ${coreClass}`} />
+            </div>
+          );
+        })}
       </div>
 
       {/* 12a — header (Run complete + score, bilingual) */}

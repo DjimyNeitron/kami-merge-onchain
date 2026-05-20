@@ -1,14 +1,15 @@
 /*
- * MintCeremony.module.css — Stage 3.5b moonlit reveal scene.
+ * MintCeremony.module.css — Stage 3.5c warm moonlit reveal scene.
  *
  * Layered atmospheric composition (back to front): void + stars →
- * torii → aurora ribbons → moon halo (5 layers) → magic circle + 8
- * kanji runes → light beam → radial rays → core pulse → silhouette /
- * NFTCard → sakura + fireflies → header / banner / mint / success.
+ * torii → 4 amber lantern corner glows → moon halo (5 cool layers) →
+ * magic circle + 8 kanji runes → light beam → radial rays → core
+ * pulse → silhouette / NFTCard → sakura + fireflies (gold+amber) →
+ * header / banner / mint / success.
  *
  * JS only flips the CeremonyPhase + drum index; every fade / scale /
- * rotation / drift is CSS, gated off the `data-phase` attribute on
- * the scene root.
+ * rotation / drift / flicker is CSS, gated off the `data-phase`
+ * attribute on the scene root.
  */
 
 .ceremonyScene {
@@ -20,7 +21,8 @@
   /* Dynamic Island clearance + Startale chrome-zone buffer. */
   padding-top: max(32px, env(safe-area-inset-top));
   padding-bottom: 140px;
-  background: #04030a;
+  /* Deep navy matching game world (was #04030a near-black in PR #38). */
+  background: #0e1a2e;
   color: var(--gold-50);
   font-family: Georgia, "Times New Roman", serif;
   user-select: none;
@@ -54,17 +56,27 @@
   z-index: 2;
 }
 
-/* ─── 3. Aurora ribbons — drift slowly always ────────────────────── */
-.aurora {
+/* ─── 3. Amber lantern corner glows — replace PR #38 aurora ribbons.
+ * Subtle radial pools at the four edges suggest off-frame paper
+ * lanterns; each flickers with a staggered delay so the four pools
+ * never breathe in unison. */
+.lanternGlow {
   position: absolute;
-  inset: 0;
   pointer-events: none;
-  opacity: 0.45;
+  border-radius: 50%;
   z-index: 3;
-  animation: aurora-drift 8s ease-in-out infinite alternate;
+  animation: lantern-flicker 4s ease-in-out infinite alternate;
 }
+.lanternBottomLeft  { bottom: 100px; left: -40px; width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(255, 167, 85, 0.25) 0%, rgba(255, 167, 85, 0.08) 40%, transparent 70%); }
+.lanternBottomRight { bottom: 120px; right: -40px; width: 200px; height: 200px; animation-delay: 0.5s;
+  background: radial-gradient(circle, rgba(255, 167, 85, 0.22) 0%, rgba(255, 167, 85, 0.07) 40%, transparent 70%); }
+.lanternTopLeft     { top: 100px; left: -30px; width: 160px; height: 160px; animation-delay: 1s;
+  background: radial-gradient(circle, rgba(232, 155, 90, 0.18) 0%, rgba(232, 155, 90, 0.05) 45%, transparent 75%); }
+.lanternTopRight    { top: 130px; right: -30px; width: 160px; height: 160px; animation-delay: 1.5s;
+  background: radial-gradient(circle, rgba(232, 155, 90, 0.18) 0%, rgba(232, 155, 90, 0.05) 45%, transparent 75%); }
 
-/* ─── 4. Moon halo (5 concentric radial gradients) ───────────────── */
+/* ─── 4. Moon halo (5 cool blue-white concentric layers) ─────────── */
 .moonHalo {
   position: absolute;
   top: 22%;
@@ -88,14 +100,14 @@
   pointer-events: none;
   transition: opacity 600ms ease-out;
 }
-.moonLayer1 { width: 360px; height: 360px; background: radial-gradient(circle, rgba(200, 160, 76, 0.12) 0%, transparent 60%); }
-.moonLayer2 { width: 280px; height: 280px; background: radial-gradient(circle, rgba(200, 160, 76, 0.18) 0%, transparent 65%); }
-.moonLayer3 { width: 200px; height: 200px; background: radial-gradient(circle, rgba(235, 195, 110, 0.3) 0%, transparent 70%); }
+.moonLayer1 { width: 360px; height: 360px; background: radial-gradient(circle, rgba(160, 180, 220, 0.10) 0%, transparent 60%); }
+.moonLayer2 { width: 280px; height: 280px; background: radial-gradient(circle, rgba(180, 200, 235, 0.15) 0%, transparent 65%); }
+.moonLayer3 { width: 200px; height: 200px; background: radial-gradient(circle, rgba(220, 230, 245, 0.25) 0%, transparent 70%); }
 .moonLayer4 { width: 140px; height: 140px; opacity: 0.6;
-  background: radial-gradient(circle, rgba(245, 230, 200, 0.55) 0%, rgba(255, 218, 110, 0.2) 70%, transparent 100%);
+  background: radial-gradient(circle, rgba(232, 238, 247, 0.5) 0%, rgba(200, 210, 225, 0.2) 70%, transparent 100%);
 }
 .moonLayer5 { width: 100px; height: 100px; opacity: 0.6;
-  background: radial-gradient(circle, #fef4d6 0%, #ffda6e 80%, transparent 100%);
+  background: radial-gradient(circle, #f0f4fa 0%, #c8d5e8 80%, transparent 100%);
 }
 /* Moon dim during intro; full brightness once spinning starts. */
 .ceremonyScene:not([data-phase="intro"]) .moonLayer4,
@@ -131,7 +143,7 @@
     "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", serif;
   font-size: 16px;
   color: var(--gold-200);
-  opacity: 0.7;
+  opacity: 0.6;
   animation: rune-pulse 3.2s ease-in-out infinite;
 }
 
@@ -370,31 +382,20 @@
   position: absolute;
   animation: firefly-pulse 3s ease-in-out infinite;
 }
-.fireflyHalo {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: calc(var(--size) * 4px);
-  height: calc(var(--size) * 4px);
-  background: radial-gradient(
-    circle,
-    rgba(255, 218, 110, 0.3) 0%,
-    transparent 70%
-  );
-  border-radius: 50%;
-}
+.fireflyHalo,
 .fireflyCore {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: calc(var(--size) * 2px);
-  height: calc(var(--size) * 2px);
-  background: #fff8e0;
   border-radius: 50%;
-  box-shadow: 0 0 6px rgba(255, 248, 224, 0.7);
 }
+.fireflyHalo { width: calc(var(--size) * 4px); height: calc(var(--size) * 4px); }
+.fireflyCore { width: calc(var(--size) * 2px); height: calc(var(--size) * 2px); }
+.fireflyHaloGold  { background: radial-gradient(circle, rgba(255, 218, 110, 0.30) 0%, transparent 70%); }
+.fireflyHaloAmber { background: radial-gradient(circle, rgba(255, 167, 85, 0.32) 0%, transparent 70%); }
+.fireflyCoreGold  { background: #fff8e0; box-shadow: 0 0 6px rgba(255, 248, 224, 0.7); }
+.fireflyCoreAmber { background: #ffd9a8; box-shadow: 0 0 6px rgba(255, 217, 168, 0.7); }
 
 /* ─── 12a. Header (Run complete + score, bilingual) ──────────────── */
 .headerContainer {
@@ -607,12 +608,12 @@
 @keyframes fade-in { to { opacity: 1; } }
 @keyframes rotate-circle { to { transform: rotate(360deg); } }
 @keyframes rune-pulse {
-  0%, 100% { opacity: 0.7; text-shadow: none; }
-  50% { opacity: 1; text-shadow: 0 0 4px var(--gold-200); }
+  0%, 100% { opacity: 0.6; text-shadow: none; }
+  50% { opacity: 0.9; text-shadow: 0 0 4px var(--gold-200); }
 }
-@keyframes aurora-drift {
-  0% { transform: translateX(-5px); }
-  100% { transform: translateX(5px); }
+@keyframes lantern-flicker {
+  0% { opacity: 0.85; }
+  100% { opacity: 1; }
 }
 @keyframes beam-pulse {
   0%, 100% { filter: brightness(1); }
@@ -650,7 +651,7 @@
 @media (prefers-reduced-motion: reduce) {
   .magicCircleRotor,
   .rune,
-  .aurora,
+  .lanternGlow,
   .coreOuter,
   .coreInner,
   .firefly,
