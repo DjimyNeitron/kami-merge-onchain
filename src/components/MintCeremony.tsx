@@ -1,26 +1,21 @@
 "use client";
 
-// MintCeremony — post-run NFT reveal ceremony.
+// MintCeremony — Stage 3.5b moonlit reveal scene.
 //
-// Sequence (Brief v13 locked): intro → decelerating tier slot-drum
-// spin → 3-beat reveal (card materialises matte → aurora rises →
-// tier banner) → mock mint. State machine + phase timeline + drum
-// mechanic are unchanged from PR #35/#36 — Stage 3.5 design-
-// alignment touched only styling, audio source, layout, and
-// particles (per the alignment spec's explicit "NOT changing" list).
+// Same 8-phase CeremonyPhase state machine, timeline, audio cues, and
+// dev controls as PR #37 — only the visual layer changes. The
+// parchment modal becomes a layered atmospheric scene: void + stars
+// + distant torii + aurora ribbons + moon halo + magic circle with
+// kanji runes + light beam + radial rays + core pulse +
+// kanji-cycling silhouette → revealed NFTCard + sakura drift + gold
+// fireflies + bilingual text overlays.
 //
-// Design-system alignment (this revision):
-//  - Slot drum + tier banner show kanji + English, parchment styling
-//  - Mint button reuses the game's global .wood-btn class
-//  - Success banner is a parchment paper card with kanji 完
-//  - Confetti replaced by CSS sakura petals
-//  - Ceremony audio reuses the game's marimba samples (ceremonySound)
-//  - NFTCard rendered interactive — aurora hover + 3D touch tilt
-//  - Dynamic Island safe-area inset + Startale danger-zone padding
+// During the spin the silhouette displays the current tier's kanji
+// full-card-size; after the land, NFTCard fades in with
+// interactive=true so the player can touch-drag for holo + 3D tilt.
 //
-// Mint is mocked via useInventory._devAddMock; real wagmi writes are
-// Stage 7. NFTCard / yokai.ts / useInventory.ts are consumed
-// read-only — none are modified.
+// NFTCard / yokai.ts / useInventory / ceremonySound / audioManager
+// are all consumed read-only.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import NFTCard from "@/components/NFTCard";
@@ -43,19 +38,14 @@ interface MintCeremonyProps {
   yokai: YokaiName;
   tier: Tier;
   score: number;
-  /** Fired ~2 s after a successful mint, with the new NFT record. */
   onMintComplete?: (nft: InventoryNFT) => void;
-  /** Fired when the user taps the success-state "View collection" button. */
   onClose?: () => void;
-  /** Revealed-card pixel width. Default 280. */
-  cardWidth?: number;
-  /** Ceremony sound cues. Default true. */
+  cardWidth?: number;          // default 200 (smaller than PR #37 — scene needs the breathing room)
   soundEnabled?: boolean;
-  /** Dev-route hook — fires on every phase transition for the inspector. */
   onPhaseChange?: (phase: CeremonyPhase) => void;
 }
 
-// ─── Timing constants (ms) ──────────────────────────────────────────
+// ─── Timing constants (ms) — unchanged from PR #37 ──────────────────
 const INTRO_MS = 1500;
 const MATERIALIZE_MS = 500;
 const AURORA_MS = 600;
@@ -63,12 +53,9 @@ const BANNER_MS = 250;
 const MINT_MOCK_MS = 2000;
 const SUCCESS_HOLD_MS = 2000;
 
-// Drum geometry — one slot tall window, 4 slots stacked inside. 56 px
-// per slot fits the stacked kanji + English label.
-const SLOT_H = 56;
-
 // Spin sequence: [tierIndex, durationMs]. 12 fast cycles, 4
-// decelerating steps, then a 500 ms landing on the real tier (~2.16 s).
+// decelerating steps, then a 500 ms landing on the real tier
+// (~2.16 s total).
 function buildSpinSequence(target: Tier): Array<[number, number]> {
   const targetIdx = TIER_ORDER.indexOf(target);
   const seq: Array<[number, number]> = [];
@@ -84,7 +71,6 @@ const TIER_LABEL: Record<Tier, string> = {
   epic: "Epic",
   legendary: "Legendary",
 };
-// Tier kanji — 大 (big) → 中 (middle) → 上 (high) → 神 (divine).
 const TIER_KANJI: Record<Tier, string> = {
   common: "大",
   rare: "中",
@@ -92,48 +78,129 @@ const TIER_KANJI: Record<Tier, string> = {
   legendary: "神",
 };
 
-// Five-petal sakura, drawn once and reused across all falling petals.
-const SAKURA_SVG = (
-  <svg viewBox="0 0 24 24" width="100%" height="100%" aria-hidden="true">
-    <g transform="translate(12 12)">
-      <ellipse cx="0" cy="-6" rx="3.5" ry="5.5" fill="#ffc4d6" />
-      <ellipse
-        cx="0"
-        cy="-6"
-        rx="3.5"
-        ry="5.5"
-        fill="#ffc4d6"
-        transform="rotate(72)"
-      />
-      <ellipse
-        cx="0"
-        cy="-6"
-        rx="3.5"
-        ry="5.5"
-        fill="#ffb0c8"
-        transform="rotate(144)"
-      />
-      <ellipse
-        cx="0"
-        cy="-6"
-        rx="3.5"
-        ry="5.5"
-        fill="#ffc4d6"
-        transform="rotate(216)"
-      />
-      <ellipse
-        cx="0"
-        cy="-6"
-        rx="3.5"
-        ry="5.5"
-        fill="#ffb0c8"
-        transform="rotate(288)"
-      />
-      <circle cx="0" cy="0" r="1.5" fill="#ffe0ec" />
+// ─── Scene geometry (viewBox 424×695, the Startale Mini App frame) ──
+const VIEW_W = 424;
+const VIEW_H = 695;
+const CIRCLE_CX = 212;
+const CIRCLE_CY = 265;
+const RUNE_R = 135;
+
+// 8 kanji runes around the magic circle, percentage-positioned so the
+// scene scales to non-424 viewports. Angles in degrees, -90° = top.
+// prettier-ignore
+const RUNES = ([
+  { kanji: "天", angle: -90 }, { kanji: "海", angle: -45 },
+  { kanji: "炎", angle: 0 }, { kanji: "影", angle: 45 },
+  { kanji: "霊", angle: 90 }, { kanji: "月", angle: 135 },
+  { kanji: "日", angle: 180 }, { kanji: "星", angle: -135 },
+] as const).map((r, i) => {
+  const rad = (r.angle * Math.PI) / 180;
+  const x = CIRCLE_CX + Math.cos(rad) * RUNE_R;
+  const y = CIRCLE_CY + Math.sin(rad) * RUNE_R;
+  return { kanji: r.kanji, leftPct: (x / VIEW_W) * 100, topPct: (y / VIEW_H) * 100, delay: i * 0.4 };
+});
+
+// 10 fixed background stars + 8 gold fireflies — positions in scene %.
+// Fireflies also carry a per-instance pulse delay.
+// prettier-ignore
+const STARS = [
+  { x: 8, y: 6, size: 2 }, { x: 28, y: 4, size: 1.5 }, { x: 56, y: 7, size: 1.5 },
+  { x: 72, y: 3, size: 1.8 }, { x: 92, y: 8, size: 1.4 }, { x: 18, y: 14, size: 1.2 },
+  { x: 50, y: 12, size: 1.2 }, { x: 80, y: 18, size: 1.6 }, { x: 6, y: 20, size: 1.3 },
+  { x: 94, y: 22, size: 1.1 },
+];
+// prettier-ignore
+const FIREFLIES = [
+  { x: 18, y: 22, size: 1.5, delay: 0 }, { x: 82, y: 25, size: 1.3, delay: 0.5 },
+  { x: 15, y: 38, size: 1.2, delay: 1 }, { x: 86, y: 40, size: 1.6, delay: 1.5 },
+  { x: 22, y: 50, size: 1.1, delay: 2 }, { x: 80, y: 53, size: 1.4, delay: 2.5 },
+  { x: 15, y: 65, size: 1.3, delay: 3 }, { x: 85, y: 68, size: 1.2, delay: 3.5 },
+];
+
+// Improved sakura — individual teardrop with a soft inner highlight
+// (not the 5-petal flower stamp from PR #37). Drawn once, reused for
+// every falling petal via JSX clone.
+const SAKURA_PETAL_SVG = (
+  <svg viewBox="0 0 12 18" width="100%" height="100%" aria-hidden="true">
+    <path
+      d="M 6 1 C 9.5 4, 10 11, 7 16 L 6.5 14 L 6 16 L 5.5 14 L 5 16 C 2 11, 2.5 4, 6 1 Z"
+      fill="#ffc4d6"
+    />
+    <path
+      d="M 6 3 C 4 6, 4 11, 5.5 14 L 6 13 Z"
+      fill="#ffe0ec"
+      opacity="0.6"
+    />
+  </svg>
+);
+
+const TORII_SVG = (
+  <svg className={styles.torii} viewBox="0 0 280 200" aria-hidden="true">
+    <polygon points="20,30 40,10 240,10 260,30" fill="#0d0a1a" />
+    <rect x="14" y="30" width="252" height="12" fill="#0a0816" />
+    <rect x="40" y="80" width="200" height="5" fill="#0a0816" opacity="0.7" />
+    <rect x="48" y="42" width="14" height="158" fill="#0a0816" />
+    <rect x="218" y="42" width="14" height="158" fill="#0a0816" />
+    <rect x="136" y="42" width="6" height="158" fill="#06040d" opacity="0.7" />
+  </svg>
+);
+
+// Aurora ribbons — `slice` keeps the curves flowing past viewport edges
+// when the scene aspect ratio drifts (iPhone SE / Pro Max).
+const AURORA_SVG = (
+  <svg className={styles.aurora} viewBox="0 0 424 695" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <path d="M -20 380 Q 100 340 212 365 T 444 350" stroke="#5dcaa5" strokeWidth="3" fill="none" strokeLinecap="round" />
+    <path d="M -20 410 Q 130 365 212 390 T 444 380" stroke="#7f77dd" strokeWidth="2.5" fill="none" strokeLinecap="round" opacity="0.9" />
+    <path d="M -20 440 Q 100 400 212 420 T 444 410" stroke="#5dcaa5" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.7" />
+    <path d="M -20 470 Q 130 425 212 445 T 444 435" stroke="#ffb0c8" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0.6" />
+  </svg>
+);
+
+const MAGIC_CIRCLE_SVG = (
+  <svg className={styles.magicCircle} viewBox="0 0 424 695" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <g className={styles.magicCircleRotor}>
+      <circle cx={CIRCLE_CX} cy={CIRCLE_CY} r="120" stroke="#c8a04c" strokeWidth="0.8" fill="none" opacity="0.85" />
+      <circle cx={CIRCLE_CX} cy={CIRCLE_CY} r="105" stroke="#c8a04c" strokeWidth="0.6" fill="none" opacity="0.6" />
+      <circle cx={CIRCLE_CX} cy={CIRCLE_CY} r="135" stroke="#c8a04c" strokeWidth="0.5" fill="none" opacity="0.35" strokeDasharray="3 4" />
     </g>
   </svg>
 );
-const SAKURA_COUNT = 30;
+
+const RAYS_SVG = (
+  <svg className={styles.rays} viewBox="0 0 424 695" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <g stroke="#ffda6e" strokeWidth="0.6" opacity="0.5">
+      <line x1="212" y1="265" x2="140" y2="200" />
+      <line x1="212" y1="265" x2="284" y2="200" />
+      <line x1="212" y1="265" x2="120" y2="240" />
+      <line x1="212" y1="265" x2="304" y2="240" />
+      <line x1="212" y1="265" x2="120" y2="290" />
+      <line x1="212" y1="265" x2="304" y2="290" />
+      <line x1="212" y1="265" x2="140" y2="330" />
+      <line x1="212" y1="265" x2="284" y2="330" />
+    </g>
+  </svg>
+);
+
+// One falling petal — randomised position / size / drift / timing.
+interface PetalSpec {
+  key: string;
+  left: number; // %
+  topOffset: number; // px below container top
+  size: number; // px width
+  rotation: number; // deg
+  drift: number; // px horizontal drift
+  duration: number; // s
+  delay: number; // s
+  opacityMax: number;
+}
+
+function makePetals(n: number, prefix: string): PetalSpec[] {
+  return Array.from({ length: n }, (_, i) => ({
+    key: `${prefix}${i}`, left: Math.random() * 100, topOffset: -(20 + Math.random() * 40),
+    size: 10 + Math.random() * 6, rotation: Math.random() * 360, drift: (Math.random() - 0.5) * 100,
+    duration: 4 + Math.random() * 3, delay: Math.random() * 2, opacityMax: 0.6 + Math.random() * 0.3,
+  }));
+}
 
 export default function MintCeremony({
   yokai,
@@ -141,7 +208,7 @@ export default function MintCeremony({
   score,
   onMintComplete,
   onClose,
-  cardWidth = 280,
+  cardWidth = 200,
   soundEnabled = true,
   onPhaseChange,
 }: MintCeremonyProps) {
@@ -150,8 +217,6 @@ export default function MintCeremony({
   const timers = useRef<number[]>([]);
   const inventory = useInventory();
 
-  // soundEnabled via ref so toggling it mid-ceremony doesn't restart
-  // the mount-driven timeline effect.
   const soundRef = useRef(soundEnabled);
   soundRef.current = soundEnabled;
 
@@ -159,7 +224,7 @@ export default function MintCeremony({
     onPhaseChange?.(phase);
   }, [phase, onPhaseChange]);
 
-  // Ceremony timeline — mount-driven. Replay = remount with a new key.
+  // Mount-driven timeline — identical to PR #37. Replay = remount.
   useEffect(() => {
     const ids = timers.current;
     const at = (fn: () => void, ms: number) => {
@@ -227,90 +292,164 @@ export default function MintCeremony({
   }, [phase, yokai, tier, score, inventory, onMintComplete]);
 
   const handleButton = () => {
-    if (phase === "success") {
-      onClose?.();
-    } else {
-      handleMint();
-    }
+    if (phase === "success") onClose?.();
+    else handleMint();
   };
 
-  // Sakura petals — positions / timings randomised once, stable across
-  // re-renders. Rendered only in the success phase.
-  const petals = useMemo(
-    () =>
-      Array.from({ length: SAKURA_COUNT }, (_, i) => ({
-        key: i,
-        left: Math.random() * 95,
-        duration: 3.5 + Math.random() * 2,
-        delay: Math.random() * 0.8,
-        drift: (Math.random() - 0.5) * 80,
-      })),
-    []
-  );
+  // Silhouette kanji + tier accent: intro shows the central 神
+  // placeholder; once the spin starts the drum-index drives both the
+  // kanji glyph and the per-tier border colour via --tier-current.
+  const silhouetteTier: Tier =
+    phase === "intro" ? "legendary" : TIER_ORDER[spinIdx];
+  const silhouetteKanji = TIER_KANJI[silhouetteTier];
 
-  // Custom-property style objects — React.CSSProperties doesn't type
-  // CSS vars, so cast through a string-indexed record.
+  // Two memoised petal sets — drift is shown from card-materializing
+  // onward (~30 petals), burst is the additional 30 that only mount
+  // during the success phase. Each set has stable random parameters.
+  const drift = useMemo(() => makePetals(30, "d"), []);
+  const burst = useMemo(() => makePetals(30, "b"), []);
+
+  const silhouetteStyle = {
+    ["--tier-current"]: `var(--tier-${silhouetteTier})`,
+  } as React.CSSProperties;
   const tierBannerStyle = {
     ["--tier-current"]: `var(--tier-${tier})`,
   } as React.CSSProperties;
 
+  const showPetals =
+    phase !== "intro" && phase !== "spinning";
+
   return (
-    <div className={styles.ceremony} data-phase={phase}>
-      <div className={styles.header}>
-        <p className={styles.runComplete}>Run complete</p>
-        <p className={styles.score}>Score {score.toLocaleString()}</p>
-      </div>
-
-      <p className={styles.earned}>You earned an NFT</p>
-
-      <div className={styles.stage} style={{ width: cardWidth }}>
-        {/* Silhouette — dark frame + parchment inner holding the slot
-         *  drum. Shown during intro + spinning, cross-fades out at
-         *  reveal. */}
-        <div className={styles.silhouetteCard}>
-          <div className={styles.silhouetteInner}>
-            <div className={styles.tierDrum}>
-              <div
-                className={styles.tierDrumInner}
-                style={{ transform: `translateY(${-spinIdx * SLOT_H}px)` }}
-              >
-                {TIER_ORDER.map((t) => (
-                  <div key={t} className={styles.tierSlot}>
-                    <span className={styles.tierSlotKanji}>
-                      {TIER_KANJI[t]}
-                    </span>
-                    <span className={styles.tierSlotEnglish}>
-                      {TIER_LABEL[t]}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Revealed NFTCard. interactive=true → after the reveal the
-         *  player can touch-drag to tilt + summon the holo. The
-         *  matte→full reveal is a saturate() filter on this wrapper
-         *  (see .revealCard in the CSS module). */}
-        <div className={styles.revealCard}>
-          <NFTCard
-            yokai={yokai}
-            tier={tier}
-            width={cardWidth}
-            interactive={true}
+    <div className={styles.ceremonyScene} data-phase={phase}>
+      {/* 2 — background stars */}
+      <div className={styles.stars} aria-hidden="true">
+        {STARS.map((s, i) => (
+          <span
+            key={i}
+            className={styles.star}
+            style={{
+              left: `${s.x}%`,
+              top: `${s.y}%`,
+              width: `${s.size}px`,
+              height: `${s.size}px`,
+            }}
           />
-        </div>
+        ))}
       </div>
 
-      {/* Tier banner — kanji + English in the tier's accent colour
-       *  (set via the --tier-current custom property). */}
+      {/* 3 / 4 — distant torii silhouette + aurora ribbons */}
+      {TORII_SVG}
+      {AURORA_SVG}
+
+      {/* 5 — moon halo (5 concentric layers) */}
+      <div className={styles.moonHalo} aria-hidden="true">
+        <div className={styles.moonLayer1} />
+        <div className={styles.moonLayer2} />
+        <div className={styles.moonLayer3} />
+        <div className={styles.moonLayer4} />
+        <div className={styles.moonLayer5} />
+      </div>
+
+      {/* 6 — magic circle + 8 kanji runes */}
+      {MAGIC_CIRCLE_SVG}
+      <div className={styles.runesContainer} aria-hidden="true">
+        {RUNES.map((r) => (
+          <span
+            key={r.kanji}
+            className={styles.rune}
+            style={{
+              left: `${r.leftPct}%`,
+              top: `${r.topPct}%`,
+              animationDelay: `${r.delay}s`,
+            }}
+          >
+            {r.kanji}
+          </span>
+        ))}
+      </div>
+
+      {/* 7 / 8 — vertical light beam + radial rays */}
+      <div className={styles.beamOuter} aria-hidden="true" />
+      <div className={styles.beamMiddle} aria-hidden="true" />
+      <div className={styles.beamCore} aria-hidden="true" />
+      {RAYS_SVG}
+
+      {/* 9 — bright core pulse */}
+      <div className={styles.corePulse} aria-hidden="true">
+        <div className={styles.coreOuter} />
+        <div className={styles.coreInner} />
+      </div>
+
+      {/* 10a — card silhouette during intro + spinning */}
+      <div
+        className={styles.cardSilhouette}
+        style={{ ...silhouetteStyle, width: cardWidth }}
+      >
+        <span className={styles.silhouetteKanji}>{silhouetteKanji}</span>
+      </div>
+
+      {/* 10b — revealed NFTCard (interactive — touch tilt + holo) */}
+      <div
+        className={styles.cardWrapper}
+        style={{ width: cardWidth, ["--card-width"]: `${cardWidth}px` } as React.CSSProperties}
+      >
+        <NFTCard
+          yokai={yokai}
+          tier={tier}
+          width={cardWidth}
+          interactive={true}
+        />
+      </div>
+
+      {/* 11a — sakura petals */}
+      {showPetals && (
+        <div className={styles.sakuraContainer} aria-hidden="true">
+          {drift.map((p) => (
+            <PetalEl key={p.key} p={p} />
+          ))}
+          {phase === "success" &&
+            burst.map((p) => <PetalEl key={p.key} p={p} />)}
+        </div>
+      )}
+
+      {/* 11b — gold fireflies */}
+      <div className={styles.firefliesContainer} aria-hidden="true">
+        {FIREFLIES.map((f, i) => (
+          <div
+            key={i}
+            className={styles.firefly}
+            style={
+              {
+                left: `${f.x}%`,
+                top: `${f.y}%`,
+                ["--size"]: `${f.size}`,
+                animationDelay: `${f.delay}s`,
+              } as React.CSSProperties
+            }
+          >
+            <div className={styles.fireflyHalo} />
+            <div className={styles.fireflyCore} />
+          </div>
+        ))}
+      </div>
+
+      {/* 12a — header (Run complete + score, bilingual) */}
+      <div className={styles.headerContainer}>
+        <div className={styles.headerRunComplete}>Run complete</div>
+        <div className={styles.headerRunCompleteJp}>完了</div>
+        <div className={styles.headerScore}>Score {score.toLocaleString()}</div>
+      </div>
+
+      {/* 12b — tier banner (─ 上 EPIC ─) */}
       <div className={styles.tierBanner} style={tierBannerStyle}>
+        <div className={styles.tierBannerDash} />
         <span className={styles.tierBannerKanji}>{TIER_KANJI[tier]}</span>
         <span className={styles.tierBannerText}>{TIER_LABEL[tier]}</span>
+        <div className={styles.tierBannerDash} />
       </div>
 
-      <div className={styles.actions}>
+      {/* 12c — wood mint button + bilingual subtext */}
+      <div className={styles.mintButtonContainer}>
         <button
           type="button"
           className={`wood-btn ${styles.mintButton}`}
@@ -328,39 +467,32 @@ export default function MintCeremony({
             "Mint to wallet"
           )}
         </button>
-        <p className={styles.mintSub}>Free mint · gas ~$0.001</p>
+        <p className={styles.mintSub}>Free · gas only ~$0.001</p>
+        <p className={styles.mintSubJp}>無料</p>
       </div>
 
-      {/* Success banner — parchment paper card, kanji 完 ("complete"),
-       *  scale-pops in then auto-dismisses after 1.5 s (CSS chained). */}
+      {/* 12d — success banner (top overlay, doesn't cover card) */}
       <div className={styles.successBanner}>
         <div className={styles.successKanji}>完</div>
         <div className={styles.successText}>NFT MINTED</div>
         <div className={styles.successSubtext}>Added to your collection</div>
       </div>
+    </div>
+  );
+}
 
-      {/* Sakura petals — success only. Each falls + spins on its own
-       *  randomised timing. */}
-      {phase === "success" && (
-        <div className={styles.sakuraContainer} aria-hidden="true">
-          {petals.map((p) => (
-            <div
-              key={p.key}
-              className={styles.sakuraPetal}
-              style={
-                {
-                  left: `${p.left}%`,
-                  ["--duration"]: `${p.duration}s`,
-                  ["--delay"]: `${p.delay}s`,
-                  ["--drift"]: `${p.drift}px`,
-                } as React.CSSProperties
-              }
-            >
-              <div className={styles.sakuraPetalInner}>{SAKURA_SVG}</div>
-            </div>
-          ))}
-        </div>
-      )}
+// Inline petal — per-instance CSS custom properties drive the fall +
+// spin keyframes; the teardrop SVG is shared (cloned via JSX reuse).
+function PetalEl({ p }: { p: PetalSpec }) {
+  const s = {
+    left: `${p.left}%`, top: `${p.topOffset}px`,
+    ["--size"]: `${p.size}px`, ["--rotation"]: `${p.rotation}deg`,
+    ["--drift"]: `${p.drift}px`, ["--duration"]: `${p.duration}s`,
+    ["--delay"]: `${p.delay}s`, ["--opacity-max"]: `${p.opacityMax}`,
+  } as React.CSSProperties;
+  return (
+    <div className={styles.petal} style={s}>
+      <div className={styles.petalSpinner}>{SAKURA_PETAL_SVG}</div>
     </div>
   );
 }
