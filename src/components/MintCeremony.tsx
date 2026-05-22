@@ -99,22 +99,36 @@ const FIREFLIES: Array<{ x: number; y: number; size: number; delay: number; tone
   { x: 15, y: 65, size: 1.3, delay: 3,   tone: "amber" }, { x: 85, y: 68, size: 1.2, delay: 3.5, tone: "gold"  },
 ];
 
-// Improved sakura — individual teardrop with a soft inner highlight
-// (not the 5-petal flower stamp from PR #37). Drawn once, reused for
-// every falling petal via JSX clone.
-const SAKURA_PETAL_SVG = (
-  <svg viewBox="0 0 12 18" width="100%" height="100%" aria-hidden="true">
-    <path
-      d="M 6 1 C 9.5 4, 10 11, 7 16 L 6.5 14 L 6 16 L 5.5 14 L 5 16 C 2 11, 2.5 4, 6 1 Z"
-      fill="#ffc4d6"
-    />
-    <path
-      d="M 6 3 C 4 6, 4 11, 5.5 14 L 6 13 Z"
-      fill="#ffe0ec"
-      opacity="0.6"
-    />
+// Sakura gradient defs — rendered once off-screen; the petal variants
+// reference them by id (single defs, many refs = valid + cheap).
+const SAKURA_DEFS = (
+  <svg className={styles.sakuraDefs} aria-hidden="true">
+    <defs>
+      <linearGradient id="sakuraFront" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#ffd4de" /><stop offset="60%" stopColor="#ffb8c8" /><stop offset="100%" stopColor="#ff9ab0" />
+      </linearGradient>
+      <linearGradient id="sakuraSide" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#ffc4d6" /><stop offset="100%" stopColor="#ffa0b8" />
+      </linearGradient>
+    </defs>
   </svg>
 );
+
+// 3 petal silhouettes — front (full bloom), side (narrower), edge (thin
+// slip). Default preserveAspectRatio keeps each undistorted in the box;
+// random per petal so the fall reads as real tumbling blossoms.
+const SAKURA_VARIANTS = [
+  <svg key="f" viewBox="0 0 16 22" width="100%" height="100%" aria-hidden="true">
+    <path d="M 8 1 C 12.5 4, 13 13, 9 19 L 8.5 17 L 8 19 L 7.5 17 L 7 19 C 3 13, 3.5 4, 8 1 Z" fill="url(#sakuraFront)" />
+    <path d="M 8 4 C 5.5 7, 5.5 13, 7 17 L 8 16 Z" fill="#ffe8ee" opacity="0.5" />
+  </svg>,
+  <svg key="s" viewBox="0 0 12 22" width="100%" height="100%" aria-hidden="true">
+    <path d="M 6 1 C 9 5, 9.5 14, 7 19 L 6 17 L 5 19 C 2.5 14, 3 5, 6 1 Z" fill="url(#sakuraSide)" />
+  </svg>,
+  <svg key="e" viewBox="0 0 8 22" width="100%" height="100%" aria-hidden="true">
+    <path d="M 4 1 C 5.5 6, 5.5 16, 4 21 C 2.5 16, 2.5 6, 4 1 Z" fill="#ffb0c5" opacity="0.85" />
+  </svg>,
+];
 
 // One falling petal — randomised position / size / drift / timing.
 interface PetalSpec {
@@ -127,13 +141,16 @@ interface PetalSpec {
   duration: number; // s
   delay: number; // s
   opacityMax: number;
+  variant: number; // index into SAKURA_VARIANTS
 }
 
+// 3.5e: bigger (18–32px), slower (7–11s), wider drift, random variant.
 function makePetals(n: number, prefix: string): PetalSpec[] {
   return Array.from({ length: n }, (_, i) => ({
     key: `${prefix}${i}`, left: Math.random() * 100, topOffset: -(20 + Math.random() * 40),
-    size: 10 + Math.random() * 6, rotation: Math.random() * 360, drift: (Math.random() - 0.5) * 100,
-    duration: 4 + Math.random() * 3, delay: Math.random() * 2, opacityMax: 0.6 + Math.random() * 0.3,
+    size: 18 + Math.random() * 14, rotation: Math.random() * 360, drift: (Math.random() - 0.5) * 160,
+    duration: 7 + Math.random() * 4, delay: Math.random() * 1.2, opacityMax: 0.6 + Math.random() * 0.3,
+    variant: Math.floor(Math.random() * SAKURA_VARIANTS.length),
   }));
 }
 
@@ -238,11 +255,12 @@ export default function MintCeremony({
     phase === "intro" ? "legendary" : TIER_ORDER[spinIdx];
   const silhouetteKanji = TIER_KANJI[silhouetteTier];
 
-  // Two memoised petal sets — drift is shown from card-materializing
-  // onward (~30 petals), burst is the additional 30 that only mount
-  // during the success phase. Each set has stable random parameters.
-  const drift = useMemo(() => makePetals(30, "d"), []);
-  const burst = useMemo(() => makePetals(30, "b"), []);
+  // 3.5e: a single 20-petal set (was 30 drift + 30 success burst). The
+  // success burst is gone — petals are a reveal-only flourish. The
+  // container mounts from card-materializing onward but CSS gates its
+  // opacity to card-materializing + aurora-rising, then fades it out so
+  // mint-ready / minting / success stay a clear scene.
+  const drift = useMemo(() => makePetals(20, "d"), []);
 
   const silhouetteStyle = {
     ["--tier-current"]: `var(--tier-${silhouetteTier})`,
@@ -281,14 +299,13 @@ export default function MintCeremony({
         />
       </div>
 
-      {/* 11a — sakura petals */}
+      {/* 11a — sakura petals (reveal-only flourish; CSS opacity-gated) */}
+      {SAKURA_DEFS}
       {showPetals && (
         <div className={styles.sakuraContainer} aria-hidden="true">
           {drift.map((p) => (
             <PetalEl key={p.key} p={p} />
           ))}
-          {phase === "success" &&
-            burst.map((p) => <PetalEl key={p.key} p={p} />)}
         </div>
       )}
 
@@ -368,7 +385,8 @@ export default function MintCeremony({
 }
 
 // Inline petal — per-instance CSS custom properties drive the fall +
-// spin keyframes; the teardrop SVG is shared (cloned via JSX reuse).
+// wobble keyframes; the SVG shape comes from one of the 3 shared
+// variants selected at spec-build time.
 function PetalEl({ p }: { p: PetalSpec }) {
   const s = {
     left: `${p.left}%`, top: `${p.topOffset}px`,
@@ -378,7 +396,7 @@ function PetalEl({ p }: { p: PetalSpec }) {
   } as React.CSSProperties;
   return (
     <div className={styles.petal} style={s}>
-      <div className={styles.petalSpinner}>{SAKURA_PETAL_SVG}</div>
+      <div className={styles.petalSpinner}>{SAKURA_VARIANTS[p.variant]}</div>
     </div>
   );
 }
