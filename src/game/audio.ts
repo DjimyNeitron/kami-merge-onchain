@@ -622,7 +622,10 @@ export class AudioManager {
    * game loop calling unlock() for it. Out-of-range index or a
    * not-yet-decoded buffer simply emits silence.
    */
-  playSampleAt(index: number, opts: { volume?: number } = {}): void {
+  playSampleAt(
+    index: number,
+    opts: { volume?: number; pitch?: number; attack?: number } = {}
+  ): void {
     if (!this.unlocked) this.unlock();
     const ctx = this.canPlay();
     if (!ctx) return;
@@ -631,8 +634,18 @@ export class AudioManager {
     const t = ctx.currentTime;
     const source = ctx.createBufferSource();
     source.buffer = buffer;
+    // pitch: playbackRate multiplier (0.5 = one octave down). Default
+    // 1.0 = native pitch, so any caller that omits it (and the engine's
+    // own combo path, which never calls this method) is unaffected.
+    source.playbackRate.value = opts.pitch ?? 1.0;
     const gain = ctx.createGain();
-    gain.gain.setValueAtTime(opts.volume ?? 0.5, t);
+    const target = opts.volume ?? 0.5;
+    // attack: short linear ramp 0 → target softens the marimba transient
+    // and avoids a click. Default 5 ms is imperceptible vs the old hard
+    // setValueAtTime, so existing behaviour is preserved.
+    const attack = opts.attack ?? 0.005;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(target, t + attack);
     source.connect(gain).connect(this.sfxGain!);
     source.start(t);
   }

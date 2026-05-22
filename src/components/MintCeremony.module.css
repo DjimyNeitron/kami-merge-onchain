@@ -1,15 +1,22 @@
 /*
- * MintCeremony.module.css — Stage 3.5c warm moonlit reveal scene.
+ * MintCeremony.module.css — Stage 3.5d image-backed reveal scene.
  *
- * Layered atmospheric composition (back to front): void + stars →
- * torii → 4 amber lantern corner glows → moon halo (5 cool layers) →
- * magic circle + 8 kanji runes → light beam → radial rays → core
- * pulse → silhouette / NFTCard → sakura + fireflies (gold+amber) →
- * header / banner / mint / success.
+ * The programmatic atmospheric layers (stars, torii, lantern glows,
+ * moon halo, magic circle + runes, light beam, radial rays, core
+ * pulse) are gone — a single Midjourney background image
+ * (public/ceremony_bg.jpg) now carries the mood, with a top/bottom
+ * vignette overlay for UI-text legibility. What remains is the
+ * foreground: card silhouette → revealed NFTCard → sakura + fireflies
+ * → header / tier banner / mint button / success banner.
  *
  * JS only flips the CeremonyPhase + drum index; every fade / scale /
- * rotation / drift / flicker is CSS, gated off the `data-phase`
- * attribute on the scene root.
+ * drift is CSS, gated off the `data-phase` attribute on the scene root.
+ *
+ * Bug fix (3.5d): the .cardWrapper::after "shine-sweep" overlay — a
+ * teal/violet gradient that held at opacity 0.5 forever — has been
+ * removed. It was the real "aurora always-on" the revealed card showed
+ * at rest (NOT the NFTCard holo), and being a non-tilting flat rect it
+ * also caused the "frame behind the card" artefact on 3D tilt.
  */
 
 .ceremonyScene {
@@ -21,244 +28,39 @@
   /* Dynamic Island clearance + Startale chrome-zone buffer. */
   padding-top: max(32px, env(safe-area-inset-top));
   padding-bottom: 140px;
-  /* Deep navy matching game world (was #04030a near-black in PR #38). */
+  /* Solid fallback behind the image (deep navy matching game world). */
   background: #0e1a2e;
   color: var(--gold-50);
   font-family: Georgia, "Times New Roman", serif;
   user-select: none;
 }
 
-/* ─── 1. Background stars ────────────────────────────────────────── */
-.stars {
+/* ─── 1. Background image + legibility vignette ──────────────────── */
+.bgImage {
   position: absolute;
   inset: 0;
-  pointer-events: none;
+  z-index: 0;
+  background-image: url("/ceremony_bg.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  /* Subtle palette correction to sit alongside splash bg_game.jpg. */
+  filter: saturate(1.08) brightness(1.05) contrast(0.98);
+}
+.bgOverlay {
+  position: absolute;
+  inset: 0;
   z-index: 1;
-}
-.star {
-  position: absolute;
-  border-radius: 50%;
-  background: #fff8e0;
-  opacity: 0.75;
-  box-shadow: 0 0 4px rgba(255, 248, 224, 0.5);
-}
-
-/* ─── 2. Distant torii silhouette (centred, behind moon) ─────────── */
-.torii {
-  position: absolute;
-  top: 30%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 280px;
-  height: 200px;
-  opacity: 0.6;
   pointer-events: none;
-  z-index: 2;
-}
-
-/* ─── 3. Amber lantern corner glows — replace PR #38 aurora ribbons.
- * Subtle radial pools at the four edges suggest off-frame paper
- * lanterns; each flickers with a staggered delay so the four pools
- * never breathe in unison. */
-.lanternGlow {
-  position: absolute;
-  pointer-events: none;
-  border-radius: 50%;
-  z-index: 3;
-  animation: lantern-flicker 4s ease-in-out infinite alternate;
-}
-.lanternBottomLeft  { bottom: 100px; left: -40px; width: 200px; height: 200px;
-  background: radial-gradient(circle, rgba(255, 167, 85, 0.25) 0%, rgba(255, 167, 85, 0.08) 40%, transparent 70%); }
-.lanternBottomRight { bottom: 120px; right: -40px; width: 200px; height: 200px; animation-delay: 0.5s;
-  background: radial-gradient(circle, rgba(255, 167, 85, 0.22) 0%, rgba(255, 167, 85, 0.07) 40%, transparent 70%); }
-.lanternTopLeft     { top: 100px; left: -30px; width: 160px; height: 160px; animation-delay: 1s;
-  background: radial-gradient(circle, rgba(232, 155, 90, 0.18) 0%, rgba(232, 155, 90, 0.05) 45%, transparent 75%); }
-.lanternTopRight    { top: 130px; right: -30px; width: 160px; height: 160px; animation-delay: 1.5s;
-  background: radial-gradient(circle, rgba(232, 155, 90, 0.18) 0%, rgba(232, 155, 90, 0.05) 45%, transparent 75%); }
-
-/* ─── 4. Moon halo (5 cool blue-white concentric layers) ─────────── */
-.moonHalo {
-  position: absolute;
-  top: 22%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  z-index: 4;
-  width: 0;
-  height: 0;
-}
-.moonLayer1,
-.moonLayer2,
-.moonLayer3,
-.moonLayer4,
-.moonLayer5 {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  pointer-events: none;
-  transition: opacity 600ms ease-out;
-}
-.moonLayer1 { width: 360px; height: 360px; background: radial-gradient(circle, rgba(160, 180, 220, 0.10) 0%, transparent 60%); }
-.moonLayer2 { width: 280px; height: 280px; background: radial-gradient(circle, rgba(180, 200, 235, 0.15) 0%, transparent 65%); }
-.moonLayer3 { width: 200px; height: 200px; background: radial-gradient(circle, rgba(220, 230, 245, 0.25) 0%, transparent 70%); }
-.moonLayer4 { width: 140px; height: 140px; opacity: 0.6;
-  background: radial-gradient(circle, rgba(232, 238, 247, 0.5) 0%, rgba(200, 210, 225, 0.2) 70%, transparent 100%);
-}
-.moonLayer5 { width: 100px; height: 100px; opacity: 0.6;
-  background: radial-gradient(circle, #f0f4fa 0%, #c8d5e8 80%, transparent 100%);
-}
-/* Moon dim during intro; full brightness once spinning starts. */
-.ceremonyScene:not([data-phase="intro"]) .moonLayer4,
-.ceremonyScene:not([data-phase="intro"]) .moonLayer5 {
-  opacity: 1;
-}
-
-/* ─── 5. Magic circle — slow continuous rotation ─────────────────── */
-.magicCircle {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 5;
-}
-.magicCircleRotor {
-  transform-origin: 212px 265px;
-  animation: rotate-circle 12s linear infinite;
-}
-
-/* 8 kanji runes positioned by % around the circle perimeter. Each
- * pulses opacity individually with a staggered animation-delay set
- * inline. */
-.runesContainer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 5;
-}
-.rune {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  font-family:
-    "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", serif;
-  font-size: 16px;
-  color: var(--gold-200);
-  opacity: 0.6;
-  animation: rune-pulse 3.2s ease-in-out infinite;
-}
-
-/* ─── 6. Vertical light beam (3 stacked rects) ───────────────────── */
-.beamOuter,
-.beamMiddle,
-.beamCore {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  pointer-events: none;
-  z-index: 6;
-  opacity: 0.3;
-  transition: opacity 800ms ease-out;
-}
-.beamOuter {
-  width: 80px;
+  /* Darken top (header text) + bottom (mint button) edges only, leave
+   * the moonlit middle clear so the art reads at full strength. */
   background: linear-gradient(
     180deg,
-    transparent 0%,
-    rgba(255, 218, 110, 0.15) 40%,
-    rgba(255, 218, 110, 0.15) 60%,
-    transparent 100%
+    rgba(14, 26, 46, 0.25) 0%,
+    rgba(14, 26, 46, 0) 30%,
+    rgba(14, 26, 46, 0) 70%,
+    rgba(14, 26, 46, 0.35) 100%
   );
-}
-.beamMiddle {
-  width: 30px;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(255, 218, 110, 0.22) 50%,
-    transparent 100%
-  );
-}
-.beamCore {
-  width: 3px;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(255, 248, 224, 0.5) 50%,
-    transparent 100%
-  );
-}
-/* Beam intensifies in spinning, full from reveal onward. */
-.ceremonyScene[data-phase="spinning"] .beamOuter,
-.ceremonyScene[data-phase="spinning"] .beamMiddle,
-.ceremonyScene[data-phase="spinning"] .beamCore {
-  opacity: 0.6;
-}
-.ceremonyScene:not([data-phase="intro"]):not([data-phase="spinning"]) .beamOuter,
-.ceremonyScene:not([data-phase="intro"]):not([data-phase="spinning"]) .beamMiddle,
-.ceremonyScene:not([data-phase="intro"]):not([data-phase="spinning"]) .beamCore {
-  opacity: 1;
-}
-/* Subtle pulse during mint-ready. */
-.ceremonyScene[data-phase="mint-ready"] .beamOuter,
-.ceremonyScene[data-phase="mint-ready"] .beamMiddle {
-  animation: beam-pulse 4s ease-in-out infinite;
-}
-
-/* ─── 7. 8 radial rays ───────────────────────────────────────────── */
-.rays {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 7;
-  transition: opacity 500ms ease-out;
-}
-.ceremonyScene[data-phase="aurora-rising"] .rays,
-.ceremonyScene[data-phase="tier-banner"] .rays,
-.ceremonyScene[data-phase="mint-ready"] .rays,
-.ceremonyScene[data-phase="minting"] .rays,
-.ceremonyScene[data-phase="success"] .rays {
-  opacity: 1.4;
-}
-
-/* ─── 8. Bright core pulse ───────────────────────────────────────── */
-.corePulse {
-  position: absolute;
-  top: 38.1%; /* CIRCLE_CY / VIEW_H */
-  left: 50%;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  z-index: 8;
-  width: 0;
-  height: 0;
-}
-.coreOuter,
-.coreInner {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-.coreOuter {
-  width: 28px;
-  height: 28px;
-  background: radial-gradient(
-    circle,
-    rgba(255, 248, 224, 0.6) 0%,
-    rgba(255, 218, 110, 0.2) 50%,
-    transparent 80%
-  );
-  animation: core-pulse 1.6s ease-in-out infinite;
-}
-.coreInner {
-  width: 8px;
-  height: 8px;
-  background: radial-gradient(circle, #fff8e0 0%, #ffda6e 100%);
-  box-shadow: 0 0 12px rgba(255, 218, 110, 0.6);
-  animation: core-pulse 1.6s ease-in-out infinite;
 }
 
 /* ─── 9. Card silhouette (intro + spinning) ──────────────────────── */
@@ -300,7 +102,7 @@
 /* Default = pre-reveal. card-materializing sharpens the card but
  * keeps it matte (low saturate); aurora-rising lifts saturation →
  * the holo + art "awaken". NFTCard itself is unchanged — this is all
- * a wrapper-level filter. */
+ * a wrapper-level filter. No ::after overlay (removed in 3.5d). */
 .cardWrapper {
   position: absolute;
   top: 25%;
@@ -332,24 +134,6 @@
   animation: card-success-pulse 600ms ease-out;
 }
 
-/* Holographic shine sweep on the card — fades in at ~aurora-rising
- * (mount-driven 4.2 s) and persists at 50 % opacity. */
-.cardWrapper::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 8px;
-  background: linear-gradient(
-    135deg,
-    rgba(93, 202, 165, 0.2) 0%,
-    rgba(255, 248, 224, 0.4) 50%,
-    rgba(127, 119, 221, 0.2) 100%
-  );
-  pointer-events: none;
-  opacity: 0;
-  animation: shine-sweep 1s ease-out 4.2s forwards;
-}
-
 /* ─── 11a. Sakura petals (drift + success burst) ─────────────────── */
 .sakuraContainer {
   position: absolute;
@@ -371,7 +155,7 @@
   animation: petal-spin 2s linear infinite;
 }
 
-/* ─── 11b. Gold fireflies — always pulsing ───────────────────────── */
+/* ─── 11b. Fireflies (gold + amber) — always pulsing ─────────────── */
 .firefliesContainer {
   position: absolute;
   inset: 0;
@@ -434,6 +218,8 @@
   margin-top: 8px;
   letter-spacing: 1px;
   opacity: 0;
+  /* Soft shadow keeps the score legible over the brighter sky region. */
+  text-shadow: 0 1px 6px rgba(4, 8, 18, 0.6);
   animation: fade-in 400ms ease-out 400ms forwards;
 }
 /* The score downsizes a hair past intro to give the scene room. */
@@ -606,23 +392,6 @@
 
 /* ─── Keyframes ──────────────────────────────────────────────────── */
 @keyframes fade-in { to { opacity: 1; } }
-@keyframes rotate-circle { to { transform: rotate(360deg); } }
-@keyframes rune-pulse {
-  0%, 100% { opacity: 0.6; text-shadow: none; }
-  50% { opacity: 0.9; text-shadow: 0 0 4px var(--gold-200); }
-}
-@keyframes lantern-flicker {
-  0% { opacity: 0.85; }
-  100% { opacity: 1; }
-}
-@keyframes beam-pulse {
-  0%, 100% { filter: brightness(1); }
-  50% { filter: brightness(1.25); }
-}
-@keyframes core-pulse {
-  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.85; }
-  50% { transform: translate(-50%, -50%) scale(1.3); opacity: 1; }
-}
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes mint-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(255, 218, 110, 0); }
@@ -632,7 +401,6 @@
   0%, 100% { transform: translate(-50%, -50%) scale(1); filter: saturate(1) brightness(1); }
   40% { transform: translate(-50%, -50%) scale(1.05); filter: saturate(1) brightness(1.2); }
 }
-@keyframes shine-sweep { to { opacity: 0.5; } }
 @keyframes petal-fall {
   0% { transform: translateY(0) translateX(0) rotate(var(--rotation, 0deg)); opacity: 0; }
   10% { opacity: var(--opacity-max, 0.8); }
@@ -646,20 +414,13 @@
 @keyframes success-slide { to { opacity: 1; transform: translateX(-50%) translateY(0); } }
 @keyframes success-dismiss { to { opacity: 0; transform: translateX(-50%) translateY(-60px); } }
 
-/* Reduced-motion: kill rotations, infinite pulses, and the entry
- * scale. Phase fades stay — brief and informative, not decorative. */
+/* Reduced-motion: kill infinite pulses + the entry scale. Phase fades
+ * stay — brief and informative, not decorative. */
 @media (prefers-reduced-motion: reduce) {
-  .magicCircleRotor,
-  .rune,
-  .lanternGlow,
-  .coreOuter,
-  .coreInner,
   .firefly,
   .petalSpinner,
   .mintButton::after,
-  .spinner,
-  .beamOuter,
-  .beamMiddle {
+  .spinner {
     animation: none !important;
   }
   .petal {

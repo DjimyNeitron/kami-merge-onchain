@@ -16,53 +16,70 @@
 import { audioManager } from "@/game/audio";
 import { type Tier } from "@/config/yokai";
 
+// Stage 3.5d — mellow pass. The marimba buffers are C5–A5; the ceremony
+// plays them one octave DOWN (playbackRate 0.5 → C4–A4) with a gentle
+// 15 ms attack so the reveal feels deep, soft, and meditative rather
+// than bright and percussive. The game's in-game merge SFX use a
+// separate playback path (AudioManager.playMergeWithCombo) and a
+// separate AudioManager instance, so they keep their native C5–A5 pitch.
+const CEREMONY_PITCH = 0.5; // one octave down
+const CEREMONY_ATTACK = 0.015; // 15 ms gentle attack (default is 5 ms)
+
 /**
- * Spinning tick — the lowest marimba note (C5), very quiet. Fired once
- * per tier change while the slot drum spins. Stage 3.5c dropped this
- * from 0.15 → 0.08 so rapid ticks during the spin no longer dominate.
+ * Spinning tick — the lowest marimba note, pitched down, very quiet.
+ * Fired once per tier change while the slot drum spins.
  */
 export function playTick(): void {
-  audioManager.playSampleAt(0, { volume: 0.08 });
+  audioManager.playSampleAt(0, {
+    volume: 0.06,
+    pitch: CEREMONY_PITCH,
+    attack: CEREMONY_ATTACK,
+  });
 }
 
-// Tier chord — note count scales with rarity, so the ear hears how
-// rare the result is. Common = a 2-note interval, Legendary = the
-// full 5-note pentatonic stack. Stage 3.5c simplified: every sequence
-// now starts on C5 (no skipping to E5/A5 for common/rare) so the chord
-// feels grounded; legendary uses the full pentatonic with no octave
-// jumps. Indices reference the C5–A5 buffers.
+// Tier chord — note count scales with rarity. Every sequence starts on
+// C (grounded); legendary fills the pentatonic with no octave jumps.
+// Indices reference the C5–A5 buffers (heard an octave down here).
 const CHIME_SEQUENCES: Record<Tier, number[]> = {
-  common: [0, 2], // C5 E5 — gentle 2-note
-  rare: [0, 2, 3], // C5 E5 G5 — triad
-  epic: [0, 2, 3, 4], // C5 E5 G5 A5
-  legendary: [0, 1, 2, 3, 4], // C5 D5 E5 G5 A5 — full pentatonic
+  common: [0, 2], // C4 E4 — gentle 2-note
+  rare: [0, 2, 3], // C4 E4 G4 — triad
+  epic: [0, 2, 3, 4], // C4 E4 G4 A4
+  legendary: [0, 1, 2, 3, 4], // C4 D4 E4 G4 A4 — full pentatonic
 };
 
 /**
  * Final-stop chime — fired the moment the spin lands. Notes stagger
- * 120 ms apart (was 80 ms) at volume 0.30 (was 0.50) — wider breathing
- * room, gentler attack.
+ * 180 ms apart at volume 0.25 — wide breathing room, soft attack.
  */
 export function playChime(tier: Tier): void {
   CHIME_SEQUENCES[tier].forEach((index, i) => {
     window.setTimeout(
-      () => audioManager.playSampleAt(index, { volume: 0.3 }),
-      i * 120
+      () =>
+        audioManager.playSampleAt(index, {
+          volume: 0.25,
+          pitch: CEREMONY_PITCH,
+          attack: CEREMONY_ATTACK,
+        }),
+      i * 180
     );
   });
 }
 
 /**
- * Mint-success cascade — fired when the mock mint completes. An
- * ascending C5-E5-G5-A5 marimba run at 150 ms spacing (was 100 ms),
- * volume 0.28 (was 0.40). Soft and patient rather than triumphant
- * fanfare — the success banner provides the visual punctuation.
+ * Mint-success cascade — fired when the mock mint completes. A slow,
+ * contemplative ascending C4-E4-G4-A4 run at 220 ms spacing, volume
+ * 0.22, with an extra-soft 20 ms attack.
  */
 export function playMintSuccess(): void {
   [0, 2, 3, 4].forEach((index, i) => {
     window.setTimeout(
-      () => audioManager.playSampleAt(index, { volume: 0.28 }),
-      i * 150
+      () =>
+        audioManager.playSampleAt(index, {
+          volume: 0.22,
+          pitch: CEREMONY_PITCH,
+          attack: 0.02,
+        }),
+      i * 220
     );
   });
 }

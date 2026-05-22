@@ -1,11 +1,22 @@
 "use client";
 
-// MintCeremony — Stage 3.5c warm moonlit reveal scene. Same 8-phase
-// state machine + timeline + audio cues + dev controls as PR #38;
-// palette refined to match the game's warm-navy + amber-lantern world.
-// Cold aurora ribbons removed; 4 amber corner lantern glows, denser
-// gold/amber fireflies, and cool blue-white moonlight provide the new
-// atmospheric balance.
+// MintCeremony — Stage 3.5d image-backed reveal scene. Same 8-phase
+// state machine + timeline + audio cues + dev controls as before; the
+// programmatic atmospheric layers (moon halo, magic circle + runes,
+// light beam, radial rays, core pulse, lantern glows, stars, torii)
+// are replaced by a single Midjourney background image
+// (public/ceremony_bg.jpg — a moonlit lotus pond that already carries
+// the warm lanterns + cool crescent moon + drifting motes we used to
+// fake). A subtle top/bottom vignette overlay keeps the UI text legible.
+//
+// Bug fixes this stage:
+//  • Aurora-always-on: removed the .cardWrapper::after "shine-sweep"
+//    teal/violet overlay that held at opacity 0.5 on the revealed card
+//    (the real culprit 3.5c missed — NOT the NFTCard holo, which is
+//    correctly hidden at rest).
+//  • Frame-on-tilt: same ::after was a flat rectangle that didn't tilt
+//    with the 3D card; removing it clears the artefact too.
+// NFTCard is therefore left completely untouched.
 //
 // During the spin the silhouette displays the current tier's kanji
 // full-card-size; after the land, NFTCard fades in with
@@ -75,37 +86,10 @@ const TIER_KANJI: Record<Tier, string> = {
   legendary: "神",
 };
 
-// ─── Scene geometry (viewBox 424×695, the Startale Mini App frame) ──
-const VIEW_W = 424;
-const VIEW_H = 695;
-const CIRCLE_CX = 212;
-const CIRCLE_CY = 265;
-const RUNE_R = 135;
-
-// 8 kanji runes around the magic circle, percentage-positioned so the
-// scene scales to non-424 viewports. Angles in degrees, -90° = top.
-// prettier-ignore
-const RUNES = ([
-  { kanji: "天", angle: -90 }, { kanji: "海", angle: -45 },
-  { kanji: "炎", angle: 0 }, { kanji: "影", angle: 45 },
-  { kanji: "霊", angle: 90 }, { kanji: "月", angle: 135 },
-  { kanji: "日", angle: 180 }, { kanji: "星", angle: -135 },
-] as const).map((r, i) => {
-  const rad = (r.angle * Math.PI) / 180;
-  const x = CIRCLE_CX + Math.cos(rad) * RUNE_R;
-  const y = CIRCLE_CY + Math.sin(rad) * RUNE_R;
-  return { kanji: r.kanji, leftPct: (x / VIEW_W) * 100, topPct: (y / VIEW_H) * 100, delay: i * 0.4 };
-});
-
-// 10 fixed background stars + 14 fireflies (mix of gold + amber for
-// warm-world consistency). Fireflies carry tone + pulse delay.
-// prettier-ignore
-const STARS = [
-  { x: 8, y: 6, size: 2 }, { x: 28, y: 4, size: 1.5 }, { x: 56, y: 7, size: 1.5 },
-  { x: 72, y: 3, size: 1.8 }, { x: 92, y: 8, size: 1.4 }, { x: 18, y: 14, size: 1.2 },
-  { x: 50, y: 12, size: 1.2 }, { x: 80, y: 18, size: 1.6 }, { x: 6, y: 20, size: 1.3 },
-  { x: 94, y: 22, size: 1.1 },
-];
+// Fireflies — a sparse 8-mote layer of gentle animated parallax over
+// the background image. Reduced from 14 (3.5c) because ceremony_bg.jpg
+// already carries warm motes of its own; a denser overlay competed
+// with the art. Edge-biased so they read against the darker margins.
 type FireflyTone = "gold" | "amber";
 // prettier-ignore
 const FIREFLIES: Array<{ x: number; y: number; size: number; delay: number; tone: FireflyTone }> = [
@@ -113,9 +97,6 @@ const FIREFLIES: Array<{ x: number; y: number; size: number; delay: number; tone
   { x: 15, y: 38, size: 1.2, delay: 1,   tone: "amber" }, { x: 86, y: 40, size: 1.6, delay: 1.5, tone: "gold"  },
   { x: 22, y: 50, size: 1.1, delay: 2,   tone: "amber" }, { x: 80, y: 53, size: 1.4, delay: 2.5, tone: "gold"  },
   { x: 15, y: 65, size: 1.3, delay: 3,   tone: "amber" }, { x: 85, y: 68, size: 1.2, delay: 3.5, tone: "gold"  },
-  { x: 35, y: 30, size: 1.0, delay: 0.8, tone: "amber" }, { x: 68, y: 32, size: 0.9, delay: 1.3, tone: "amber" },
-  { x: 30, y: 58, size: 1.1, delay: 1.8, tone: "gold"  }, { x: 72, y: 60, size: 1.0, delay: 2.3, tone: "amber" },
-  { x: 40, y: 75, size: 0.8, delay: 2.8, tone: "amber" }, { x: 65, y: 78, size: 0.9, delay: 3.3, tone: "gold"  },
 ];
 
 // Improved sakura — individual teardrop with a soft inner highlight
@@ -132,42 +113,6 @@ const SAKURA_PETAL_SVG = (
       fill="#ffe0ec"
       opacity="0.6"
     />
-  </svg>
-);
-
-const TORII_SVG = (
-  <svg className={styles.torii} viewBox="0 0 280 200" aria-hidden="true">
-    <polygon points="20,30 40,10 240,10 260,30" fill="#0d0a1a" />
-    <rect x="14" y="30" width="252" height="12" fill="#0a0816" />
-    <rect x="40" y="80" width="200" height="5" fill="#0a0816" opacity="0.7" />
-    <rect x="48" y="42" width="14" height="158" fill="#0a0816" />
-    <rect x="218" y="42" width="14" height="158" fill="#0a0816" />
-    <rect x="136" y="42" width="6" height="158" fill="#06040d" opacity="0.7" />
-  </svg>
-);
-
-const MAGIC_CIRCLE_SVG = (
-  <svg className={styles.magicCircle} viewBox="0 0 424 695" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-    <g className={styles.magicCircleRotor}>
-      <circle cx={CIRCLE_CX} cy={CIRCLE_CY} r="120" stroke="#c8a04c" strokeWidth="0.8" fill="none" opacity="0.85" />
-      <circle cx={CIRCLE_CX} cy={CIRCLE_CY} r="105" stroke="#c8a04c" strokeWidth="0.6" fill="none" opacity="0.6" />
-      <circle cx={CIRCLE_CX} cy={CIRCLE_CY} r="135" stroke="#c8a04c" strokeWidth="0.5" fill="none" opacity="0.35" strokeDasharray="3 4" />
-    </g>
-  </svg>
-);
-
-const RAYS_SVG = (
-  <svg className={styles.rays} viewBox="0 0 424 695" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-    <g stroke="#ffda6e" strokeWidth="0.6" opacity="0.5">
-      <line x1="212" y1="265" x2="140" y2="200" />
-      <line x1="212" y1="265" x2="284" y2="200" />
-      <line x1="212" y1="265" x2="120" y2="240" />
-      <line x1="212" y1="265" x2="304" y2="240" />
-      <line x1="212" y1="265" x2="120" y2="290" />
-      <line x1="212" y1="265" x2="304" y2="290" />
-      <line x1="212" y1="265" x2="140" y2="330" />
-      <line x1="212" y1="265" x2="284" y2="330" />
-    </g>
   </svg>
 );
 
@@ -311,69 +256,9 @@ export default function MintCeremony({
 
   return (
     <div className={styles.ceremonyScene} data-phase={phase}>
-      {/* 2 — background stars */}
-      <div className={styles.stars} aria-hidden="true">
-        {STARS.map((s, i) => (
-          <span
-            key={i}
-            className={styles.star}
-            style={{
-              left: `${s.x}%`,
-              top: `${s.y}%`,
-              width: `${s.size}px`,
-              height: `${s.size}px`,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* 3 — distant torii silhouette */}
-      {TORII_SVG}
-
-      {/* 4 — warm amber lantern corner glows (replace PR #38 aurora ribbons) */}
-      <div className={`${styles.lanternGlow} ${styles.lanternBottomLeft}`} aria-hidden="true" />
-      <div className={`${styles.lanternGlow} ${styles.lanternBottomRight}`} aria-hidden="true" />
-      <div className={`${styles.lanternGlow} ${styles.lanternTopLeft}`} aria-hidden="true" />
-      <div className={`${styles.lanternGlow} ${styles.lanternTopRight}`} aria-hidden="true" />
-
-      {/* 5 — moon halo (5 concentric layers) */}
-      <div className={styles.moonHalo} aria-hidden="true">
-        <div className={styles.moonLayer1} />
-        <div className={styles.moonLayer2} />
-        <div className={styles.moonLayer3} />
-        <div className={styles.moonLayer4} />
-        <div className={styles.moonLayer5} />
-      </div>
-
-      {/* 6 — magic circle + 8 kanji runes */}
-      {MAGIC_CIRCLE_SVG}
-      <div className={styles.runesContainer} aria-hidden="true">
-        {RUNES.map((r) => (
-          <span
-            key={r.kanji}
-            className={styles.rune}
-            style={{
-              left: `${r.leftPct}%`,
-              top: `${r.topPct}%`,
-              animationDelay: `${r.delay}s`,
-            }}
-          >
-            {r.kanji}
-          </span>
-        ))}
-      </div>
-
-      {/* 7 / 8 — vertical light beam + radial rays */}
-      <div className={styles.beamOuter} aria-hidden="true" />
-      <div className={styles.beamMiddle} aria-hidden="true" />
-      <div className={styles.beamCore} aria-hidden="true" />
-      {RAYS_SVG}
-
-      {/* 9 — bright core pulse */}
-      <div className={styles.corePulse} aria-hidden="true">
-        <div className={styles.coreOuter} />
-        <div className={styles.coreInner} />
-      </div>
+      {/* 1 — Midjourney background image + legibility vignette */}
+      <div className={styles.bgImage} aria-hidden="true" />
+      <div className={styles.bgOverlay} aria-hidden="true" />
 
       {/* 10a — card silhouette during intro + spinning */}
       <div
@@ -407,7 +292,7 @@ export default function MintCeremony({
         </div>
       )}
 
-      {/* 11b — 14 warm fireflies (gold + amber tones) */}
+      {/* 11b — 8 warm fireflies (gold + amber tones) over the image */}
       <div className={styles.firefliesContainer} aria-hidden="true">
         {FIREFLIES.map((f, i) => {
           const haloClass =
