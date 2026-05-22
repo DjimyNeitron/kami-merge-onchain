@@ -44,31 +44,36 @@
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  /* 3.5e: dimmed ~17% (brightness 1.05 → 0.88) + a touch more saturation
-   * and contrast so the ceremony reads at the same tone as the in-game
-   * scene rather than ~15% brighter. */
-  filter: saturate(1.12) brightness(0.88) contrast(1.05);
+  /* 3.5f: dimmed further (0.88 → 0.78) to match the in-game scene tone,
+   * with more saturation + contrast to keep the art from going muddy. */
+  filter: saturate(1.18) brightness(0.78) contrast(1.1);
 }
 .bgOverlay {
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  /* Darken top (header text) + bottom (mint button) edges only, leave
-   * the moonlit middle clear. 3.5e: deeper + cooler than before. */
-  background: linear-gradient(
-    180deg,
-    rgba(8, 12, 24, 0.4) 0%,
-    rgba(8, 12, 24, 0) 25%,
-    rgba(8, 12, 24, 0) 75%,
-    rgba(8, 12, 24, 0.5) 100%
-  );
+  /* 3.5f: stronger top/bottom band (0.55/0.65) + an always-on radial
+   * vignette so even the middle is gently pulled down. */
+  background:
+    linear-gradient(
+      180deg,
+      rgba(6, 10, 22, 0.55) 0%,
+      rgba(6, 10, 22, 0.2) 30%,
+      rgba(6, 10, 22, 0.2) 70%,
+      rgba(6, 10, 22, 0.65) 100%
+    ),
+    radial-gradient(ellipse at center, transparent 30%, rgba(6, 10, 22, 0.25) 100%);
 }
 
 /* ─── 9. Card silhouette (intro + spinning) ──────────────────────── */
 .cardSilhouette {
   position: absolute;
-  top: 25%;
+  /* 3.5f: lowered 25% → 37% so the card clears the header text and is
+   * vertically centred in the band between header and tier banner.
+   * (Paired with the smaller demo cardWidth — a 280px card was too tall
+   * to sit below the header without overlapping the 58% tier banner.) */
+  top: 37%;
   left: 50%;
   transform: translate(-50%, -50%);
   aspect-ratio: 5 / 7;
@@ -112,7 +117,7 @@
  * a wrapper-level filter. No ::after overlay (removed in 3.5d). */
 .cardWrapper {
   position: absolute;
-  top: 25%;
+  top: 37%; /* 3.5f: matches .cardSilhouette — see note there */
   left: 50%;
   transform: translate(-50%, -50%) scale(0.85);
   z-index: 10;
@@ -151,23 +156,20 @@
   background: transparent;
 }
 
-/* ─── 11a. Sakura petals (reveal-only flourish) ──────────────────── */
-/* 3.5e: petals are a flourish for the reveal moment only. The
- * container is gated to opacity 1 during card-materializing +
- * aurora-rising, then fades out — so mint-ready / minting / success
- * stay a clear scene (no more success burst). */
+/* ─── 11a. Sakura petals (state-driven, self-cleaning) ───────────── */
+/* 3.5f: petals are spawned once (React state) when entering
+ * card-materializing and each removes itself on animationend, so a
+ * petal completes its full fall regardless of phase changes (3.5e's
+ * phase-gated container cut them off mid-fall). The container is
+ * therefore always visible; visibility is governed entirely by the
+ * petals' own fall opacity. New petals are never spawned after the
+ * reveal, so the scene depletes naturally. */
 .sakuraContainer {
   position: absolute;
   inset: 0;
   pointer-events: none;
   overflow: hidden;
   z-index: 11;
-  opacity: 0;
-  transition: opacity 600ms ease-out;
-}
-.ceremonyScene[data-phase="card-materializing"] .sakuraContainer,
-.ceremonyScene[data-phase="aurora-rising"] .sakuraContainer {
-  opacity: 1;
 }
 /* Off-screen holder for the shared sakura gradient defs. */
 .sakuraDefs {

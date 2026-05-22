@@ -25,7 +25,7 @@
 // NFTCard / yokai.ts / useInventory / ceremonySound / audioManager
 // are all consumed read-only.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import NFTCard from "@/components/NFTCard";
 import styles from "./MintCeremony.module.css";
 import { TIER_ORDER, type Tier, type YokaiName } from "@/config/yokai";
@@ -144,12 +144,13 @@ interface PetalSpec {
   variant: number; // index into SAKURA_VARIANTS
 }
 
-// 3.5e: bigger (18–32px), slower (7–11s), wider drift, random variant.
-function makePetals(n: number, prefix: string): PetalSpec[] {
+// 3.5f: smaller (10–20px), slower (8–12s), staggered. The `seed` makes
+// keys unique across spawns (a fresh Replay remount restarts them).
+function makePetals(n: number, seed: number): PetalSpec[] {
   return Array.from({ length: n }, (_, i) => ({
-    key: `${prefix}${i}`, left: Math.random() * 100, topOffset: -(20 + Math.random() * 40),
-    size: 18 + Math.random() * 14, rotation: Math.random() * 360, drift: (Math.random() - 0.5) * 160,
-    duration: 7 + Math.random() * 4, delay: Math.random() * 1.2, opacityMax: 0.6 + Math.random() * 0.3,
+    key: `p${seed}-${i}`, left: Math.random() * 100, topOffset: -(20 + Math.random() * 40),
+    size: 10 + Math.random() * 10, rotation: Math.random() * 360, drift: (Math.random() - 0.5) * 120,
+    duration: 8 + Math.random() * 4, delay: Math.random() * 1.5, opacityMax: 0.55 + Math.random() * 0.35,
     variant: Math.floor(Math.random() * SAKURA_VARIANTS.length),
   }));
 }
@@ -255,12 +256,17 @@ export default function MintCeremony({
     phase === "intro" ? "legendary" : TIER_ORDER[spinIdx];
   const silhouetteKanji = TIER_KANJI[silhouetteTier];
 
-  // 3.5e: a single 20-petal set (was 30 drift + 30 success burst). The
-  // success burst is gone — petals are a reveal-only flourish. The
-  // container mounts from card-materializing onward but CSS gates its
-  // opacity to card-materializing + aurora-rising, then fades it out so
-  // mint-ready / minting / success stay a clear scene.
-  const drift = useMemo(() => makePetals(20, "d"), []);
+  // 3.5f: petals live in state so each completes its full fall even as
+  // the phase advances. Spawned once on entering card-materializing;
+  // each removes itself on animationend (see removePetal). A Replay
+  // remounts the component, so the list resets to [] automatically.
+  const [petals, setPetals] = useState<PetalSpec[]>([]);
+  useEffect(() => {
+    if (phase === "card-materializing") setPetals(makePetals(20, Date.now()));
+  }, [phase]);
+  const removePetal = useCallback((key: string) => {
+    setPetals((prev) => prev.filter((p) => p.key !== key));
+  }, []);
 
   const silhouetteStyle = {
     ["--tier-current"]: `var(--tier-${silhouetteTier})`,
@@ -268,9 +274,6 @@ export default function MintCeremony({
   const tierBannerStyle = {
     ["--tier-current"]: `var(--tier-${tier})`,
   } as React.CSSProperties;
-
-  const showPetals =
-    phase !== "intro" && phase !== "spinning";
 
   return (
     <div className={styles.ceremonyScene} data-phase={phase}>
@@ -299,15 +302,13 @@ export default function MintCeremony({
         />
       </div>
 
-      {/* 11a — sakura petals (reveal-only flourish; CSS opacity-gated) */}
+      {/* 11a — sakura petals (state-driven; each self-removes on end) */}
       {SAKURA_DEFS}
-      {showPetals && (
-        <div className={styles.sakuraContainer} aria-hidden="true">
-          {drift.map((p) => (
-            <PetalEl key={p.key} p={p} />
-          ))}
-        </div>
-      )}
+      <div className={styles.sakuraContainer} aria-hidden="true">
+        {petals.map((p) => (
+          <PetalEl key={p.key} p={p} onDone={() => removePetal(p.key)} />
+        ))}
+      </div>
 
       {/* 11b — 8 warm fireflies (gold + amber tones) over the image */}
       <div className={styles.firefliesContainer} aria-hidden="true">
@@ -385,9 +386,12 @@ export default function MintCeremony({
 }
 
 // Inline petal — per-instance CSS custom properties drive the fall +
-// wobble keyframes; the SVG shape comes from one of the 3 shared
-// variants selected at spec-build time.
-function PetalEl({ p }: { p: PetalSpec }) {
+// wobble keyframes; the SVG shape is one of the 3 shared variants.
+// onAnimationEnd fires when the (finite, forwards) petal-fall completes
+// — the inner wobble is infinite so it never triggers it — letting the
+// parent drop this petal from state. The target===currentTarget guard
+// ignores any animationend bubbling up from the child spinner.
+function PetalEl({ p, onDone }: { p: PetalSpec; onDone: () => void }) {
   const s = {
     left: `${p.left}%`, top: `${p.topOffset}px`,
     ["--size"]: `${p.size}px`, ["--rotation"]: `${p.rotation}deg`,
@@ -395,7 +399,13 @@ function PetalEl({ p }: { p: PetalSpec }) {
     ["--delay"]: `${p.delay}s`, ["--opacity-max"]: `${p.opacityMax}`,
   } as React.CSSProperties;
   return (
-    <div className={styles.petal} style={s}>
+    <div
+      className={styles.petal}
+      style={s}
+      onAnimationEnd={(e) => {
+        if (e.target === e.currentTarget) onDone();
+      }}
+    >
       <div className={styles.petalSpinner}>{SAKURA_VARIANTS[p.variant]}</div>
     </div>
   );

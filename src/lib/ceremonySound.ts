@@ -22,8 +22,8 @@ import { type Tier } from "@/config/yokai";
 // than bright and percussive. The game's in-game merge SFX use a
 // separate playback path (AudioManager.playMergeWithCombo) and a
 // separate AudioManager instance, so they keep their native C5–A5 pitch.
-const CEREMONY_PITCH = 0.4; // ~maj-6th below the octave-down (A3-region)
-const CEREMONY_ATTACK = 0.025; // 25 ms — softer still than 3.5d's 15 ms
+const CEREMONY_PITCH = 0.35; // ~G3 region — deepest while keeping clarity
+const CEREMONY_ATTACK = 0.035; // 35 ms — softest attack yet
 
 /**
  * Spinning tick — the lowest marimba note, pitched down, very quiet.
@@ -31,7 +31,7 @@ const CEREMONY_ATTACK = 0.025; // 25 ms — softer still than 3.5d's 15 ms
  */
 export function playTick(): void {
   audioManager.playSampleAt(0, {
-    volume: 0.045,
+    volume: 0.035,
     pitch: CEREMONY_PITCH,
     attack: CEREMONY_ATTACK,
   });
@@ -49,37 +49,37 @@ const CHIME_SEQUENCES: Record<Tier, number[]> = {
 
 /**
  * Final-stop chime — fired the moment the spin lands. Notes stagger
- * 220 ms apart at volume 0.18 — deep, calm, bowl-chime feel.
+ * 260 ms apart at volume 0.14 — deep, very calm bowl-chime feel.
  */
 export function playChime(tier: Tier): void {
   CHIME_SEQUENCES[tier].forEach((index, i) => {
     window.setTimeout(
       () =>
         audioManager.playSampleAt(index, {
-          volume: 0.18,
+          volume: 0.14,
           pitch: CEREMONY_PITCH,
           attack: CEREMONY_ATTACK,
         }),
-      i * 220
+      i * 260
     );
   });
 }
 
 /**
  * Mint-success cascade — fired when the mock mint completes. A slow,
- * contemplative ascending run at 280 ms spacing, volume 0.16, with the
- * gentlest 30 ms attack.
+ * contemplative ascending run at 320 ms spacing, volume 0.12, with the
+ * gentlest 40 ms attack.
  */
 export function playMintSuccess(): void {
   [0, 2, 3, 4].forEach((index, i) => {
     window.setTimeout(
       () =>
         audioManager.playSampleAt(index, {
-          volume: 0.16,
+          volume: 0.12,
           pitch: CEREMONY_PITCH,
-          attack: 0.03,
+          attack: 0.04,
         }),
-      i * 280
+      i * 320
     );
   });
 }
