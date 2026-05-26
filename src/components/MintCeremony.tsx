@@ -305,6 +305,10 @@ export default function MintCeremony({
     ["--tier-current"]: `var(--tier-${tier})`,
   } as React.CSSProperties;
 
+  // Score badge: aurora-rising → success (the NFT's defining metadata).
+  const showScoreBadge =
+    phase !== "intro" && phase !== "spinning" && phase !== "card-materializing";
+
   return (
     <div className={styles.ceremonyScene} data-phase={phase}>
       {/* 1 — Midjourney background image + legibility vignette */}
@@ -330,25 +334,31 @@ export default function MintCeremony({
           width={cardWidth}
           interactive={true}
         />
+        {/* Score badge — overlaid from MintCeremony (NFTCard untouched). */}
+        {showScoreBadge && (
+          <div className={styles.cardScoreBadge}>
+            <span className={styles.cardScoreLabel}>Score</span>
+            <span className={styles.cardScoreValue}>{score.toLocaleString()}</span>
+          </div>
+        )}
       </div>
 
-      {/* 10c — success celebration: golden flash + radial sparkle burst */}
+      {/* 10c — success celebration: breathing aura (behind card) +
+          one-shot flash + radial burst + 4 continuous drifting sparkles */}
       {phase === "success" && (
         <>
+          <div className={styles.successAura} aria-hidden="true" />
           <div className={styles.successFlash} aria-hidden="true" />
           <div className={styles.sparkleContainer} aria-hidden="true">
             {SPARKLES.map((s, i) => (
-              <div
-                key={i}
-                className={styles.sparkle}
-                style={
-                  {
-                    ["--end-x"]: `${s.x}px`,
-                    ["--end-y"]: `${s.y}px`,
-                    ["--delay"]: `${s.delay}s`,
-                  } as React.CSSProperties
-                }
-              />
+              <div key={i} className={styles.sparkle}
+                style={{ ["--end-x"]: `${s.x}px`, ["--end-y"]: `${s.y}px`, ["--delay"]: `${s.delay}s` } as React.CSSProperties} />
+            ))}
+          </div>
+          <div className={styles.driftingSparkles} aria-hidden="true">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className={styles.driftingSparkle}
+                style={{ ["--delay"]: `${i * 1.2}s`, ["--start-x"]: `${20 + (i % 2) * 60}%`, ["--start-y"]: `${30 + Math.floor(i / 2) * 30}%` } as React.CSSProperties} />
             ))}
           </div>
         </>
@@ -365,35 +375,31 @@ export default function MintCeremony({
       {/* 11b — 8 warm fireflies (gold + amber tones) over the image */}
       <div className={styles.firefliesContainer} aria-hidden="true">
         {FIREFLIES.map((f, i) => {
-          const haloClass =
-            f.tone === "gold" ? styles.fireflyHaloGold : styles.fireflyHaloAmber;
-          const coreClass =
-            f.tone === "gold" ? styles.fireflyCoreGold : styles.fireflyCoreAmber;
+          const gold = f.tone === "gold";
           return (
-            <div
-              key={i}
-              className={styles.firefly}
-              style={
-                {
-                  left: `${f.x}%`,
-                  top: `${f.y}%`,
-                  ["--size"]: `${f.size}`,
-                  animationDelay: `${f.delay}s`,
-                } as React.CSSProperties
-              }
-            >
-              <div className={`${styles.fireflyHalo} ${haloClass}`} />
-              <div className={`${styles.fireflyCore} ${coreClass}`} />
+            <div key={i} className={styles.firefly}
+              style={{ left: `${f.x}%`, top: `${f.y}%`, ["--size"]: `${f.size}`, animationDelay: `${f.delay}s` } as React.CSSProperties}>
+              <div className={`${styles.fireflyHalo} ${gold ? styles.fireflyHaloGold : styles.fireflyHaloAmber}`} />
+              <div className={`${styles.fireflyCore} ${gold ? styles.fireflyCoreGold : styles.fireflyCoreAmber}`} />
             </div>
           );
         })}
       </div>
 
-      {/* 12a — header (Run complete + score, bilingual) */}
+      {/* 12a — header. Evolves on success ("Your kami / 守護神") and dims
+          (via [data-phase="success"]) so the card becomes the hero. */}
       <div className={styles.headerContainer}>
-        <div className={styles.headerRunComplete}>Run complete</div>
-        <div className={styles.headerRunCompleteJp}>完了</div>
-        <div className={styles.headerScore}>Score {score.toLocaleString()}</div>
+        <div className={styles.headerRunComplete}>
+          {phase === "success" ? "Your kami" : "Run complete"}
+        </div>
+        <div className={styles.headerRunCompleteJp}>
+          {phase === "success" ? "守護神" : "完了"}
+        </div>
+        <div className={styles.headerScore}>
+          {phase === "success"
+            ? `✦ ${score.toLocaleString()}`
+            : `Score ${score.toLocaleString()}`}
+        </div>
       </div>
 
       {/* 12a′ — anticipation subtitle (intro + spinning only) */}
@@ -416,27 +422,34 @@ export default function MintCeremony({
         </div>
       )}
 
-      {/* 12c — wood mint button + bilingual subtext */}
+      {/* 12c — action button. Primary heavy wood button before mint;
+          a light ghost button (secondary, no urgency) on success. */}
       <div className={styles.mintButtonContainer}>
-        <button
-          type="button"
-          className={`wood-btn ${styles.mintButton}`}
-          onClick={handleButton}
-          disabled={phase === "minting"}
-        >
-          {phase === "minting" ? (
-            <>
-              <span className={styles.spinner} />
-              鋳造中…
-            </>
-          ) : phase === "success" ? (
-            "Visit the shrine →"
-          ) : (
-            "Bind the spirit"
-          )}
-        </button>
-        <p className={styles.mintSub}>A blessing — only the network fee</p>
-        <p className={styles.mintSubJp}>御祭 · 無料</p>
+        {phase === "success" ? (
+          <button type="button" className={styles.ghostBtn} onClick={handleButton}>
+            Visit the shrine →
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              className={`wood-btn ${styles.mintButton}`}
+              onClick={handleButton}
+              disabled={phase === "minting"}
+            >
+              {phase === "minting" ? (
+                <>
+                  <span className={styles.spinner} />
+                  鋳造中…
+                </>
+              ) : (
+                "Bind the spirit"
+              )}
+            </button>
+            <p className={styles.mintSub}>A blessing — only the network fee</p>
+            <p className={styles.mintSubJp}>御祭 · 無料</p>
+          </>
+        )}
       </div>
 
       {/* 12d — success banner: inline, replaces the tier banner in-place
