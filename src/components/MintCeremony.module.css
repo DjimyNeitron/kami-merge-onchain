@@ -284,10 +284,11 @@
     transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
   pointer-events: none;
 }
+/* 3.5h: tier banner no longer shows on success — the inline success
+ * banner takes its place (same position), so they never coexist. */
 .ceremonyScene[data-phase="tier-banner"] .tierBanner,
 .ceremonyScene[data-phase="mint-ready"] .tierBanner,
-.ceremonyScene[data-phase="minting"] .tierBanner,
-.ceremonyScene[data-phase="success"] .tierBanner {
+.ceremonyScene[data-phase="minting"] .tierBanner {
   opacity: 1;
   transform: translateX(-50%) scale(1);
 }
@@ -386,57 +387,50 @@
   animation: spin 600ms linear infinite;
 }
 
-/* ─── 12d. Success banner (top overlay, doesn't cover the card) ──── */
-.successBanner {
+/* ─── 12d. Success banner (inline — occupies the tier-banner slot) ─ */
+/* 3.5h: replaces the old top-overlay parchment banner, which could
+ * cover the card. Sits at the tier-banner position (top 58%, below the
+ * card); the tier banner is hidden on success, so they never overlap. */
+.successBannerInline {
   position: absolute;
-  top: max(80px, calc(env(safe-area-inset-top, 16px) + 64px));
+  top: 58%;
   left: 50%;
-  transform: translateX(-50%) translateY(-60px);
-  /* 3.5g: parchment gradient + lift shadow for a richer "blessing". */
-  background: linear-gradient(135deg, var(--gold-50) 0%, #e8d4a8 100%);
-  color: var(--wood-dark);
-  padding: 14px 28px;
-  border-radius: 6px;
-  border: 1.5px solid var(--gold-700);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-  text-align: center;
-  z-index: 100;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  z-index: 14;
   opacity: 0;
   pointer-events: none;
+  animation: fade-in-soft 0.5s ease-out 0.2s forwards;
 }
-.ceremonyScene[data-phase="success"] .successBanner {
-  animation:
-    success-slide 500ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
-    success-dismiss 400ms ease-in 1500ms forwards;
-}
-.successKanji {
+.successKanjiInline {
   font-family:
     "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", serif;
-  font-size: 24px;
+  font-size: 22px;
+  line-height: 1;
   color: var(--torii-red);
-  margin-bottom: 4px;
 }
-.successText {
+.successTextInline {
   font-family: Georgia, "Times New Roman", serif;
   font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 4px;
+  font-weight: 500;
+  letter-spacing: 5px;
   text-transform: uppercase;
-  color: var(--wood-dark);
-}
-.successSubtext {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 10px;
-  color: var(--wood-light);
-  opacity: 0.7;
-  margin-top: 2px;
-  letter-spacing: var(--tracking-extra);
+  color: var(--gold-50);
+  text-shadow: 0 0 8px rgba(255, 218, 110, 0.5);
 }
 
 /* ─── 12a′. Anticipation subtitle (intro + spinning) ─────────────── */
+/* 3.5h: moved to 60% — BELOW the forming card — to fix the overlap with
+ * the card silhouette. The lowered card (top 37%, ~18–56% of the
+ * viewport) leaves no room above it under the header, but the
+ * tier-banner band below the card is empty during intro/spinning, so
+ * the subtitle reads as a clean caption under the forming card. */
 .anticipationText {
   position: absolute;
-  top: 20%;
+  top: 60%;
   left: 0;
   right: 0;
   text-align: center;
@@ -536,8 +530,6 @@
   0%, 100% { opacity: 0.6; }
   50% { opacity: 1; }
 }
-@keyframes success-slide { to { opacity: 1; transform: translateX(-50%) translateY(0); } }
-@keyframes success-dismiss { to { opacity: 0; transform: translateX(-50%) translateY(-60px); } }
 
 /* Reduced-motion: kill infinite pulses + the entry scale. Phase fades
  * stay — brief and informative, not decorative. */
@@ -558,10 +550,5 @@
   }
   .ceremonyScene[data-phase="success"] .cardWrapper {
     animation: none !important;
-  }
-  .ceremonyScene[data-phase="success"] .successBanner {
-    animation: none !important;
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
   }
 }

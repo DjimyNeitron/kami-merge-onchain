@@ -702,6 +702,72 @@ export class AudioManager {
   }
 
   // ==============================================================
+  // SINGING BOWL — synthesized tone for the MintCeremony (3.5h).
+  // A sine fundamental + two inharmonic overtones (2.76×, 5.4× — the
+  // signature of a struck metal bowl) through a warm lowpass, with a
+  // slow attack and long exponential decay so it reads as a sustained,
+  // breathed tone rather than a percussive strike. Optional wet/dry
+  // reverb split. Pure synthesis — no sample, no new dependency. The
+  // game's merge SFX never call this; they keep the marimba samples.
+  // ==============================================================
+  playBowlTone(opts: {
+    frequency: number;
+    duration?: number;
+    volume?: number;
+    attack?: number;
+    useReverb?: boolean;
+  }): void {
+    if (!this.unlocked) this.unlock();
+    const ctx = this.canPlay();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const duration = opts.duration ?? 4.0;
+    const volume = opts.volume ?? 0.15;
+    const attack = opts.attack ?? 0.4;
+
+    // Envelope: silence → slow attack → long exponential decay. Starts
+    // at 0.0001 (not 0) so exponentialRamp is legal.
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.0001, now);
+    master.gain.linearRampToValueAtTime(volume, now + attack);
+    master.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = opts.frequency * 5;
+    filter.Q.value = 0.5;
+
+    const harmonics = [
+      { ratio: 1.0, gain: 1.0 },
+      { ratio: 2.76, gain: 0.35 },
+      { ratio: 5.4, gain: 0.15 },
+    ];
+    for (const h of harmonics) {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = opts.frequency * h.ratio;
+      const g = ctx.createGain();
+      g.gain.value = h.gain;
+      osc.connect(g).connect(filter);
+      osc.start(now);
+      osc.stop(now + duration);
+    }
+    filter.connect(master);
+
+    const reverb = opts.useReverb ? this.getCeremonyReverb(ctx) : null;
+    if (reverb) {
+      const dry = ctx.createGain();
+      const wet = ctx.createGain();
+      dry.gain.value = 0.55;
+      wet.gain.value = 0.45; // wetter than samples — cathedral wash
+      master.connect(dry).connect(this.sfxGain!);
+      master.connect(reverb).connect(wet).connect(this.sfxGain!);
+    } else {
+      master.connect(this.sfxGain!);
+    }
+  }
+
+  // ==============================================================
   // GAME OVER — pre-rendered 4-note minor cadence (~4.8s).
   // The asset already bakes in the loudness emphasis vs merge SFX,
   // so the playback path is plain: no per-source gain, no scheduling.
