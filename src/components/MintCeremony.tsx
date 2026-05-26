@@ -305,10 +305,6 @@ export default function MintCeremony({
     ["--tier-current"]: `var(--tier-${tier})`,
   } as React.CSSProperties;
 
-  // Score badge: aurora-rising → success (the NFT's defining metadata).
-  const showScoreBadge =
-    phase !== "intro" && phase !== "spinning" && phase !== "card-materializing";
-
   return (
     <div className={styles.ceremonyScene} data-phase={phase}>
       {/* 1 — Midjourney background image + legibility vignette */}
@@ -334,13 +330,6 @@ export default function MintCeremony({
           width={cardWidth}
           interactive={true}
         />
-        {/* Score badge — overlaid from MintCeremony (NFTCard untouched). */}
-        {showScoreBadge && (
-          <div className={styles.cardScoreBadge}>
-            <span className={styles.cardScoreLabel}>Score</span>
-            <span className={styles.cardScoreValue}>{score.toLocaleString()}</span>
-          </div>
-        )}
       </div>
 
       {/* 10c — success celebration: breathing aura (behind card) +
@@ -427,7 +416,7 @@ export default function MintCeremony({
       <div className={styles.mintButtonContainer}>
         {phase === "success" ? (
           <button type="button" className={styles.ghostBtn} onClick={handleButton}>
-            Visit the shrine →
+            Visit the Shrine
           </button>
         ) : (
           <>
