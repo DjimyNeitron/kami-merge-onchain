@@ -232,6 +232,11 @@
   text-align: center;
   z-index: 13;
   pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+/* 3.5j: recede on success so the card is the clear hero. */
+.ceremonyScene[data-phase="success"] .headerContainer {
+  opacity: 0.55;
 }
 .headerRunComplete {
   font-family: Georgia, "Times New Roman", serif;
@@ -388,38 +393,39 @@
 }
 
 /* ─── 12d. Success banner (inline — occupies the tier-banner slot) ─ */
-/* 3.5i: a single CENTERED ROW (was a 2-line column extending downward).
- * The column's lower line collided with the mint button's upward
- * pulse-glow and got clipped. As a compact row, vertically centred in
- * the band between the card bottom (~56%) and the mint button, it
- * clears both. Position 60% (mid-band) with translate(-50%,-50%). */
+/* 3.5j: vertical stack again — 完 crowning "BLESSING RECEIVED", both
+ * centred (the row layout read off-centre because the heavy red kanji
+ * pulled the optical centre left). Centred on both axes at 60%, in the
+ * band between the card bottom and the (now glow-less) ghost button. */
 .successBannerInline {
   position: absolute;
   top: 60%;
   left: 50%;
   transform: translate(-50%, -50%);
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 4px;
   z-index: 14;
   opacity: 0;
   pointer-events: none;
-  animation: fade-in-soft 0.5s ease-out 0.2s forwards;
+  animation: fade-in-soft 0.6s ease-out 0.3s forwards;
 }
 .successKanjiInline {
   font-family:
     "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", serif;
-  font-size: 22px;
+  font-size: 26px;
   line-height: 1;
   color: var(--torii-red);
+  text-shadow: 0 0 12px rgba(184, 54, 44, 0.5);
 }
 .successTextInline {
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 5px;
   text-transform: uppercase;
+  white-space: nowrap;
   color: var(--gold-50);
   text-shadow: 0 0 8px rgba(255, 218, 110, 0.5);
 }
@@ -487,6 +493,110 @@
   opacity: 0;
   animation: sparkle-burst 0.9s ease-out var(--delay, 0s) forwards;
 }
+/* 3.5j — persistent breathing aura behind the card (ambient "this is
+ * yours now"); 0.5s delay lets the one-shot flash resolve first. */
+.successAura {
+  position: absolute;
+  top: 37%;
+  left: 50%;
+  width: 250px;
+  height: 350px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 218, 110, 0.18) 0%,
+    rgba(255, 218, 110, 0.1) 30%,
+    rgba(255, 218, 110, 0.03) 60%,
+    transparent 80%
+  );
+  pointer-events: none;
+  z-index: 3;
+  opacity: 0;
+  animation: success-aura-breathe 2.5s ease-in-out 0.5s infinite;
+}
+/* 3.5j — 4 slow gold sparkles drifting upward, staggered, continuous. */
+.driftingSparkles {
+  position: absolute;
+  top: 25%;
+  left: 0;
+  right: 0;
+  bottom: 40%;
+  pointer-events: none;
+  z-index: 8;
+}
+.driftingSparkle {
+  position: absolute;
+  left: var(--start-x);
+  top: var(--start-y);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff8e0 0%, rgba(255, 218, 110, 0.9) 50%, transparent 100%);
+  filter: blur(0.5px);
+  opacity: 0;
+  animation: drift-sparkle 4s ease-in-out var(--delay, 0s) infinite;
+}
+
+/* ─── Ghost button (secondary action on success) ─────────────────── */
+.ghostBtn {
+  background: transparent;
+  border: 1px solid rgba(245, 230, 200, 0.4);
+  color: var(--gold-50);
+  padding: 10px 28px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 3px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    border-color 0.3s ease,
+    background 0.3s ease,
+    transform 0.15s ease;
+}
+.ghostBtn:hover {
+  border-color: var(--gold-200);
+  background: rgba(245, 230, 200, 0.05);
+}
+.ghostBtn:active {
+  transform: scale(0.98);
+}
+
+/* ─── Score badge (overlaid on the card from MintCeremony) ───────── */
+.cardScoreBadge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 6px 10px;
+  background: rgba(10, 8, 22, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 218, 110, 0.3);
+  border-radius: 4px;
+  z-index: 11;
+  pointer-events: none;
+  opacity: 0;
+  animation: fade-in-soft 0.5s ease-out 0.3s forwards;
+}
+.cardScoreLabel {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 8px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--gold-200);
+  opacity: 0.8;
+}
+.cardScoreValue {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--gold-50);
+}
 
 /* ─── Keyframes ──────────────────────────────────────────────────── */
 @keyframes fade-in { to { opacity: 1; } }
@@ -501,6 +611,18 @@
   0%   { transform: translate(0, 0) scale(0); opacity: 0; }
   20%  { transform: translate(calc(var(--end-x) * 0.3), calc(var(--end-y) * 0.3)) scale(1.2); opacity: 1; }
   100% { transform: translate(var(--end-x), var(--end-y)) scale(0.5); opacity: 0; }
+}
+@keyframes success-aura-breathe {
+  0%   { opacity: 0.5; transform: translate(-50%, -50%) scale(0.95); }
+  50%  { opacity: 0.85; transform: translate(-50%, -50%) scale(1.05); }
+  100% { opacity: 0.5; transform: translate(-50%, -50%) scale(0.95); }
+}
+@keyframes drift-sparkle {
+  0%   { opacity: 0; transform: translate(0, 0) scale(0.5); }
+  20%  { opacity: 1; transform: translate(10px, -8px) scale(1); }
+  50%  { opacity: 0.7; transform: translate(-5px, -20px) scale(0.8); }
+  80%  { opacity: 0.5; transform: translate(8px, -30px) scale(0.6); }
+  100% { opacity: 0; transform: translate(0, -40px) scale(0.3); }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes mint-pulse {
@@ -540,9 +662,16 @@
   .petalInner,
   .successFlash,
   .sparkle,
+  .successAura,
+  .driftingSparkle,
   .mintButton::after,
   .spinner {
     animation: none !important;
+  }
+  /* Keep the success aura softly visible (it normally fades in via the
+   * breathe animation, which we just disabled). */
+  .successAura {
+    opacity: 0.6;
   }
   .petal {
     animation-duration: 4s;
