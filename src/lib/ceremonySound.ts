@@ -38,17 +38,19 @@ export function playTick(): void {
   });
 }
 
-// Tier chord — note count scales with rarity, ascending the pentatonic.
+// Reveal = MELODY. Ascending sequential bowls, note count scaling with
+// rarity — a "story" that arrives one tone at a time (discovery).
 const CHIME_SEQUENCES: Record<Tier, number[]> = {
   common: [BOWL.A3, BOWL.D4],
   rare: [BOWL.G3, BOWL.A3, BOWL.D4],
-  epic: [BOWL.E3, BOWL.G3, BOWL.A3, BOWL.D4],
+  epic: [BOWL.G3, BOWL.A3, BOWL.B3, BOWL.D4],
   legendary: [BOWL.E3, BOWL.G3, BOWL.A3, BOWL.B3, BOWL.D4],
 };
 
 /**
- * Final-stop chime — fired the moment the spin lands. Slow-attack bowls
- * 450 ms apart, each ringing for 5 s, richer = rarer tier.
+ * Reveal chime — fired the moment the spin lands. Brighter, quicker,
+ * drier (35% wet) than the mint: sequential tones, shorter ring,
+ * faster attack — reads as an announcement / discovery.
  */
 export function playChime(tier: Tier): void {
   CHIME_SEQUENCES[tier].forEach((frequency, i) => {
@@ -56,32 +58,46 @@ export function playChime(tier: Tier): void {
       () =>
         audioManager.playBowlTone({
           frequency,
-          duration: 5.0,
-          volume: 0.12,
-          attack: 0.5,
+          duration: 3.5,
+          volume: 0.13,
+          attack: 0.3,
           useReverb: true,
+          reverbWet: 0.35,
         }),
-      i * 450
+      i * 380
     );
   });
 }
 
+// Mint = HARMONY. The same bowls, but overlapping into a sustained
+// chord (E minor + octave) — all tones land together = arrival /
+// resolution / "amen". Each note carries its own gentle stagger,
+// volume, and attack so the chord blooms rather than stacks abruptly.
+const MINT_CHORD: Array<{ freq: number; delay: number; volume: number; attack: number }> = [
+  { freq: BOWL.E3, delay: 0, volume: 0.12, attack: 0.7 },
+  { freq: BOWL.G3, delay: 80, volume: 0.1, attack: 0.6 },
+  { freq: BOWL.B3, delay: 160, volume: 0.09, attack: 0.6 },
+  { freq: BOWL.D4, delay: 320, volume: 0.08, attack: 0.5 },
+];
+
 /**
- * Mint-success cascade — fired when the mock mint completes. A slow
- * ascending bowl arpeggio, the final note ringing out for 6 s.
+ * Mint-success chord — fired when the mock mint completes. Long (7 s),
+ * very wet (60%) — a cathedral resolution distinct from the reveal's
+ * dry ascending melody.
  */
 export function playMintSuccess(): void {
-  [BOWL.E3, BOWL.G3, BOWL.A3, BOWL.D4].forEach((frequency, i) => {
+  MINT_CHORD.forEach((note) => {
     window.setTimeout(
       () =>
         audioManager.playBowlTone({
-          frequency,
-          duration: 6.0,
-          volume: 0.13,
-          attack: 0.6,
+          frequency: note.freq,
+          duration: 7.0,
+          volume: note.volume,
+          attack: note.attack,
           useReverb: true,
+          reverbWet: 0.6,
         }),
-      i * 550
+      note.delay
     );
   });
 }
