@@ -76,6 +76,10 @@ export class AudioManager {
   private unlocked = false;
   private sfxMuted = false;
   private bgmMuted = false;
+  // Lazily-built synthetic convolution reverb for the MintCeremony's
+  // opt-in `useReverb` cues. Null until the first reverbed sample plays;
+  // the game's merge SFX never request it, so it stays unbuilt in-game.
+  private ceremonyReverb: ConvolverNode | null = null;
 
   // Sampled instruments. mergeBuffers stays empty until loadSamples()
   // resolves the parallel decode of the five marimba notes; a method
@@ -624,7 +628,13 @@ export class AudioManager {
    */
   playSampleAt(
     index: number,
-    opts: { volume?: number; pitch?: number; attack?: number } = {}
+    opts: {
+      volume?: number;
+      pitch?: number;
+      attack?: number;
+      release?: number;
+      useReverb?: boolean;
+    } = {}
   ): void {
     if (!this.unlocked) this.unlock();
     const ctx = this.canPlay();
@@ -637,17 +647,58 @@ export class AudioManager {
     // pitch: playbackRate multiplier (0.5 = one octave down). Default
     // 1.0 = native pitch, so any caller that omits it (and the engine's
     // own combo path, which never calls this method) is unaffected.
-    source.playbackRate.value = opts.pitch ?? 1.0;
+    const pitch = opts.pitch ?? 1.0;
+    source.playbackRate.value = pitch;
     const gain = ctx.createGain();
     const target = opts.volume ?? 0.5;
-    // attack: short linear ramp 0 → target softens the marimba transient
-    // and avoids a click. Default 5 ms is imperceptible vs the old hard
-    // setValueAtTime, so existing behaviour is preserved.
+    // attack: short linear ramp 0 → target softens the marimba transient.
+    // release: linear fade-out tail over the final `release` seconds of
+    // playback, so the note dissolves instead of cutting. Both default
+    // to the prior behaviour (5 ms attack, no release).
     const attack = opts.attack ?? 0.005;
+    const release = opts.release ?? 0;
+    const dur = buffer.duration / pitch;
     gain.gain.setValueAtTime(0, t);
     gain.gain.linearRampToValueAtTime(target, t + attack);
-    source.connect(gain).connect(this.sfxGain!);
+    if (release > 0) {
+      const relStart = Math.max(t + attack, t + dur - release);
+      gain.gain.setValueAtTime(target, relStart);
+      gain.gain.linearRampToValueAtTime(0, t + dur);
+    }
+    source.connect(gain);
+    // useReverb (opt-in; ceremony only): split into a dry path + a wet
+    // path through the synthetic convolver. The engine's merge SFX never
+    // pass useReverb, so they stay bone-dry.
+    const reverb = opts.useReverb ? this.getCeremonyReverb(ctx) : null;
+    if (reverb) {
+      const dry = ctx.createGain();
+      const wet = ctx.createGain();
+      dry.gain.value = 0.6;
+      wet.gain.value = 0.4;
+      gain.connect(dry).connect(this.sfxGain!);
+      gain.connect(reverb).connect(wet).connect(this.sfxGain!);
+    } else {
+      gain.connect(this.sfxGain!);
+    }
     source.start(t);
+  }
+
+  // Build (once) a 2.5 s decaying-noise impulse response and wrap it in
+  // a ConvolverNode. Cheap, no asset, no dependency. Cached on first use.
+  private getCeremonyReverb(ctx: AudioContext): ConvolverNode | null {
+    if (this.ceremonyReverb) return this.ceremonyReverb;
+    const len = Math.floor(ctx.sampleRate * 2.5);
+    const impulse = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = impulse.getChannelData(ch);
+      for (let i = 0; i < len; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.5);
+      }
+    }
+    const conv = ctx.createConvolver();
+    conv.buffer = impulse;
+    this.ceremonyReverb = conv;
+    return conv;
   }
 
   // ==============================================================

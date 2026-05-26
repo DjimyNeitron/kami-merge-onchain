@@ -155,6 +155,15 @@ function makePetals(n: number, seed: number): PetalSpec[] {
   }));
 }
 
+// 3.5g — 12 gold sparkles bursting radially on success. Fixed vectors
+// (not Math.random in render) so re-renders during the success phase
+// don't make them jump.
+const SPARKLES = Array.from({ length: 12 }, (_, i) => {
+  const angle = (i / 12) * Math.PI * 2;
+  const dist = 90 + (i % 3) * 25;
+  return { x: Math.cos(angle) * dist, y: Math.sin(angle) * dist, delay: i * 0.03 };
+});
+
 export default function MintCeremony({
   yokai,
   tier,
@@ -302,6 +311,28 @@ export default function MintCeremony({
         />
       </div>
 
+      {/* 10c — success celebration: golden flash + radial sparkle burst */}
+      {phase === "success" && (
+        <>
+          <div className={styles.successFlash} aria-hidden="true" />
+          <div className={styles.sparkleContainer} aria-hidden="true">
+            {SPARKLES.map((s, i) => (
+              <div
+                key={i}
+                className={styles.sparkle}
+                style={
+                  {
+                    ["--end-x"]: `${s.x}px`,
+                    ["--end-y"]: `${s.y}px`,
+                    ["--delay"]: `${s.delay}s`,
+                  } as React.CSSProperties
+                }
+              />
+            ))}
+          </div>
+        </>
+      )}
+
       {/* 11a — sakura petals (state-driven; each self-removes on end) */}
       {SAKURA_DEFS}
       <div className={styles.sakuraContainer} aria-hidden="true">
@@ -344,6 +375,14 @@ export default function MintCeremony({
         <div className={styles.headerScore}>Score {score.toLocaleString()}</div>
       </div>
 
+      {/* 12a′ — anticipation subtitle (intro + spinning only) */}
+      {(phase === "intro" || phase === "spinning") && (
+        <div className={styles.anticipationText}>
+          Calling forth your spirit
+          <span className={styles.anticipationJp}>魂を呼ぶ</span>
+        </div>
+      )}
+
       {/* 12b — tier banner (─ 上 EPIC ─) */}
       <div className={styles.tierBanner} style={tierBannerStyle}>
         <div className={styles.tierBannerDash} />
@@ -366,47 +405,55 @@ export default function MintCeremony({
               鋳造中…
             </>
           ) : phase === "success" ? (
-            "View collection →"
+            "Visit the shrine →"
           ) : (
-            "Mint to wallet"
+            "Bind the spirit"
           )}
         </button>
-        <p className={styles.mintSub}>Free · gas only ~$0.001</p>
-        <p className={styles.mintSubJp}>無料</p>
+        <p className={styles.mintSub}>A blessing — only the network fee</p>
+        <p className={styles.mintSubJp}>御祭 · 無料</p>
       </div>
 
       {/* 12d — success banner (top overlay, doesn't cover card) */}
       <div className={styles.successBanner}>
         <div className={styles.successKanji}>完</div>
-        <div className={styles.successText}>NFT MINTED</div>
+        <div className={styles.successText}>Blessing received</div>
         <div className={styles.successSubtext}>Added to your collection</div>
       </div>
     </div>
   );
 }
 
-// Inline petal — per-instance CSS custom properties drive the fall +
-// wobble keyframes; the SVG shape is one of the 3 shared variants.
-// onAnimationEnd fires when the (finite, forwards) petal-fall completes
-// — the inner wobble is infinite so it never triggers it — letting the
-// parent drop this petal from state. The target===currentTarget guard
-// ignores any animationend bubbling up from the child spinner.
+// 3.5g — two nested elements decouple the motion so the descent is a
+// pure linear translateY (no "staircase" from uneven keyframe Y deltas):
+//   • outer .petal  — vertical fall only (finite, forwards).
+//   • inner .petalInner — horizontal sine drift + gentle wobble (both
+//     infinite, independent periods → organic, non-repeating motion).
+// onAnimationEnd fires only from the outer's finite fall (the inner's
+// infinite animations never end); the target===currentTarget guard
+// ignores any event bubbling up from the inner.
 function PetalEl({ p, onDone }: { p: PetalSpec; onDone: () => void }) {
-  const s = {
+  const outer = {
     left: `${p.left}%`, top: `${p.topOffset}px`,
-    ["--size"]: `${p.size}px`, ["--rotation"]: `${p.rotation}deg`,
-    ["--drift"]: `${p.drift}px`, ["--duration"]: `${p.duration}s`,
+    ["--size"]: `${p.size}px`, ["--duration"]: `${p.duration}s`,
     ["--delay"]: `${p.delay}s`, ["--opacity-max"]: `${p.opacityMax}`,
+  } as React.CSSProperties;
+  const inner = {
+    ["--drift"]: `${p.drift}px`, ["--rotation-start"]: `${p.rotation}deg`,
+    ["--drift-duration"]: `${(p.duration * 0.4).toFixed(2)}s`,
+    ["--wobble-duration"]: `${(p.duration * 0.5).toFixed(2)}s`,
   } as React.CSSProperties;
   return (
     <div
       className={styles.petal}
-      style={s}
+      style={outer}
       onAnimationEnd={(e) => {
         if (e.target === e.currentTarget) onDone();
       }}
     >
-      <div className={styles.petalSpinner}>{SAKURA_VARIANTS[p.variant]}</div>
+      <div className={styles.petalInner} style={inner}>
+        {SAKURA_VARIANTS[p.variant]}
+      </div>
     </div>
   );
 }

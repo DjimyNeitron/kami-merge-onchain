@@ -24,6 +24,12 @@ import { type Tier } from "@/config/yokai";
 // separate AudioManager instance, so they keep their native C5–A5 pitch.
 const CEREMONY_PITCH = 0.35; // ~G3 region — deepest while keeping clarity
 const CEREMONY_ATTACK = 0.035; // 35 ms — softest attack yet
+const CEREMONY_RELEASE = 0.6; // long fade-out tail so notes dissolve
+
+// 3.5g — every cue now routes through the synthetic convolution reverb
+// (useReverb) and carries a release tail, turning the percussive marimba
+// strike into an atmospheric, dissolving temple-bell tone. Reverb is
+// opt-in per call, so the in-game merge SFX stay dry.
 
 /**
  * Spinning tick — the lowest marimba note, pitched down, very quiet.
@@ -34,6 +40,8 @@ export function playTick(): void {
     volume: 0.035,
     pitch: CEREMONY_PITCH,
     attack: CEREMONY_ATTACK,
+    release: 0.2,
+    useReverb: true,
   });
 }
 
@@ -49,7 +57,8 @@ const CHIME_SEQUENCES: Record<Tier, number[]> = {
 
 /**
  * Final-stop chime — fired the moment the spin lands. Notes stagger
- * 260 ms apart at volume 0.14 — deep, very calm bowl-chime feel.
+ * 300 ms apart at volume 0.14 with a long reverb tail — atmospheric,
+ * temple-like, not percussive.
  */
 export function playChime(tier: Tier): void {
   CHIME_SEQUENCES[tier].forEach((index, i) => {
@@ -59,16 +68,18 @@ export function playChime(tier: Tier): void {
           volume: 0.14,
           pitch: CEREMONY_PITCH,
           attack: CEREMONY_ATTACK,
+          release: CEREMONY_RELEASE,
+          useReverb: true,
         }),
-      i * 260
+      i * 300
     );
   });
 }
 
 /**
  * Mint-success cascade — fired when the mock mint completes. A slow,
- * contemplative ascending run at 320 ms spacing, volume 0.12, with the
- * gentlest 40 ms attack.
+ * contemplative ascending run at 360 ms spacing, volume 0.12, with the
+ * gentlest attack and the longest tail of all the cues.
  */
 export function playMintSuccess(): void {
   [0, 2, 3, 4].forEach((index, i) => {
@@ -78,8 +89,10 @@ export function playMintSuccess(): void {
           volume: 0.12,
           pitch: CEREMONY_PITCH,
           attack: 0.04,
+          release: 0.8,
+          useReverb: true,
         }),
-      i * 320
+      i * 360
     );
   });
 }

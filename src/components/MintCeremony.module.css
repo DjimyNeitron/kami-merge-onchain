@@ -178,18 +178,23 @@
   height: 0;
   pointer-events: none;
 }
+/* 3.5g — outer = pure linear vertical fall (no staircase). */
 .petal {
   position: absolute;
-  width: var(--size, 24px);
-  height: calc(var(--size, 24px) * 1.4);
+  width: var(--size, 16px);
+  height: calc(var(--size, 16px) * 1.4);
   pointer-events: none;
-  animation: petal-fall var(--duration, 9s) var(--delay, 0s) ease-in-out forwards;
+  animation: petal-fall var(--duration, 9s) var(--delay, 0s) linear forwards;
+  will-change: transform;
 }
-/* Gentle tumble (flip + rock) — replaces the old constant 360° spin. */
-.petalSpinner {
+/* 3.5g — inner = horizontal sine drift (transform) + wobble (rotate
+ * property, independent of transform) on separate periods → organic. */
+.petalInner {
   width: 100%;
   height: 100%;
-  animation: petal-wobble 3.2s ease-in-out infinite;
+  animation:
+    petal-drift var(--drift-duration, 3.6s) ease-in-out infinite alternate,
+    petal-wobble var(--wobble-duration, 4.5s) ease-in-out infinite;
 }
 
 /* ─── 11b. Fireflies (gold + amber) — always pulsing ─────────────── */
@@ -230,7 +235,7 @@
 }
 .headerRunComplete {
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: var(--tracking-spaced);
   color: var(--gold-50);
   opacity: 0;
@@ -247,22 +252,20 @@
   margin-top: 2px;
   animation: fade-in 300ms ease-out 200ms forwards;
 }
+/* 3.5g — the tier kanji (silhouette, 120px) is the hero; the score is
+ * supportive metadata, so it's 22px throughout (was 30px, shrinking to
+ * 22px past intro) and settles at 0.85 opacity via fade-in-soft. */
 .headerScore {
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 30px;
+  font-size: 22px;
   font-weight: 500;
   color: var(--gold-50);
-  margin-top: 8px;
+  margin-top: 4px;
   letter-spacing: 1px;
   opacity: 0;
   /* Soft shadow keeps the score legible over the brighter sky region. */
   text-shadow: 0 1px 6px rgba(4, 8, 18, 0.6);
-  animation: fade-in 400ms ease-out 400ms forwards;
-}
-/* The score downsizes a hair past intro to give the scene room. */
-.ceremonyScene:not([data-phase="intro"]) .headerScore {
-  font-size: 22px;
-  transition: font-size 400ms ease-out;
+  animation: fade-in-soft 400ms ease-out 400ms forwards;
 }
 
 /* ─── 12b. Tier banner (─ 上 EPIC ─) ─────────────────────────────── */
@@ -389,11 +392,13 @@
   top: max(80px, calc(env(safe-area-inset-top, 16px) + 64px));
   left: 50%;
   transform: translateX(-50%) translateY(-60px);
-  background: var(--gold-50);
+  /* 3.5g: parchment gradient + lift shadow for a richer "blessing". */
+  background: linear-gradient(135deg, var(--gold-50) 0%, #e8d4a8 100%);
   color: var(--wood-dark);
   padding: 14px 28px;
   border-radius: 6px;
   border: 1.5px solid var(--gold-700);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
   text-align: center;
   z-index: 100;
   opacity: 0;
@@ -416,6 +421,7 @@
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 4px;
+  text-transform: uppercase;
   color: var(--wood-dark);
 }
 .successSubtext {
@@ -427,8 +433,79 @@
   letter-spacing: var(--tracking-extra);
 }
 
+/* ─── 12a′. Anticipation subtitle (intro + spinning) ─────────────── */
+.anticipationText {
+  position: absolute;
+  top: 20%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 11px;
+  color: var(--gold-50);
+  opacity: 0;
+  letter-spacing: 2px;
+  z-index: 13;
+  pointer-events: none;
+  animation: anticipation-fade 1s ease-out 0.5s forwards;
+}
+.anticipationJp {
+  display: block;
+  font-family:
+    "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", serif;
+  font-size: 10px;
+  color: var(--gold-200);
+  opacity: 0.7;
+  margin-top: 4px;
+  letter-spacing: 4px;
+}
+
+/* ─── Success celebration (golden flash + radial sparkle burst) ──── */
+.successFlash {
+  position: absolute;
+  top: 37%;
+  left: 50%;
+  width: 250px;
+  height: 250px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(255, 218, 110, 0.7) 0%, rgba(255, 218, 110, 0.4) 30%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 5;
+  animation: success-flash 0.8s ease-out forwards;
+}
+.sparkleContainer {
+  position: absolute;
+  top: 37%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 6;
+  pointer-events: none;
+}
+.sparkle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff8e0 0%, #ffda6e 60%, transparent 100%);
+  opacity: 0;
+  animation: sparkle-burst 0.9s ease-out var(--delay, 0s) forwards;
+}
+
 /* ─── Keyframes ──────────────────────────────────────────────────── */
 @keyframes fade-in { to { opacity: 1; } }
+@keyframes fade-in-soft { to { opacity: 0.85; } }
+@keyframes anticipation-fade { to { opacity: 0.7; } }
+@keyframes success-flash {
+  0%   { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+  20%  { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
+}
+@keyframes sparkle-burst {
+  0%   { transform: translate(0, 0) scale(0); opacity: 0; }
+  20%  { transform: translate(calc(var(--end-x) * 0.3), calc(var(--end-y) * 0.3)) scale(1.2); opacity: 1; }
+  100% { transform: translate(var(--end-x), var(--end-y)) scale(0.5); opacity: 0; }
+}
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes mint-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(255, 218, 110, 0); }
@@ -438,20 +515,22 @@
   0%, 100% { transform: translate(-50%, -50%) scale(1); filter: saturate(1) brightness(1); }
   40% { transform: translate(-50%, -50%) scale(1.05); filter: saturate(1) brightness(1.2); }
 }
-/* Sine-ish horizontal drift (0 → 0.3 → 1 → 0.7 → 0.4 of --drift) while
- * falling, so petals sway rather than slide straight down. */
+/* 3.5g — vertical fall is now pure linear (constant speed, no staircase).
+ * Horizontal drift + wobble live on .petalInner as separate animations. */
 @keyframes petal-fall {
-  0%   { transform: translateY(0) translateX(0) rotate(var(--rotation, 0deg)); opacity: 0; }
+  0%   { transform: translateY(0); opacity: 0; }
   5%   { opacity: var(--opacity-max, 0.8); }
-  25%  { transform: translateY(150px) translateX(calc(var(--drift, 0) * 0.3)) rotate(calc(var(--rotation, 0deg) + 45deg)); }
-  50%  { transform: translateY(380px) translateX(var(--drift, 0)) rotate(calc(var(--rotation, 0deg) + 180deg)); }
-  75%  { transform: translateY(620px) translateX(calc(var(--drift, 0) * 0.7)) rotate(calc(var(--rotation, 0deg) + 315deg)); }
-  95%  { opacity: calc(var(--opacity-max, 0.8) * 0.6); }
-  100% { transform: translateY(900px) translateX(calc(var(--drift, 0) * 0.4)) rotate(calc(var(--rotation, 0deg) + 360deg)); opacity: 0; }
+  90%  { opacity: var(--opacity-max, 0.8); }
+  100% { transform: translateY(900px); opacity: 0; }
+}
+@keyframes petal-drift {
+  0%   { transform: translateX(calc(var(--drift, 60px) * -0.5)); }
+  100% { transform: translateX(var(--drift, 60px)); }
 }
 @keyframes petal-wobble {
-  0%, 100% { transform: rotateY(0deg) rotate(-6deg); }
-  50% { transform: rotateY(180deg) rotate(6deg); }
+  0%   { rotate: calc(var(--rotation-start, 0deg) - 8deg); }
+  50%  { rotate: calc(var(--rotation-start, 0deg) + 8deg); }
+  100% { rotate: calc(var(--rotation-start, 0deg) - 8deg); }
 }
 @keyframes firefly-pulse {
   0%, 100% { opacity: 0.6; }
@@ -464,7 +543,9 @@
  * stay — brief and informative, not decorative. */
 @media (prefers-reduced-motion: reduce) {
   .firefly,
-  .petalSpinner,
+  .petalInner,
+  .successFlash,
+  .sparkle,
   .mintButton::after,
   .spinner {
     animation: none !important;
