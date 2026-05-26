@@ -404,13 +404,17 @@ export default function MintCeremony({
         </div>
       )}
 
-      {/* 12b — tier banner (─ 上 EPIC ─) */}
-      <div className={styles.tierBanner} style={tierBannerStyle}>
-        <div className={styles.tierBannerDash} />
-        <span className={styles.tierBannerKanji}>{TIER_KANJI[tier]}</span>
-        <span className={styles.tierBannerText}>{TIER_LABEL[tier]}</span>
-        <div className={styles.tierBannerDash} />
-      </div>
+      {/* 12b — tier banner (─ 上 EPIC ─). Unmounted on success so it
+          can't crossfade against the inline success banner at the same
+          slot — the success banner takes over cleanly. */}
+      {phase !== "success" && (
+        <div className={styles.tierBanner} style={tierBannerStyle}>
+          <div className={styles.tierBannerDash} />
+          <span className={styles.tierBannerKanji}>{TIER_KANJI[tier]}</span>
+          <span className={styles.tierBannerText}>{TIER_LABEL[tier]}</span>
+          <div className={styles.tierBannerDash} />
+        </div>
+      )}
 
       {/* 12c — wood mint button + bilingual subtext */}
       <div className={styles.mintButtonContainer}>

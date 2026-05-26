@@ -716,6 +716,8 @@ export class AudioManager {
     volume?: number;
     attack?: number;
     useReverb?: boolean;
+    reverbWet?: number; // 0–1 wet mix (default 0.4) — lets the reveal
+    // stay present/clear (low wet) and the mint bloom (high wet).
   }): void {
     if (!this.unlocked) this.unlock();
     const ctx = this.canPlay();
@@ -756,10 +758,11 @@ export class AudioManager {
 
     const reverb = opts.useReverb ? this.getCeremonyReverb(ctx) : null;
     if (reverb) {
+      const wetAmount = opts.reverbWet ?? 0.4;
       const dry = ctx.createGain();
       const wet = ctx.createGain();
-      dry.gain.value = 0.55;
-      wet.gain.value = 0.45; // wetter than samples — cathedral wash
+      dry.gain.value = 1 - wetAmount;
+      wet.gain.value = wetAmount;
       master.connect(dry).connect(this.sfxGain!);
       master.connect(reverb).connect(wet).connect(this.sfxGain!);
     } else {

@@ -388,18 +388,20 @@
 }
 
 /* ─── 12d. Success banner (inline — occupies the tier-banner slot) ─ */
-/* 3.5h: replaces the old top-overlay parchment banner, which could
- * cover the card. Sits at the tier-banner position (top 58%, below the
- * card); the tier banner is hidden on success, so they never overlap. */
+/* 3.5i: a single CENTERED ROW (was a 2-line column extending downward).
+ * The column's lower line collided with the mint button's upward
+ * pulse-glow and got clipped. As a compact row, vertically centred in
+ * the band between the card bottom (~56%) and the mint button, it
+ * clears both. Position 60% (mid-band) with translate(-50%,-50%). */
 .successBannerInline {
   position: absolute;
-  top: 58%;
+  top: 60%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 4px;
+  gap: 10px;
   z-index: 14;
   opacity: 0;
   pointer-events: none;
