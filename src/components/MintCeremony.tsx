@@ -144,16 +144,27 @@ interface PetalSpec {
   variant: number; // index into SAKURA_VARIANTS
 }
 
-// 3.5f: smaller (10–20px), slower (8–12s), staggered. The `seed` makes
-// keys unique across spawns (a fresh Replay remount restarts them).
-function makePetals(n: number, seed: number): PetalSpec[] {
-  return Array.from({ length: n }, (_, i) => ({
-    key: `p${seed}-${i}`, left: Math.random() * 100, topOffset: -(20 + Math.random() * 40),
-    size: 10 + Math.random() * 10, rotation: Math.random() * 360, drift: (Math.random() - 0.5) * 120,
-    duration: 8 + Math.random() * 4, delay: Math.random() * 1.5, opacityMax: 0.55 + Math.random() * 0.35,
+// 3.5h: one petal at a time. delay:0 — petals fall the instant they
+// spawn; the natural stagger comes from the spawn interval, not a
+// per-petal delay (that was the old "stripes" cause). Unique key via
+// timestamp + random suffix so continuous spawns never collide.
+function createPetal(): PetalSpec {
+  return {
+    key: `p${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    left: Math.random() * 100, topOffset: -(20 + Math.random() * 40),
+    size: 10 + Math.random() * 10, rotation: Math.random() * 360,
+    drift: (Math.random() - 0.5) * 120, duration: 8 + Math.random() * 4,
+    delay: 0, opacityMax: 0.55 + Math.random() * 0.35,
     variant: Math.floor(Math.random() * SAKURA_VARIANTS.length),
-  }));
+  };
 }
+
+// Phases during which sakura keep spawning (continuous snowfall). On
+// exit, existing petals finish their fall and the scene depletes.
+const REVEAL_PHASES = new Set<CeremonyPhase>([
+  "card-materializing", "aurora-rising", "tier-banner",
+  "mint-ready", "minting", "success",
+]);
 
 // 3.5g — 12 gold sparkles bursting radially on success. Fixed vectors
 // (not Math.random in render) so re-renders during the success phase
@@ -265,13 +276,23 @@ export default function MintCeremony({
     phase === "intro" ? "legendary" : TIER_ORDER[spinIdx];
   const silhouetteKanji = TIER_KANJI[silhouetteTier];
 
-  // 3.5f: petals live in state so each completes its full fall even as
-  // the phase advances. Spawned once on entering card-materializing;
-  // each removes itself on animationend (see removePetal). A Replay
+  // 3.5h: continuous staggered snowfall. A 6-petal burst the instant the
+  // card materialises (immediate presence), then one new petal every
+  // 450 ms while in a reveal phase, capped at 25 live at once. Each
+  // petal removes itself on animationend (removePetal). A Replay
   // remounts the component, so the list resets to [] automatically.
   const [petals, setPetals] = useState<PetalSpec[]>([]);
   useEffect(() => {
-    if (phase === "card-materializing") setPetals(makePetals(20, Date.now()));
+    if (phase === "card-materializing") {
+      setPetals((prev) => [...prev, ...Array.from({ length: 6 }, () => createPetal())]);
+    }
+  }, [phase]);
+  useEffect(() => {
+    if (!REVEAL_PHASES.has(phase)) return;
+    const id = window.setInterval(() => {
+      setPetals((prev) => (prev.length >= 25 ? prev : [...prev, createPetal()]));
+    }, 450);
+    return () => window.clearInterval(id);
   }, [phase]);
   const removePetal = useCallback((key: string) => {
     setPetals((prev) => prev.filter((p) => p.key !== key));
@@ -414,12 +435,14 @@ export default function MintCeremony({
         <p className={styles.mintSubJp}>御祭 · 無料</p>
       </div>
 
-      {/* 12d — success banner (top overlay, doesn't cover card) */}
-      <div className={styles.successBanner}>
-        <div className={styles.successKanji}>完</div>
-        <div className={styles.successText}>Blessing received</div>
-        <div className={styles.successSubtext}>Added to your collection</div>
-      </div>
+      {/* 12d — success banner: inline, replaces the tier banner in-place
+          on success (no top-overlay that could cover the card). */}
+      {phase === "success" && (
+        <div className={styles.successBannerInline}>
+          <div className={styles.successKanjiInline}>完</div>
+          <div className={styles.successTextInline}>Blessing received</div>
+        </div>
+      )}
     </div>
   );
 }
