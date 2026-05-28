@@ -2,8 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import { GameEngine } from "@/game/engine";
-import { YokaiType, YOKAI_CHAIN } from "@/config/yokai";
+import {
+  YokaiType,
+  YOKAI_CHAIN,
+  type YokaiName,
+  type Tier,
+} from "@/config/yokai";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/config/constants";
+import MintCeremony from "@/components/MintCeremony";
+import { tierFromScore, MIN_MINT_SCORE } from "@/lib/tierFromScore";
+import gcStyles from "./GameCanvas.module.css";
+
+// Map a numeric YOKAI_CHAIN id (1-11, as tracked by engine.reached) to
+// the lowercase YokaiName MintCeremony expects. Single use today;
+// promote to src/config/yokai.ts if a second consumer appears.
+const yokaiNameFromId = (id: number): YokaiName =>
+  YOKAI_CHAIN[id - 1].name.toLowerCase() as YokaiName;
 import SplashScreen from "@/components/SplashScreen";
 import Settings from "@/components/Settings";
 import SuzuIcon from "@/components/icons/SuzuIcon";
@@ -66,6 +80,21 @@ export default function GameCanvas() {
   const [gameOver, setGameOver] = useState(false);
   const [finalScore, setFinalScore] = useState(0);
   const [reached, setReached] = useState<number[]>([]);
+  // Mirror of `reached` for use inside the engine's onGameOver closure.
+  // The engine's callback is captured at mount time in the engine-init
+  // useEffect, so it can't read the latest React state directly; a ref
+  // gives it the current value at fire-time without re-binding.
+  const reachedRef = useRef<number[]>([]);
+  // 3.5L — ceremony eligibility resolved once on game-over and cached
+  // here so re-renders don't re-roll the tier. null means "no ceremony
+  // this run" (below threshold or no reached yokai); the player then
+  // sees the existing Restart panel + motivational message.
+  const [ceremonyRun, setCeremonyRun] = useState<{
+    yokai: YokaiName;
+    tier: Tier;
+    score: number;
+  } | null>(null);
+  const [ceremonyDismissed, setCeremonyDismissed] = useState(false);
   const [unlockedIds, setUnlockedIds] = useState<number[]>(() => {
     if (typeof window === "undefined") return [1];
     try {
@@ -161,8 +190,36 @@ export default function GameCanvas() {
         onGameOver: (final) => {
           setFinalScore(final);
           setGameOver(true);
+          setCeremonyDismissed(false);
+          // Eligibility: ≥ MIN_MINT_SCORE and the player merged at
+          // least one yokai (defensive — at 500+ they almost certainly
+          // have, but better than crashing on Math.max(...[])).
+          const reachedNow = reachedRef.current;
+          if (final < MIN_MINT_SCORE || reachedNow.length === 0) {
+            setCeremonyRun(null);
+            return;
+          }
+          // Fresh seed per game-over → tier re-rolls across runs even
+          // for identical scores. tierFromScore returns null below
+          // MIN_MINT_SCORE; we've already guarded, so the second-pass
+          // null check is just type-narrowing.
+          const seed = `${final}-${Date.now()}`;
+          const tier = tierFromScore(final, seed);
+          if (!tier) {
+            setCeremonyRun(null);
+            return;
+          }
+          const highestId = Math.max(...reachedNow);
+          setCeremonyRun({
+            yokai: yokaiNameFromId(highestId),
+            tier,
+            score: final,
+          });
         },
-        onReachedChange: (ids) => setReached(ids),
+        onReachedChange: (ids) => {
+          setReached(ids);
+          reachedRef.current = ids;
+        },
         onUnlockChange: (ids) => setUnlockedIds(ids),
       });
       engineRef.current = engine;
@@ -304,6 +361,8 @@ export default function GameCanvas() {
     engineRef.current?.restart();
     setGameOver(false);
     setFinalScore(0);
+    setCeremonyRun(null);
+    setCeremonyDismissed(false);
   };
 
   // Session watcher: when (connected + correct chain) transitions to
@@ -537,7 +596,31 @@ export default function GameCanvas() {
               "0 10px 30px rgba(var(--black-rgb) / 0.55), 0 0 0 1px rgba(var(--gold-rgb) / 0.15)",
           }}
         >
-          {gameOver && (
+          {/* 3.5L — eligible run: ceremony overlay on top of everything.
+              Below threshold or after dismiss, fall through to the
+              existing Restart panel below. */}
+          {gameOver && ceremonyRun && !ceremonyDismissed && (
+            <div className={gcStyles.ceremonyOverlay} data-game-overlay>
+              <MintCeremony
+                yokai={ceremonyRun.yokai}
+                tier={ceremonyRun.tier}
+                score={ceremonyRun.score}
+                cardWidth={190}
+                soundEnabled={sfxEnabled}
+                onClose={() => setCeremonyDismissed(true)}
+              />
+              <button
+                type="button"
+                className={gcStyles.ceremonyDismissBtn}
+                onClick={() => setCeremonyDismissed(true)}
+                aria-label="Skip ceremony"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {gameOver && (!ceremonyRun || ceremonyDismissed) && (
             <div
               data-game-overlay
               className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm"
@@ -564,6 +647,17 @@ export default function GameCanvas() {
                   <div className="kami-serif text-[0.65rem] tracking-wider text-(--wood-light)/60 mt-2">
                     Best: {highScore}
                   </div>
+                  {/* 3.5L — motivational message only when below the
+                      mint threshold (and ceremony wasn't dismissed; the
+                      gate above ensures that). */}
+                  {finalScore < MIN_MINT_SCORE && !ceremonyDismissed && (
+                    <div className={gcStyles.motivationalMessage}>
+                      Score {MIN_MINT_SCORE}+ to earn an NFT
+                      <span className={gcStyles.motivationalJp}>
+                        もう一度 · Try again
+                      </span>
+                    </div>
+                  )}
                   <div className="h-px bg-gradient-to-r from-transparent via-(--gold-700)/50 to-transparent my-4" />
                   <button
                     data-game-overlay
