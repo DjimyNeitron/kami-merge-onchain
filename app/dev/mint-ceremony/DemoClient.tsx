@@ -206,7 +206,12 @@ export default function DemoClient() {
               yokai={selectedYokai}
               tier={effectiveTier}
               score={score}
-              cardWidth={280}
+              /* 3.5f: 280 → 190. A 280px card is 392px tall — taller than
+               * the gap between the header and the 58% tier banner, so it
+               * couldn't be lowered for header breathing room without
+               * overlapping the banner. 190px (≈266px tall) fits the band
+               * with comfortable clearance both sides. */
+              cardWidth={190}
               soundEnabled={soundEnabled}
               onPhaseChange={handlePhaseChange}
             />
