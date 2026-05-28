@@ -689,52 +689,61 @@ export default function GameCanvas() {
         </div>
       </div>
 
-      {/* Merge chain preview — all 11 yokai, lit when reached */}
-      <div
-        className="shrink-0 flex items-center justify-between w-full px-2 py-1 rounded-md score-plate"
-        style={{ maxWidth: CANVAS_WIDTH, gap: 2 }}
-      >
-        {YOKAI_CHAIN.map((y) => {
-          const isReached = reachedSet.has(y.id);
-          return (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={y.id}
-              src={y.sprite}
-              alt={y.name}
-              title={y.name}
-              style={{
-                width: 24,
-                height: 24,
-                objectFit: "contain",
-                opacity: isReached ? 1 : 0.25,
-                filter: isReached
-                  ? "drop-shadow(0 0 4px rgba(var(--gold-rgb) / 0.5))"
-                  : "grayscale(1) brightness(0.6)",
-                transition: "opacity 0.3s ease, filter 0.3s ease",
-              }}
-            />
-          );
-        })}
-      </div>
-
-      {/* Restart + current-yokai label */}
-      <div className="shrink-0 flex flex-col items-center gap-1 pb-1">
-        <button
-          onClick={handleRestart}
-          type="button"
-          className="wood-btn kami-serif px-4 py-1 rounded-md text-xs font-semibold tracking-wider"
-          style={{ touchAction: "manipulation" }}
-        >
-          Restart
-        </button>
-        {current && (
-          <div className="kami-serif text-[0.65rem] text-(--gold-200)/60 tracking-wider">
-            Dropping:{" "}
-            <span className="text-(--gold-50)/80">{current.name}</span>
+      {/* 3.5L — bottom in-play HUD (merge chain + mini Restart + Dropping
+          label) is hidden on game-over so the only restart affordance is
+          the wood-scroll panel's button (or, for an eligible run, the
+          ceremony's own controls). The persistent top header — title /
+          score / high / wallet — stays visible. */}
+      {!gameOver && (
+        <>
+          {/* Merge chain preview — all 11 yokai, lit when reached */}
+          <div
+            className="shrink-0 flex items-center justify-between w-full px-2 py-1 rounded-md score-plate"
+            style={{ maxWidth: CANVAS_WIDTH, gap: 2 }}
+          >
+            {YOKAI_CHAIN.map((y) => {
+              const isReached = reachedSet.has(y.id);
+              return (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={y.id}
+                  src={y.sprite}
+                  alt={y.name}
+                  title={y.name}
+                  style={{
+                    width: 24,
+                    height: 24,
+                    objectFit: "contain",
+                    opacity: isReached ? 1 : 0.25,
+                    filter: isReached
+                      ? "drop-shadow(0 0 4px rgba(var(--gold-rgb) / 0.5))"
+                      : "grayscale(1) brightness(0.6)",
+                    transition: "opacity 0.3s ease, filter 0.3s ease",
+                  }}
+                />
+              );
+            })}
           </div>
-        )}
-      </div>
+
+          {/* Restart + current-yokai label */}
+          <div className="shrink-0 flex flex-col items-center gap-1 pb-1">
+            <button
+              onClick={handleRestart}
+              type="button"
+              className="wood-btn kami-serif px-4 py-1 rounded-md text-xs font-semibold tracking-wider"
+              style={{ touchAction: "manipulation" }}
+            >
+              Restart
+            </button>
+            {current && (
+              <div className="kami-serif text-[0.65rem] text-(--gold-200)/60 tracking-wider">
+                Dropping:{" "}
+                <span className="text-(--gold-50)/80">{current.name}</span>
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {showSettings && (
         <Settings
