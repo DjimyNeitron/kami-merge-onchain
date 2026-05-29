@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<title>Kami Merge — NFT Gallery</title>
+<style>
+body { background:#0f0f1e; color:#f5e6c8;
+       font-family:ui-monospace,monospace; margin:0; padding:32px 24px; }
+h1 { color:#c8a04c; letter-spacing:6px; font-weight:300;
+      text-align:center; margin:0 0 4px; }
+.subtitle { text-align:center; opacity:0.6; font-size:12px;
+             margin-bottom:48px; letter-spacing:1.5px; }
+.yokai { margin-bottom:48px; }
+.yokai h2 { color:#c8a04c; font-size:16px; letter-spacing:3px;
+             margin:0 0 16px; padding-bottom:8px;
+             border-bottom:1px solid rgba(200,160,76,0.2); }
+.yokai .kanji { font-size:18px; margin-left:12px; opacity:0.8;
+                 font-family:'Hiragino Mincho ProN', serif; }
+.row { display:grid; grid-template-columns:repeat(4, 1fr);
+        gap:16px; max-width:1100px; margin:0 auto; }
+.cell { display:flex; flex-direction:column;
+         align-items:center; gap:8px; }
+.card-wrap { width:100%; aspect-ratio: 5/7;
+              background:repeating-conic-gradient(
+                #1a1a2e 0% 25%, #0f0f1e 0% 50%) 50% 50% / 16px 16px;
+              border-radius:8px; overflow:hidden;
+              display:flex; align-items:center; justify-content:center; }
+.card-wrap img { width:100%; height:100%; object-fit:contain;
+                  display:block; }
+.missing { color:rgba(245,230,200,0.3); font-size:10px;
+            letter-spacing:2px; }
+.caption { display:flex; gap:8px; font-size:9px;
+            letter-spacing:1.5px; }
+.tier { padding:2px 6px; border-radius:3px; font-weight:600; }
+.tier.common    { color:rgb(180,150,90); border:1px solid rgba(180,150,90,0.4); }
+.tier.rare      { color:rgb(210,175,105); border:1px solid rgba(210,175,105,0.4); }
+.tier.epic      { color:rgb(235,195,110); border:1px solid rgba(235,195,110,0.4); }
+.tier.legendary { color:rgb(255,218,110); border:1px solid rgba(255,218,110,0.5); }
+.state { color:rgba(245,230,200,0.4); }
+</style></head>
+<body>
+<h1>KAMI MERGE — NFT GALLERY</h1>
+<div class="subtitle">44/44 static · 44/44 animated · checkerboard background shows transparent corners</div>
+
+<section class="yokai">
+  <h2>KODAMA <span class="kanji">木霊</span></h2>
+  <div class="row">
+<div class="cell">
+  <div class="card-wrap"><img src="animated/kodama_common.webp" alt="kodama_common"></div>
+  <div class="caption">
+    <span class="tier common">COMMON</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/kodama_rare.webp" alt="kodama_rare"></div>
+  <div class="caption">
+    <span class="tier rare">RARE</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/kodama_epic.webp" alt="kodama_epic"></div>
+  <div class="caption">
+    <span class="tier epic">EPIC</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/kodama_legendary.webp" alt="kodama_legendary"></div>
+  <div class="caption">
+    <span class="tier legendary">LEGENDARY</span>
+    <span class="state">static+anim</span>
+  </div>
+</div></div>
+</section>
+<section class="yokai">
+  <h2>HITODAMA <span class="kanji">人魂</span></h2>
+  <div class="row">
+<div class="cell">
+  <div class="card-wrap"><img src="animated/hitodama_common.webp" alt="hitodama_common"></div>
+  <div class="caption">
+    <span class="tier common">COMMON</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/hitodama_rare.webp" alt="hitodama_rare"></div>
+  <div class="caption">
+    <span class="tier rare">RARE</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/hitodama_epic.webp" alt="hitodama_epic"></div>
+  <div class="caption">
+    <span class="tier epic">EPIC</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/hitodama_legendary.webp" alt="hitodama_legendary"></div>
+  <div class="caption">
+    <span class="tier legendary">LEGENDARY</span>
+    <span class="state">static+anim</span>
+  </div>
+</div></div>
+</section>
+<section class="yokai">
+  <h2>TANUKI <span class="kanji">狸</span></h2>
+  <div class="row">
+<div class="cell">
+  <div class="card-wrap"><img src="animated/tanuki_common.webp" alt="tanuki_common"></div>
+  <div class="caption">
+    <span class="tier common">COMMON</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/tanuki_rare.webp" alt="tanuki_rare"></div>
+  <div class="caption">
+    <span class="tier rare">RARE</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/tanuki_epic.webp" alt="tanuki_epic"></div>
+  <div class="caption">
+    <span class="tier epic">EPIC</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/tanuki_legendary.webp" alt="tanuki_legendary"></div>
+  <div class="caption">
+    <span class="tier legendary">LEGENDARY</span>
+    <span class="state">static+anim</span>
+  </div>
+</div></div>
+</section>
+<section class="yokai">
+  <h2>KAPPA <span class="kanji">河童</span></h2>
+  <div class="row">
+<div class="cell">
+  <div class="card-wrap"><img src="animated/kappa_common.webp" alt="kappa_common"></div>
+  <div class="caption">
+    <span class="tier common">COMMON</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/kappa_rare.webp" alt="kappa_rare"></div>
+  <div class="caption">
+    <span class="tier rare">RARE</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/kappa_epic.webp" alt="kappa_epic"></div>
+  <div class="caption">
+    <span class="tier epic">EPIC</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/kappa_legendary.webp" alt="kappa_legendary"></div>
+  <div class="caption">
+    <span class="tier legendary">LEGENDARY</span>
+    <span class="state">static+anim</span>
+  </div>
+</div></div>
+</section>
+<section class="yokai">
+  <h2>KITSUNE <span class="kanji">狐</span></h2>
+  <div class="row">
+<div class="cell">
+  <div class="card-wrap"><img src="animated/kitsune_common.webp" alt="kitsune_common"></div>
+  <div class="caption">
+    <span class="tier common">COMMON</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/kitsune_rare.webp" alt="kitsune_rare"></div>
+  <div class="caption">
+    <span class="tier rare">RARE</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/kitsune_epic.webp" alt="kitsune_epic"></div>
+  <div class="caption">
+    <span class="tier epic">EPIC</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/kitsune_legendary.webp" alt="kitsune_legendary"></div>
+  <div class="caption">
+    <span class="tier legendary">LEGENDARY</span>
+    <span class="state">static+anim</span>
+  </div>
+</div></div>
+</section>
+<section class="yokai">
+  <h2>JOROGUMO <span class="kanji">絡新婦</span></h2>
+  <div class="row">
+<div class="cell">
+  <div class="card-wrap"><img src="animated/jorogumo_common.webp" alt="jorogumo_common"></div>
+  <div class="caption">
+    <span class="tier common">COMMON</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/jorogumo_rare.webp" alt="jorogumo_rare"></div>
+  <div class="caption">
+    <span class="tier rare">RARE</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/jorogumo_epic.webp" alt="jorogumo_epic"></div>
+  <div class="caption">
+    <span class="tier epic">EPIC</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/jorogumo_legendary.webp" alt="jorogumo_legendary"></div>
+  <div class="caption">
+    <span class="tier legendary">LEGENDARY</span>
+    <span class="state">static+anim</span>
+  </div>
+</div></div>
+</section>
+<section class="yokai">
+  <h2>TENGU <span class="kanji">天狗</span></h2>
+  <div class="row">
+<div class="cell">
+  <div class="card-wrap"><img src="animated/tengu_common.webp" alt="tengu_common"></div>
+  <div class="caption">
+    <span class="tier common">COMMON</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/tengu_rare.webp" alt="tengu_rare"></div>
+  <div class="caption">
+    <span class="tier rare">RARE</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/tengu_epic.webp" alt="tengu_epic"></div>
+  <div class="caption">
+    <span class="tier epic">EPIC</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/tengu_legendary.webp" alt="tengu_legendary"></div>
+  <div class="caption">
+    <span class="tier legendary">LEGENDARY</span>
+    <span class="state">static+anim</span>
+  </div>
+</div></div>
+</section>
+<section class="yokai">
+  <h2>ONI <span class="kanji">鬼</span></h2>
+  <div class="row">
+<div class="cell">
+  <div class="card-wrap"><img src="animated/oni_common.webp" alt="oni_common"></div>
+  <div class="caption">
+    <span class="tier common">COMMON</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/oni_rare.webp" alt="oni_rare"></div>
+  <div class="caption">
+    <span class="tier rare">RARE</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/oni_epic.webp" alt="oni_epic"></div>
+  <div class="caption">
+    <span class="tier epic">EPIC</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/oni_legendary.webp" alt="oni_legendary"></div>
+  <div class="caption">
+    <span class="tier legendary">LEGENDARY</span>
+    <span class="state">static+anim</span>
+  </div>
+</div></div>
+</section>
+<section class="yokai">
+  <h2>RAIJIN <span class="kanji">雷神</span></h2>
+  <div class="row">
+<div class="cell">
+  <div class="card-wrap"><img src="animated/raijin_common.webp" alt="raijin_common"></div>
+  <div class="caption">
+    <span class="tier common">COMMON</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/raijin_rare.webp" alt="raijin_rare"></div>
+  <div class="caption">
+    <span class="tier rare">RARE</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/raijin_epic.webp" alt="raijin_epic"></div>
+  <div class="caption">
+    <span class="tier epic">EPIC</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/raijin_legendary.webp" alt="raijin_legendary"></div>
+  <div class="caption">
+    <span class="tier legendary">LEGENDARY</span>
+    <span class="state">static+anim</span>
+  </div>
+</div></div>
+</section>
+<section class="yokai">
+  <h2>RYUJIN <span class="kanji">龍神</span></h2>
+  <div class="row">
+<div class="cell">
+  <div class="card-wrap"><img src="animated/ryujin_common.webp" alt="ryujin_common"></div>
+  <div class="caption">
+    <span class="tier common">COMMON</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/ryujin_rare.webp" alt="ryujin_rare"></div>
+  <div class="caption">
+    <span class="tier rare">RARE</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/ryujin_epic.webp" alt="ryujin_epic"></div>
+  <div class="caption">
+    <span class="tier epic">EPIC</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/ryujin_legendary.webp" alt="ryujin_legendary"></div>
+  <div class="caption">
+    <span class="tier legendary">LEGENDARY</span>
+    <span class="state">static+anim</span>
+  </div>
+</div></div>
+</section>
+<section class="yokai">
+  <h2>AMATERASU <span class="kanji">天照</span></h2>
+  <div class="row">
+<div class="cell">
+  <div class="card-wrap"><img src="animated/amaterasu_common.webp" alt="amaterasu_common"></div>
+  <div class="caption">
+    <span class="tier common">COMMON</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/amaterasu_rare.webp" alt="amaterasu_rare"></div>
+  <div class="caption">
+    <span class="tier rare">RARE</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/amaterasu_epic.webp" alt="amaterasu_epic"></div>
+  <div class="caption">
+    <span class="tier epic">EPIC</span>
+    <span class="state">static+anim</span>
+  </div>
+</div>
+<div class="cell">
+  <div class="card-wrap"><img src="animated/amaterasu_legendary.webp" alt="amaterasu_legendary"></div>
+  <div class="caption">
+    <span class="tier legendary">LEGENDARY</span>
+    <span class="state">static+anim</span>
+  </div>
+</div></div>
+</section>
+</body></html>
