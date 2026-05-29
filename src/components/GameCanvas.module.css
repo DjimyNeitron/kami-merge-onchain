@@ -1,0 +1,79 @@
+/* GameCanvas.module.css — scoped styles for the ceremony wire-up.
+ *
+ * The rest of GameCanvas uses Tailwind utility classes; this module
+ * only carries the new layers introduced in stage 3.5L (the ceremony
+ * overlay container, its skip button, and the below-threshold
+ * motivational message under the wood-scroll Restart panel). Keeping
+ * them in a module avoids polluting the global stylesheet and lets us
+ * use unique keyframe names without colliding with Tailwind utilities
+ * or the MintCeremony module. */
+
+.ceremonyOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 25; /* above the existing game-over panel (z 20) */
+  animation: ceremony-overlay-in 0.3s ease-out;
+}
+
+@keyframes ceremony-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.ceremonyDismissBtn {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 22, 38, 0.6);
+  border: 1px solid rgba(245, 230, 200, 0.3);
+  border-radius: 50%;
+  color: var(--gold-50, #f5e6c8);
+  font-size: 20px;
+  font-weight: 300;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 26;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.ceremonyDismissBtn:hover {
+  background: rgba(15, 22, 38, 0.8);
+  border-color: rgba(245, 230, 200, 0.5);
+}
+.ceremonyDismissBtn:active {
+  transform: scale(0.95);
+}
+
+/* Motivational message rendered below the Best line in the existing
+ * wood-scroll Restart panel when finalScore < MIN_MINT_SCORE. */
+.motivationalMessage {
+  margin-top: 12px;
+  text-align: center;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 13px;
+  color: var(--gold-200, #ebc36e);
+  opacity: 0.85;
+  letter-spacing: 1px;
+}
+.motivationalJp {
+  display: block;
+  margin-top: 4px;
+  font-family:
+    "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", serif;
+  font-size: 11px;
+  color: var(--gold-50, #f5e6c8);
+  opacity: 0.6;
+  letter-spacing: 3px;
+}
