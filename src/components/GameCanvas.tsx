@@ -11,6 +11,7 @@ import {
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/config/constants";
 import MintCeremony from "@/components/MintCeremony";
 import { tierFromScore, MIN_MINT_SCORE } from "@/lib/tierFromScore";
+import { yokaiScale } from "@/config/yokaiDisplayScale";
 import gcStyles from "./GameCanvas.module.css";
 
 // Map a numeric YOKAI_CHAIN id (1-11, as tracked by engine.reached) to
@@ -670,7 +671,7 @@ export default function GameCanvas() {
                       handleRestart();
                     }}
                     type="button"
-                    className="wood-btn kami-serif px-6 py-2 rounded-md text-sm font-semibold tracking-wider cursor-pointer"
+                    className="btn-on-light px-6 py-2 text-sm font-semibold"
                     style={{
                       touchAction: "manipulation",
                       pointerEvents: "auto",
@@ -714,6 +715,9 @@ export default function GameCanvas() {
                     width: 24,
                     height: 24,
                     objectFit: "contain",
+                    /* Gallery-only content-fill compensation. */
+                    transform: `scale(${yokaiScale(y.name)})`,
+                    transformOrigin: "center",
                     opacity: isReached ? 1 : 0.25,
                     filter: isReached
                       ? "drop-shadow(0 0 4px rgba(var(--gold-rgb) / 0.5))"
@@ -730,7 +734,7 @@ export default function GameCanvas() {
             <button
               onClick={handleRestart}
               type="button"
-              className="wood-btn kami-serif px-4 py-1 rounded-md text-xs font-semibold tracking-wider"
+              className="btn-on-light px-4 py-1 text-xs font-semibold"
               style={{ touchAction: "manipulation" }}
             >
               Restart

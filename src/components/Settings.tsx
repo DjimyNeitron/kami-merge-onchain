@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { YOKAI_CHAIN } from "@/config/yokai";
+import { yokaiScale } from "@/config/yokaiDisplayScale";
 import YokaiDetailCard from "@/components/YokaiDetailCard";
 import SuzuIcon from "@/components/icons/SuzuIcon";
 import TaikoIcon from "@/components/icons/TaikoIcon";
@@ -297,6 +298,9 @@ export default function Settings({
                           width: 40,
                           height: 40,
                           objectFit: "contain",
+                          /* Gallery-only content-fill compensation. */
+                          transform: `scale(${yokaiScale(y.name)})`,
+                          transformOrigin: "center",
                           opacity: isUnlocked ? 1 : 0.3,
                           filter: isUnlocked
                             ? "drop-shadow(0 0 3px rgba(var(--gold-rgb) / 0.5))"
@@ -341,7 +345,7 @@ export default function Settings({
                   onClose();
                 }}
                 type="button"
-                className="wood-btn px-6 py-2 rounded-md text-base tracking-wider flex flex-col items-center leading-tight"
+                className="btn-on-light px-6 py-2 text-base flex flex-col items-center leading-tight"
                 style={{ touchAction: "manipulation" }}
               >
                 <span>Close</span>

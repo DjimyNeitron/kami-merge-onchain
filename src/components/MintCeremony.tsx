@@ -415,14 +415,14 @@ export default function MintCeremony({
           a light ghost button (secondary, no urgency) on success. */}
       <div className={styles.mintButtonContainer}>
         {phase === "success" ? (
-          <button type="button" className={styles.ghostBtn} onClick={handleButton}>
+          <button type="button" className={`btn-ghost ${styles.ghostBtn}`} onClick={handleButton}>
             Visit the Shrine
           </button>
         ) : (
           <>
             <button
               type="button"
-              className={`wood-btn ${styles.mintButton}`}
+              className={`btn-on-dark ${styles.mintButton}`}
               onClick={handleButton}
               disabled={phase === "minting"}
             >

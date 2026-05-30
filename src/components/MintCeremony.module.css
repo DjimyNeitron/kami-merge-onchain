@@ -338,16 +338,15 @@
   opacity: 1;
   pointer-events: auto;
 }
+/* Bind-the-Spirit sizing + pulse ring. Family DNA (font/border/radius/
+ * tracking/active-scale) lives on the global .btn-on-dark. Only the
+ * ceremony-specific size + uppercase + pulse glow stay here. */
 .mintButton {
   position: relative;
-  font-family: Georgia, "Times New Roman", serif;
   font-size: 15px;
   font-weight: 700;
-  letter-spacing: var(--tracking-extra);
   text-transform: uppercase;
   padding: 13px 32px;
-  border-radius: 6px;
-  cursor: pointer;
 }
 .mintButton::after {
   content: "";
@@ -538,29 +537,13 @@
 }
 
 /* ─── Ghost button (secondary action on success) ─────────────────── */
+/* Visit-the-Shrine sizing only. Family DNA (transparent fill, gold
+ * border, font, tracking, active scale) lives on the global .btn-ghost. */
 .ghostBtn {
-  background: transparent;
-  border: 1px solid rgba(245, 230, 200, 0.4);
-  color: var(--gold-50);
   padding: 10px 32px;
-  font-family: Georgia, "Times New Roman", serif;
   font-size: 14px;
   font-weight: 500;
-  letter-spacing: 3px;
-  border-radius: 4px;
-  cursor: pointer;
   white-space: nowrap;
-  transition:
-    border-color 0.3s ease,
-    background 0.3s ease,
-    transform 0.15s ease;
-}
-.ghostBtn:hover {
-  border-color: var(--gold-200);
-  background: rgba(245, 230, 200, 0.05);
-}
-.ghostBtn:active {
-  transform: scale(0.98);
 }
 
 /* ─── Keyframes ──────────────────────────────────────────────────── */
