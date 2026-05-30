@@ -365,7 +365,11 @@
 .mintSub {
   margin: 10px 0 0;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 12px;
+  /* 11px (was 12px) + nowrap so the "A blessing — only the network fee"
+   * subtitle stays on a single line at a 390 px viewport. The JP line
+   * 御祭 · 無料 below stays as-is (shorter, no wrap risk). */
+  font-size: 11px;
+  white-space: nowrap;
   color: var(--gold-50);
   opacity: 0.6;
   letter-spacing: var(--tracking-extra);

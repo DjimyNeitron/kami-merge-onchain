@@ -11,7 +11,6 @@ import {
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/config/constants";
 import MintCeremony from "@/components/MintCeremony";
 import { tierFromScore, MIN_MINT_SCORE } from "@/lib/tierFromScore";
-import { yokaiScale } from "@/config/yokaiDisplayScale";
 import gcStyles from "./GameCanvas.module.css";
 
 // Map a numeric YOKAI_CHAIN id (1-11, as tracked by engine.reached) to
@@ -715,9 +714,6 @@ export default function GameCanvas() {
                     width: 24,
                     height: 24,
                     objectFit: "contain",
-                    /* Gallery-only content-fill compensation. */
-                    transform: `scale(${yokaiScale(y.name)})`,
-                    transformOrigin: "center",
                     opacity: isReached ? 1 : 0.25,
                     filter: isReached
                       ? "drop-shadow(0 0 4px rgba(var(--gold-rgb) / 0.5))"

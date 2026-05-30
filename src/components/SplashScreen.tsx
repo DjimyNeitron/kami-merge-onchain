@@ -36,7 +36,6 @@ import { useAccount, useDisconnect, useSwitchChain } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { soneium } from "viem/chains";
 import { YOKAI_CHAIN } from "@/config/yokai";
-import { yokaiScale } from "@/config/yokaiDisplayScale";
 import MonIcon from "@/components/icons/MonIcon";
 import { useDevSkipWallet } from "@/hooks/useDevSkipWallet";
 import { useActualChainId } from "@/hooks/useActualChainId";
@@ -368,11 +367,6 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
                 width: 24,
                 height: 24,
                 objectFit: "contain",
-                /* Gallery-only content-fill compensation — see
-                 * src/config/yokaiDisplayScale.ts. The layout box stays
-                 * 24×24; only the rendered image scales. */
-                transform: `scale(${yokaiScale(y.name)})`,
-                transformOrigin: "center",
                 filter: "drop-shadow(0 0 4px rgba(var(--gold-rgb) / 0.4))",
               }}
             />
