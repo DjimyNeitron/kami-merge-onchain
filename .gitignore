@@ -45,3 +45,5 @@ kami-merge-nft-source/
 nft_source_clean/
 audit_for_claude_*.md
 nft_assets_master/
+public/kody*.png
+public/yokai/tanuki_sprite_cropped.png

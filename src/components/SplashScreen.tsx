@@ -459,11 +459,8 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
                   handleSwitchChain();
                 }}
                 disabled={isSwitching}
-                className="splash-pulse kami-serif text-(--gold-50) text-base sm:text-lg font-semibold tracking-wider px-6 py-2.5 rounded-md border border-(--gold-200)/70 hover:bg-(--gold-200)/10 transition-colors disabled:opacity-60 disabled:animation-none disabled:cursor-wait"
-                style={{
-                  touchAction: "manipulation",
-                  boxShadow: "0 0 14px rgba(var(--gold-rgb) / 0.18)",
-                }}
+                className="btn-on-dark splash-pulse text-base sm:text-lg font-semibold px-6 py-2.5 disabled:opacity-60 disabled:animation-none disabled:cursor-wait"
+                style={{ touchAction: "manipulation" }}
               >
                 {isSwitching ? "Switching…" : "Switch to Soneium"}
               </button>
@@ -511,11 +508,8 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
                   e.preventDefault();
                   onStart();
                 }}
-                className="splash-pulse kami-serif text-(--gold-50) text-lg sm:text-xl font-semibold tracking-wider px-8 py-3 rounded-md border border-(--gold-200)/70 hover:bg-(--gold-200)/10 transition-colors"
-                style={{
-                  touchAction: "manipulation",
-                  boxShadow: "0 0 14px rgba(var(--gold-rgb) / 0.18)",
-                }}
+                className="btn-on-dark splash-pulse text-lg sm:text-xl font-semibold px-8 py-3"
+                style={{ touchAction: "manipulation" }}
               >
                 ~ Tap to Start ~
               </button>

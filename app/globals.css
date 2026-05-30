@@ -318,11 +318,83 @@ button {
     inset 0 1px 0 rgba(245 230 200 / 0.2); /* gold-50 alpha — no rgb triple token */
 }
 
-/* Wooden plaque button — was 5 hardcoded gradient stops across base/hover/active.
- * Now: single gradient (wood-light → wood-dark) plus brightness() filters for
- * state. The :hover ~+18% lift and :active ~-45% drop visually match the old
- * hand-tuned colours within ~5% perceptual error (verified). One source of
- * truth, far easier to retheme. */
+/* ─── Button family — shared DNA, two contextual variants + ghost.
+ *
+ * One identity (gold border, serif, --tracking-spaced, raised shadow,
+ * :active scale(0.97)) across all CTAs; the fill is what changes by
+ * context:
+ *   .btn-on-light  on parchment panels (Restart, Close)  — wood-gradient
+ *   .btn-on-dark   on dark scenes (Bind, Tap to Start)   — parchment-gold
+ *   .btn-ghost     tertiary on dark scenes (Visit Shrine) — transparent
+ *
+ * Sizing (padding / font-size) is left to the consumer; only the DNA
+ * is global. .wood-btn below is preserved unchanged so legacy consumers
+ * keep working; new consumers should use .btn-on-light. */
+
+.btn-on-light,
+.btn-on-dark,
+.btn-ghost {
+  font-family:
+    Georgia, "Times New Roman", "Hiragino Sans", "Yu Gothic", serif;
+  letter-spacing: var(--tracking-spaced);
+  border: 1px solid var(--gold-200);
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  box-shadow:
+    inset 0 1px 0 rgba(var(--gold-rgb) / 0.15),
+    0 2px 6px rgba(var(--black-rgb) / 0.45);
+  transition:
+    transform 0.12s ease,
+    filter 0.15s ease,
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+.btn-on-light:active,
+.btn-on-dark:active,
+.btn-ghost:active {
+  transform: scale(0.97);
+}
+
+.btn-on-light {
+  background: linear-gradient(
+    to bottom,
+    var(--wood-light) 0%,
+    var(--wood-dark) 100%
+  );
+  color: var(--gold-200);
+}
+.btn-on-light:hover {
+  filter: brightness(1.15);
+}
+
+.btn-on-dark {
+  background: linear-gradient(
+    to bottom,
+    var(--gold-50) 0%,
+    #e8d4a8 100%
+  );
+  color: var(--wood-dark);
+  border-color: var(--gold-700);
+}
+.btn-on-dark:hover {
+  filter: brightness(1.05);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--gold-50);
+  border-color: rgba(var(--gold-rgb) / 0.4);
+  box-shadow: none;
+}
+.btn-ghost:hover {
+  background: rgba(var(--gold-rgb) / 0.08);
+  border-color: var(--gold-200);
+}
+
+/* Wooden plaque button — kept as the legacy class for any consumer that
+ * still references it directly. Behaviourally close to .btn-on-light. */
 .wood-btn {
   background: linear-gradient(to bottom, var(--wood-light) 0%, var(--wood-dark) 100%);
   color: var(--gold-200);

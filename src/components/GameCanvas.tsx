@@ -670,7 +670,7 @@ export default function GameCanvas() {
                       handleRestart();
                     }}
                     type="button"
-                    className="wood-btn kami-serif px-6 py-2 rounded-md text-sm font-semibold tracking-wider cursor-pointer"
+                    className="btn-on-light px-6 py-2 text-sm font-semibold"
                     style={{
                       touchAction: "manipulation",
                       pointerEvents: "auto",
@@ -730,7 +730,7 @@ export default function GameCanvas() {
             <button
               onClick={handleRestart}
               type="button"
-              className="wood-btn kami-serif px-4 py-1 rounded-md text-xs font-semibold tracking-wider"
+              className="btn-on-light px-4 py-1 text-xs font-semibold"
               style={{ touchAction: "manipulation" }}
             >
               Restart

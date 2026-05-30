@@ -341,7 +341,7 @@ export default function Settings({
                   onClose();
                 }}
                 type="button"
-                className="wood-btn px-6 py-2 rounded-md text-base tracking-wider flex flex-col items-center leading-tight"
+                className="btn-on-light px-6 py-2 text-base flex flex-col items-center leading-tight"
                 style={{ touchAction: "manipulation" }}
               >
                 <span>Close</span>
