@@ -44,9 +44,11 @@
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  /* 3.5f: dimmed further (0.88 → 0.78) to match the in-game scene tone,
-   * with more saturation + contrast to keep the art from going muddy. */
-  filter: saturate(1.18) brightness(0.78) contrast(1.1);
+  /* 3.5g: bg has been per-channel ratio-matched to bg_game's mean RGB
+   * at the asset level (≈54/64/91), so the CSS no longer needs the
+   * aggressive 0.78 darken. Bumped to 0.90 to remove the double-darken
+   * and let the indigo + lantern accents read at their intended depth. */
+  filter: saturate(1.18) brightness(0.90) contrast(1.1);
 }
 .bgOverlay {
   position: absolute;
