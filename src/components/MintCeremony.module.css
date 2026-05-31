@@ -44,24 +44,29 @@
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  /* 3.5f: dimmed further (0.88 → 0.78) to match the in-game scene tone,
-   * with more saturation + contrast to keep the art from going muddy. */
-  filter: saturate(1.18) brightness(0.78) contrast(1.1);
+  /* 3.5h: bg is fully hue+luminance-matched to bg_game (mean RGB
+   * ≈54/64/91) at the asset layer — any global brightness <1 darkens
+   * the ceremony below the in-play scene that's rendered raw. Drop the
+   * knockdown entirely; .bgOverlay handles local text legibility. */
+  filter: saturate(1.18) brightness(1.0) contrast(1.1);
 }
 .bgOverlay {
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  /* 3.5f: stronger top/bottom band (0.55/0.65) + an always-on radial
-   * vignette so even the middle is gently pulled down. */
+  /* 3.5h: with bg filter brightness lifted to 1.0 (matching bg_game),
+   * the unscrimmed top + bottom bands lose contrast for the gold-serif
+   * header text and the ghost "Visit the Shrine" button. Boost ONLY the
+   * top (0.55 → 0.68) and bottom (0.65 → 0.78) bands; mid + radial
+   * vignette unchanged. */
   background:
     linear-gradient(
       180deg,
-      rgba(6, 10, 22, 0.55) 0%,
+      rgba(6, 10, 22, 0.68) 0%,
       rgba(6, 10, 22, 0.2) 30%,
       rgba(6, 10, 22, 0.2) 70%,
-      rgba(6, 10, 22, 0.65) 100%
+      rgba(6, 10, 22, 0.78) 100%
     ),
     radial-gradient(ellipse at center, transparent 30%, rgba(6, 10, 22, 0.25) 100%);
 }
