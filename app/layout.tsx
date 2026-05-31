@@ -9,7 +9,7 @@ import DebugConsole from "@/components/DebugConsole";
 // (fc:miniapp action.url, fc:miniapp imageUrl, fc:miniapp
 // splashImageUrl, openGraph.url, twitter image, og image) in lockstep.
 const SITE_URL = "https://kami-merge.vercel.app";
-const EMBED_IMAGE = `${SITE_URL}/image.png`;
+const EMBED_IMAGE = `${SITE_URL}/image.jpg`;
 const SOCIAL_TITLE = "Kami Merge - Yokai Puzzle";
 const SOCIAL_DESC =
   "Merge mythical Japanese yokai in a serene physics puzzle. Climb the kami leaderboard on Soneium.";
