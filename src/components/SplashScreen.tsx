@@ -541,10 +541,9 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
       </div>
 
       <div
-        className="w-full flex justify-between items-end px-5"
+        className="w-full flex justify-end items-end px-5"
         style={{ zIndex: 101 }}
       >
-        <span className="kami-serif text-(--gold-200)/60 text-xs">v0.1</span>
         <button
           onClick={(e) => {
             e.stopPropagation();
