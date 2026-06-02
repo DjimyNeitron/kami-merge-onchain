@@ -10,7 +10,7 @@
     "iconUrl": "https://kami-merge.vercel.app/icon.png",
     "homeUrl": "https://kami-merge.vercel.app",
     "imageUrl": "https://kami-merge.vercel.app/hero.webp",
-    "heroImageUrl": "https://kami-merge.vercel.app/hero.webp",
+    "heroImageUrl": "https://kami-merge.vercel.app/og.webp",
     "buttonTitle": "Play",
     "splashImageUrl": "https://kami-merge.vercel.app/splash.png",
     "splashBackgroundColor": "#0F1626",
