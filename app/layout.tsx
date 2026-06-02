@@ -5,11 +5,14 @@ import FarcasterUserBadge from "@/components/FarcasterUserBadge";
 import DebugConsole from "@/components/DebugConsole";
 
 // Canonical site origin — used by every absolute URL in the embed
-// metadata below. Exposing it as a const keeps the four occurrences
-// (fc:miniapp action.url, fc:miniapp imageUrl, fc:miniapp
-// splashImageUrl, openGraph.url, twitter image, og image) in lockstep.
+// metadata below. Exposing it as a const keeps the occurrences
+// (fc:miniapp action.url + imageUrl + splashImageUrl, openGraph.url,
+// twitter image, og image) in lockstep.
 const SITE_URL = "https://kami-merge.vercel.app";
-const EMBED_IMAGE = `${SITE_URL}/image.jpg`;
+// Farcaster embed (fc:miniapp) hero — 3:2 1200x800. OG/Twitter cards
+// use the 1.91:1 1200x630 crop instead (scrapers expect that ratio).
+const EMBED_IMAGE = `${SITE_URL}/hero.webp`;
+const OG_IMAGE = `${SITE_URL}/og.webp`;
 const SOCIAL_TITLE = "Kami Merge - Yokai Puzzle";
 const SOCIAL_DESC =
   "Merge mythical Japanese yokai in a serene physics puzzle. Climb the kami leaderboard on Soneium.";
@@ -59,7 +62,7 @@ export const metadata: Metadata = {
     description: SOCIAL_DESC,
     url: SITE_URL,
     siteName: "Kami Merge",
-    images: [EMBED_IMAGE],
+    images: [OG_IMAGE],
     type: "website",
   },
   // Twitter / X large-image card. Twitter does not fall back to og:*
@@ -69,7 +72,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: SOCIAL_TITLE,
     description: SOCIAL_DESC,
-    images: [EMBED_IMAGE],
+    images: [OG_IMAGE],
   },
   // Pair the modern standardised `mobile-web-app-capable` with the
   // legacy `apple-mobile-web-app-capable`. Chrome / WebKit now emit a
