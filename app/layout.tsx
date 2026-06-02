@@ -9,9 +9,11 @@ import DebugConsole from "@/components/DebugConsole";
 // (fc:miniapp action.url + imageUrl + splashImageUrl, openGraph.url,
 // twitter image, og image) in lockstep.
 const SITE_URL = "https://kami-merge.vercel.app";
-// Farcaster embed (fc:miniapp) hero — 3:2 1200x800. OG/Twitter cards
-// use the 1.91:1 1200x630 crop instead (scrapers expect that ratio).
-const EMBED_IMAGE = `${SITE_URL}/hero.webp`;
+// Farcaster embed (fc:miniapp) image AND OG/Twitter cards both use the
+// 1.91:1 1200x630 composition. The Startale embed frame is 1.91:1, so a
+// 3:2 source got the moon cropped — og.webp is the full uncropped art at
+// the frame's native ratio.
+const EMBED_IMAGE = `${SITE_URL}/og.webp`;
 const OG_IMAGE = `${SITE_URL}/og.webp`;
 const SOCIAL_TITLE = "Kami Merge - Yokai Puzzle";
 const SOCIAL_DESC =
