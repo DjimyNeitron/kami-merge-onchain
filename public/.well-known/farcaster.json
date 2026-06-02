@@ -9,7 +9,8 @@
     "name": "Kami Merge",
     "iconUrl": "https://kami-merge.vercel.app/icon.png",
     "homeUrl": "https://kami-merge.vercel.app",
-    "imageUrl": "https://kami-merge.vercel.app/image.jpg",
+    "imageUrl": "https://kami-merge.vercel.app/hero.webp",
+    "heroImageUrl": "https://kami-merge.vercel.app/hero.webp",
     "buttonTitle": "Play",
     "splashImageUrl": "https://kami-merge.vercel.app/splash.png",
     "splashBackgroundColor": "#0F1626",
@@ -20,6 +21,11 @@
     "tagline": "Drop, merge, summon.",
     "ogTitle": "Kami Merge - Yokai Puzzle",
     "ogDescription": "Merge mythical Japanese yokai in a serene physics puzzle. Climb the kami leaderboard on Soneium.",
-    "ogImageUrl": "https://kami-merge.vercel.app/image.jpg"
+    "ogImageUrl": "https://kami-merge.vercel.app/og.webp"
+  },
+  "startale": {
+    "manifestVersion": "2.3",
+    "featuredBannerImageUrl": "https://kami-merge.vercel.app/banner.webp",
+    "screenCompatibility": { "desktop": false }
   }
 }
