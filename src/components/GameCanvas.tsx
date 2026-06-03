@@ -42,6 +42,7 @@ import {
   useMiniAppContext,
   type FarcasterUser,
 } from "@/hooks/useMiniAppContext";
+import { useLeaderboard } from "@/hooks/useLeaderboard";
 
 // Plain import — previous conditional `require(...)` gated by
 // `process.env.NODE_ENV` broke at browser runtime (Turbopack didn't
@@ -171,6 +172,15 @@ export default function GameCanvas() {
   // Farcaster identity (fid/username/pfp) for the leaderboard submit
   // payload. null in standalone web → submit is skipped (reads still work).
   const { user: fcUser } = useMiniAppContext();
+  // Leaderboard reads (anon, everywhere). Seeded with the player's best
+  // from the submit response so their rank shows without an extra fetch.
+  const {
+    topN: lbTopN,
+    myRank: lbMyRank,
+    myBest: lbMyBest,
+    loading: lbLoading,
+    error: lbError,
+  } = useLeaderboard(fcUser?.fid ?? null, submitResult?.personalBest ?? null);
   const actualChainId = useActualChainId();
   const devSkipWallet = useDevSkipWallet();
   const isValidSession =
@@ -777,6 +787,92 @@ export default function GameCanvas() {
                   <div className="kami-serif text-[0.65rem] tracking-wider text-(--wood-light)/60 mt-2">
                     Best: {highScore}
                   </div>
+
+                  {/* ─── 7A Leaderboard — parchment palette to match the
+                      wood-scroll panel it lives in (wood-dark ink, gold-700
+                      dividers). Renders only inside this game-over block, so
+                      it can't bleed into gameplay. ─────────────────────── */}
+                  <div className="h-px bg-gradient-to-r from-transparent via-(--gold-700)/50 to-transparent my-4" />
+                  <div className="kami-serif text-[0.6rem] uppercase tracking-(--tracking-spaced) text-(--wood-light)/70">
+                    Leaderboard
+                  </div>
+                  <div className="text-[0.6rem] tracking-(--tracking-spaced) text-(--wood-light)/55 mb-2">
+                    番付
+                  </div>
+
+                  {lbError ? (
+                    <div className="kami-serif text-[0.7rem] text-(--wood-light)/60 py-1">
+                      Leaderboard unavailable
+                    </div>
+                  ) : lbLoading && lbTopN.length === 0 ? (
+                    <div className="kami-serif text-[0.7rem] text-(--wood-light)/60 py-1">
+                      Loading…
+                    </div>
+                  ) : lbTopN.length === 0 ? (
+                    <div className="kami-serif text-[0.7rem] text-(--wood-light)/60 py-1">
+                      Be the first to score!
+                    </div>
+                  ) : (
+                    <>
+                      {submitResult?.isNewPersonalBest && (
+                        <div className="kami-serif text-[0.7rem] font-bold tracking-(--tracking-wide) text-(--wood-dark) mb-1">
+                          ★ New personal best! ★
+                        </div>
+                      )}
+                      {lbMyRank != null && (
+                        <div className="kami-serif text-[0.7rem] text-(--wood-dark)/80 mb-2">
+                          Your rank:{" "}
+                          <span className="font-bold">#{lbMyRank}</span>
+                          {lbMyBest != null && (
+                            <span className="text-(--wood-light)/60">
+                              {" "}
+                              · {lbMyBest}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      <div className="max-h-40 overflow-y-auto pr-1 flex flex-col gap-0.5">
+                        {lbTopN.map((entry) => {
+                          const isMe =
+                            fcUser?.fid != null && entry.fid === fcUser.fid;
+                          const name = entry.username
+                            ? `@${entry.username}`
+                            : entry.displayName ?? `#${entry.fid}`;
+                          return (
+                            <div
+                              key={entry.fid}
+                              className={`flex items-center gap-2 px-2 py-1 rounded ${
+                                isMe
+                                  ? "bg-(--gold-200)/15 border border-(--gold-700)/40"
+                                  : ""
+                              }`}
+                            >
+                              <span className="kami-serif text-[0.7rem] font-bold text-(--wood-light)/70 w-5 text-right tabular-nums">
+                                {entry.rank}
+                              </span>
+                              {entry.pfpUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={entry.pfpUrl}
+                                  alt=""
+                                  className="w-5 h-5 rounded-full object-cover shrink-0"
+                                />
+                              ) : (
+                                <div className="w-5 h-5 rounded-full bg-(--wood-light)/20 shrink-0" />
+                              )}
+                              <span className="kami-serif text-[0.72rem] text-(--wood-dark) truncate flex-1 text-left">
+                                {name}
+                              </span>
+                              <span className="kami-serif text-[0.72rem] font-bold text-(--wood-dark) tabular-nums">
+                                {entry.score}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+
                   {/* 3.5L — motivational message only when below the
                       mint threshold (and ceremony wasn't dismissed; the
                       gate above ensures that). */}
