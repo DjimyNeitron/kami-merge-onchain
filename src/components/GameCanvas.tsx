@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { GameEngine } from "@/game/engine";
 import {
   YokaiType,
@@ -37,6 +37,11 @@ import { soneium } from "viem/chains";
 import { useDevSkipWallet } from "@/hooks/useDevSkipWallet";
 import { useActualChainId } from "@/hooks/useActualChainId";
 import { saveTrack, type BgmTrackId } from "@/game/bgmTracks";
+import { sdk } from "@farcaster/miniapp-sdk";
+import {
+  useMiniAppContext,
+  type FarcasterUser,
+} from "@/hooks/useMiniAppContext";
 
 // Plain import — previous conditional `require(...)` gated by
 // `process.env.NODE_ENV` broke at browser runtime (Turbopack didn't
@@ -85,6 +90,25 @@ export default function GameCanvas() {
   // useEffect, so it can't read the latest React state directly; a ref
   // gives it the current value at fire-time without re-binding.
   const reachedRef = useRef<number[]>([]);
+
+  // ─── Leaderboard (Stage 7A) ───────────────────────────────────────
+  // Per-run telemetry the submit needs: a run-start timestamp (→
+  // runDurationMs) and a unique nonce (server replay guard). Both are
+  // re-minted at each run start (splash dismiss + restart).
+  const runStartRef = useRef<number>(0);
+  const nonceRef = useRef<string>("");
+  // The engine's onGameOver closure is captured once at mount, so the
+  // live values the submit needs (Farcaster identity, wallet address)
+  // are mirrored into refs — same stale-closure workaround as reachedRef.
+  const fcUserRef = useRef<FarcasterUser | null>(null);
+  const walletRef = useRef<string | undefined>(undefined);
+  // Submit response, surfaced to the leaderboard UI: seeds the player's
+  // own rank and drives the "new personal best!" flourish. null until a
+  // run is submitted (or in standalone web, where submit is skipped).
+  const [submitResult, setSubmitResult] = useState<{
+    isNewPersonalBest: boolean;
+    personalBest: number | null;
+  } | null>(null);
   // 3.5L — ceremony eligibility resolved once on game-over and cached
   // here so re-renders don't re-roll the tier. null means "no ceremony
   // this run" (below threshold or no reached yokai); the player then
@@ -143,7 +167,10 @@ export default function GameCanvas() {
   // wallet is on a chain not in `config.chains`, defeating the
   // wrong-chain detection. See src/hooks/useActualChainId.ts and the
   // matching write-up in SplashScreen.tsx for the full story.
-  const { isConnected: walletConnected } = useAccount();
+  const { isConnected: walletConnected, address } = useAccount();
+  // Farcaster identity (fid/username/pfp) for the leaderboard submit
+  // payload. null in standalone web → submit is skipped (reads still work).
+  const { user: fcUser } = useMiniAppContext();
   const actualChainId = useActualChainId();
   const devSkipWallet = useDevSkipWallet();
   const isValidSession =
@@ -187,10 +214,13 @@ export default function GameCanvas() {
           setCurrent(c);
           setNext(n);
         },
-        onGameOver: (final) => {
+        onGameOver: (final, mergeCount) => {
           setFinalScore(final);
           setGameOver(true);
           setCeremonyDismissed(false);
+          // Fire-and-forget leaderboard submit — never blocks the
+          // game-over UI; skips itself silently in standalone web.
+          void submitScore(final, mergeCount);
           // Eligibility: ≥ MIN_MINT_SCORE and the player merged at
           // least one yokai (defensive — at 500+ they almost certainly
           // have, but better than crashing on Math.max(...[])).
@@ -356,9 +386,106 @@ export default function GameCanvas() {
     };
   }, []);
 
+  // Keep the refs the engine's mount-captured onGameOver closure reads
+  // in sync with live React state.
+  useEffect(() => {
+    fcUserRef.current = fcUser;
+  }, [fcUser]);
+  useEffect(() => {
+    walletRef.current = address;
+  }, [address]);
+
+  // Anchor a new run: stamp the start time + mint a fresh replay nonce.
+  // Called at every run start (splash dismiss, restart).
+  const beginRun = useCallback(() => {
+    runStartRef.current = performance.now();
+    nonceRef.current =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setSubmitResult(null);
+  }, []);
+
+  // Submit a finished run to the leaderboard. Fire-and-forget: never
+  // blocks or crashes the game-over UI. Skips silently when there's no
+  // Farcaster identity (standalone web) or Quick Auth is unavailable —
+  // the read-only leaderboard still renders for everyone. All inputs are
+  // read from refs so this stays stable and closure-safe.
+  const submitScore = useCallback(
+    async (score: number, mergeCount: number) => {
+      const user = fcUserRef.current;
+      // No fid → not in a Mini App host. Reads still work; skip the write.
+      if (!user || typeof user.fid !== "number") return;
+
+      const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      if (!baseUrl) return;
+
+      const reachedNow = reachedRef.current;
+      const highestYokai = reachedNow.length
+        ? Math.max(0, Math.max(...reachedNow) - 1) // engine ids are 1-based
+        : 0;
+      const runDurationMs = Math.max(
+        0,
+        Math.round(performance.now() - runStartRef.current),
+      );
+
+      // Acquire a Quick Auth JWT (aud = our domain). Throws outside a
+      // host or if the user dismisses — treat as "skip submit".
+      let token: string;
+      try {
+        ({ token } = await sdk.quickAuth.getToken());
+      } catch {
+        return;
+      }
+
+      try {
+        const res = await fetch(`${baseUrl}/functions/v1/submit-score`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            score,
+            runDurationMs,
+            mergeCount,
+            highestYokai,
+            clientNonce: nonceRef.current,
+            walletAddress: walletRef.current,
+            user: {
+              fid: user.fid,
+              username: user.username,
+              displayName: user.displayName,
+              pfpUrl: user.pfpUrl,
+            },
+          }),
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          setSubmitResult({
+            isNewPersonalBest: Boolean(json.isNewPersonalBest),
+            personalBest:
+              typeof json.personalBest === "number" ? json.personalBest : null,
+          });
+        } else {
+          // 409 duplicate / 429 rate-limited are benign; everything else
+          // is logged and ignored. Never throw — game-over UI must stand.
+          console.warn(
+            `[leaderboard] submit-score ${res.status} — leaderboard still renders read-only`,
+          );
+        }
+      } catch (e) {
+        console.warn("[leaderboard] submit-score network error", e);
+      }
+    },
+    [],
+  );
+
   const handleRestart = () => {
     console.log("[GameCanvas] restart clicked");
     engineRef.current?.restart();
+    beginRun();
     setGameOver(false);
     setFinalScore(0);
     setCeremonyRun(null);
@@ -463,6 +590,9 @@ export default function GameCanvas() {
     // engine via handleSelectTrack.
     const track = eng?.getBgmTrack();
     if (track) setCurrentTrack(track);
+    // Anchor the first run's telemetry (start time + replay nonce) the
+    // moment gameplay becomes active.
+    beginRun();
     setShowSplash(false);
   };
 
