@@ -49,7 +49,7 @@ const PARTICLE_GRAVITY = 400; // px/sec^2
 export type EngineCallbacks = {
   onScoreChange?: (score: number, highScore: number) => void;
   onNextChange?: (current: YokaiType, next: YokaiType) => void;
-  onGameOver?: (finalScore: number) => void;
+  onGameOver?: (finalScore: number, mergeCount: number) => void;
   onReachedChange?: (reachedIds: number[]) => void;
   onUnlockChange?: (unlockedIds: number[]) => void;
 };
@@ -151,6 +151,10 @@ export class GameEngine {
 
   // Yokai ids that have been created (spawned or merged-into) this run
   private reached = new Set<number>();
+
+  // Total merge events this run — leaderboard telemetry only. Reset on
+  // restart; surfaced to the host via onGameOver's second arg.
+  private mergeCount = 0;
 
   // Persistent "collection" — yokai ids the player has ever seen merge into
   // across all sessions. Initialized from localStorage in the constructor.
@@ -503,6 +507,7 @@ export class GameEngine {
         // Combo tracking + score with multiplier
         const now = performance.now();
         this.registerMergeForCombo(now);
+        this.mergeCount += 1;
         const mult = this.comboMultiplier();
         this.score += Math.round(next.score * mult);
 
@@ -558,7 +563,7 @@ export class GameEngine {
   private triggerGameOver() {
     this.gameOver = true;
     this.audio.playGameOver();
-    this.callbacks.onGameOver?.(this.score);
+    this.callbacks.onGameOver?.(this.score, this.mergeCount);
   }
 
   private updateVfx(dt: number) {
@@ -859,6 +864,7 @@ export class GameEngine {
     this.shake = null;
     this.render.canvas.style.transform = "";
     this.score = 0;
+    this.mergeCount = 0;
     this.lastDropTime = 0;
     this.gameOver = false;
     this.reached.clear();
