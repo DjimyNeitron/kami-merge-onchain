@@ -1,0 +1,38 @@
+name: Supabase keep-alive
+
+# Supabase's free plan pauses a project after ~7 days with no activity.
+# A tiny scheduled read keeps Postgres warm so the leaderboard never
+# cold-starts (or worse, sleeps) for a visitor. GitHub-hosted cron can
+# drift by a few minutes-to-hours, so the ~3-day cadence leaves plenty
+# of slack against the 7-day window.
+
+on:
+  schedule:
+    # 06:17 UTC every 3rd day-of-month (1,4,7,…,28). Off-the-hour minute
+    # to avoid the top-of-hour congestion GitHub explicitly warns about.
+    - cron: "17 6 */3 * *"
+  # Manual trigger for testing / on-demand pings.
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping weekly_leaderboard (1 row)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::Missing SUPABASE_URL or SUPABASE_ANON_KEY repo secret."
+            exit 1
+          fi
+          # Anon key is public-safe; kept as a secret only to keep the
+          # workflow file clean and the project ref out of source.
+          curl -fsS \
+            "${SUPABASE_URL}/rest/v1/weekly_leaderboard?select=fid&limit=1" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            -o /dev/null
+          echo "Supabase keep-alive ping OK."
