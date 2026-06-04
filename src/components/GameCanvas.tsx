@@ -22,6 +22,7 @@ import SplashScreen from "@/components/SplashScreen";
 import Settings from "@/components/Settings";
 import SuzuIcon from "@/components/icons/SuzuIcon";
 import MonIcon from "@/components/icons/MonIcon";
+import LeaderboardIcon from "@/components/icons/LeaderboardIcon";
 // FurinIcon kept in the codebase for future use (BGM / notifications);
 // the in-game mute button now uses SuzuIcon to match Settings Sound icon.
 import {
@@ -146,6 +147,9 @@ export default function GameCanvas() {
   const [currentTrack, setCurrentTrack] = useState<BgmTrackId | null>(null);
   const [showSplash, setShowSplash] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
+  // In-game leaderboard overlay (pauses the sim while open — see the
+  // pause/resume effect below). Distinct from the game-over leaderboard.
+  const [showLeaderboardOverlay, setShowLeaderboardOverlay] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [godMode, setGodMode] = useState(false);
   const isDev = useDevMode();
@@ -689,6 +693,24 @@ export default function GameCanvas() {
           }}
         >
           <SuzuIcon muted={muted} size={18} />
+        </button>
+        <button
+          onClick={() => setShowLeaderboardOverlay(true)}
+          type="button"
+          title="Leaderboard"
+          aria-label="Leaderboard"
+          className="icon-btn flex items-center justify-center rounded-full"
+          style={{
+            width: 28,
+            height: 28,
+            color: "var(--gold-200)",
+            background: "rgba(var(--indigo-rgb) / 0.3)",
+            border: "1px solid rgba(var(--gold-rgb) / 0.25)",
+            opacity: 0.9,
+            touchAction: "manipulation",
+          }}
+        >
+          <LeaderboardIcon size={18} />
         </button>
         <button
           onClick={openSettings}
