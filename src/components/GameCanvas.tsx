@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { GameEngine } from "@/game/engine";
 import {
   YokaiType,
@@ -22,6 +22,7 @@ import SplashScreen from "@/components/SplashScreen";
 import Settings from "@/components/Settings";
 import SuzuIcon from "@/components/icons/SuzuIcon";
 import MonIcon from "@/components/icons/MonIcon";
+import LeaderboardIcon from "@/components/icons/LeaderboardIcon";
 // FurinIcon kept in the codebase for future use (BGM / notifications);
 // the in-game mute button now uses SuzuIcon to match Settings Sound icon.
 import {
@@ -37,6 +38,12 @@ import { soneium } from "viem/chains";
 import { useDevSkipWallet } from "@/hooks/useDevSkipWallet";
 import { useActualChainId } from "@/hooks/useActualChainId";
 import { saveTrack, type BgmTrackId } from "@/game/bgmTracks";
+import { sdk } from "@farcaster/miniapp-sdk";
+import {
+  useMiniAppContext,
+  type FarcasterUser,
+} from "@/hooks/useMiniAppContext";
+import Leaderboard from "@/components/Leaderboard";
 
 // Plain import — previous conditional `require(...)` gated by
 // `process.env.NODE_ENV` broke at browser runtime (Turbopack didn't
@@ -85,6 +92,25 @@ export default function GameCanvas() {
   // useEffect, so it can't read the latest React state directly; a ref
   // gives it the current value at fire-time without re-binding.
   const reachedRef = useRef<number[]>([]);
+
+  // ─── Leaderboard (Stage 7A) ───────────────────────────────────────
+  // Per-run telemetry the submit needs: a run-start timestamp (→
+  // runDurationMs) and a unique nonce (server replay guard). Both are
+  // re-minted at each run start (splash dismiss + restart).
+  const runStartRef = useRef<number>(0);
+  const nonceRef = useRef<string>("");
+  // The engine's onGameOver closure is captured once at mount, so the
+  // live values the submit needs (Farcaster identity, wallet address)
+  // are mirrored into refs — same stale-closure workaround as reachedRef.
+  const fcUserRef = useRef<FarcasterUser | null>(null);
+  const walletRef = useRef<string | undefined>(undefined);
+  // Submit response, surfaced to the leaderboard UI: seeds the player's
+  // own rank and drives the "new personal best!" flourish. null until a
+  // run is submitted (or in standalone web, where submit is skipped).
+  const [submitResult, setSubmitResult] = useState<{
+    isNewPersonalBest: boolean;
+    personalBest: number | null;
+  } | null>(null);
   // 3.5L — ceremony eligibility resolved once on game-over and cached
   // here so re-renders don't re-roll the tier. null means "no ceremony
   // this run" (below threshold or no reached yokai); the player then
@@ -121,6 +147,9 @@ export default function GameCanvas() {
   const [currentTrack, setCurrentTrack] = useState<BgmTrackId | null>(null);
   const [showSplash, setShowSplash] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
+  // In-game leaderboard overlay (pauses the sim while open — see the
+  // pause/resume effect below). Distinct from the game-over leaderboard.
+  const [showLeaderboardOverlay, setShowLeaderboardOverlay] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [godMode, setGodMode] = useState(false);
   const isDev = useDevMode();
@@ -143,7 +172,10 @@ export default function GameCanvas() {
   // wallet is on a chain not in `config.chains`, defeating the
   // wrong-chain detection. See src/hooks/useActualChainId.ts and the
   // matching write-up in SplashScreen.tsx for the full story.
-  const { isConnected: walletConnected } = useAccount();
+  const { isConnected: walletConnected, address } = useAccount();
+  // Farcaster identity (fid/username/pfp) for the leaderboard submit
+  // payload. null in standalone web → submit is skipped (reads still work).
+  const { user: fcUser } = useMiniAppContext();
   const actualChainId = useActualChainId();
   const devSkipWallet = useDevSkipWallet();
   const isValidSession =
@@ -187,10 +219,13 @@ export default function GameCanvas() {
           setCurrent(c);
           setNext(n);
         },
-        onGameOver: (final) => {
+        onGameOver: (final, mergeCount) => {
           setFinalScore(final);
           setGameOver(true);
           setCeremonyDismissed(false);
+          // Fire-and-forget leaderboard submit — never blocks the
+          // game-over UI; skips itself silently in standalone web.
+          void submitScore(final, mergeCount);
           // Eligibility: ≥ MIN_MINT_SCORE and the player merged at
           // least one yokai (defensive — at 500+ they almost certainly
           // have, but better than crashing on Math.max(...[])).
@@ -356,9 +391,106 @@ export default function GameCanvas() {
     };
   }, []);
 
+  // Keep the refs the engine's mount-captured onGameOver closure reads
+  // in sync with live React state.
+  useEffect(() => {
+    fcUserRef.current = fcUser;
+  }, [fcUser]);
+  useEffect(() => {
+    walletRef.current = address;
+  }, [address]);
+
+  // Anchor a new run: stamp the start time + mint a fresh replay nonce.
+  // Called at every run start (splash dismiss, restart).
+  const beginRun = useCallback(() => {
+    runStartRef.current = performance.now();
+    nonceRef.current =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setSubmitResult(null);
+  }, []);
+
+  // Submit a finished run to the leaderboard. Fire-and-forget: never
+  // blocks or crashes the game-over UI. Skips silently when there's no
+  // Farcaster identity (standalone web) or Quick Auth is unavailable —
+  // the read-only leaderboard still renders for everyone. All inputs are
+  // read from refs so this stays stable and closure-safe.
+  const submitScore = useCallback(
+    async (score: number, mergeCount: number) => {
+      const user = fcUserRef.current;
+      // No fid → not in a Mini App host. Reads still work; skip the write.
+      if (!user || typeof user.fid !== "number") return;
+
+      const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      if (!baseUrl) return;
+
+      const reachedNow = reachedRef.current;
+      const highestYokai = reachedNow.length
+        ? Math.max(0, Math.max(...reachedNow) - 1) // engine ids are 1-based
+        : 0;
+      const runDurationMs = Math.max(
+        0,
+        Math.round(performance.now() - runStartRef.current),
+      );
+
+      // Acquire a Quick Auth JWT (aud = our domain). Throws outside a
+      // host or if the user dismisses — treat as "skip submit".
+      let token: string;
+      try {
+        ({ token } = await sdk.quickAuth.getToken());
+      } catch {
+        return;
+      }
+
+      try {
+        const res = await fetch(`${baseUrl}/functions/v1/submit-score`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            score,
+            runDurationMs,
+            mergeCount,
+            highestYokai,
+            clientNonce: nonceRef.current,
+            walletAddress: walletRef.current,
+            user: {
+              fid: user.fid,
+              username: user.username,
+              displayName: user.displayName,
+              pfpUrl: user.pfpUrl,
+            },
+          }),
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          setSubmitResult({
+            isNewPersonalBest: Boolean(json.isNewPersonalBest),
+            personalBest:
+              typeof json.personalBest === "number" ? json.personalBest : null,
+          });
+        } else {
+          // 409 duplicate / 429 rate-limited are benign; everything else
+          // is logged and ignored. Never throw — game-over UI must stand.
+          console.warn(
+            `[leaderboard] submit-score ${res.status} — leaderboard still renders read-only`,
+          );
+        }
+      } catch (e) {
+        console.warn("[leaderboard] submit-score network error", e);
+      }
+    },
+    [],
+  );
+
   const handleRestart = () => {
     console.log("[GameCanvas] restart clicked");
     engineRef.current?.restart();
+    beginRun();
     setGameOver(false);
     setFinalScore(0);
     setCeremonyRun(null);
@@ -453,6 +585,23 @@ export default function GameCanvas() {
     if (!showSplash) engineRef.current?.resume();
   };
 
+  // In-game leaderboard overlay — pause the sim on open, resume on close.
+  // Mirrors the settings pause/resume pair; the engine's resume() rebases
+  // its wall-clock timers so combo/drop/danger timing survives the pause.
+  const openLeaderboard = () => {
+    engineRef.current?.pause();
+    setShowLeaderboardOverlay(true);
+  };
+
+  const closeLeaderboard = () => {
+    setShowLeaderboardOverlay(false);
+    // Same guard as closeSettings: resume whenever we're not on the
+    // splash. This also runs at game-over (the runner is normally live
+    // there anyway), which clears the engine's pausedAt so a later
+    // Restart isn't left with a stopped runner / stale timer baseline.
+    if (!showSplash) engineRef.current?.resume();
+  };
+
   const dismissSplash = () => {
     const eng = engineRef.current;
     eng?.unlockAudio();
@@ -463,6 +612,9 @@ export default function GameCanvas() {
     // engine via handleSelectTrack.
     const track = eng?.getBgmTrack();
     if (track) setCurrentTrack(track);
+    // Anchor the first run's telemetry (start time + replay nonce) the
+    // moment gameplay becomes active.
+    beginRun();
     setShowSplash(false);
   };
 
@@ -560,6 +712,24 @@ export default function GameCanvas() {
           <SuzuIcon muted={muted} size={18} />
         </button>
         <button
+          onClick={openLeaderboard}
+          type="button"
+          title="Leaderboard"
+          aria-label="Leaderboard"
+          className="icon-btn flex items-center justify-center rounded-full"
+          style={{
+            width: 28,
+            height: 28,
+            color: "var(--gold-200)",
+            background: "rgba(var(--indigo-rgb) / 0.3)",
+            border: "1px solid rgba(var(--gold-rgb) / 0.25)",
+            opacity: 0.9,
+            touchAction: "manipulation",
+          }}
+        >
+          <LeaderboardIcon size={18} />
+        </button>
+        <button
           onClick={openSettings}
           type="button"
           title="Settings"
@@ -647,6 +817,25 @@ export default function GameCanvas() {
                   <div className="kami-serif text-[0.65rem] tracking-wider text-(--wood-light)/60 mt-2">
                     Best: {highScore}
                   </div>
+
+                  {/* ─── 7A Leaderboard — parchment palette to match the
+                      wood-scroll panel it lives in (wood-dark ink, gold-700
+                      dividers). Renders only inside this game-over block, so
+                      it can't bleed into gameplay. ─────────────────────── */}
+                  <div className="h-px bg-gradient-to-r from-transparent via-(--gold-700)/50 to-transparent my-4" />
+                  <div className="kami-serif text-[0.6rem] uppercase tracking-(--tracking-spaced) text-(--wood-light)/70">
+                    Leaderboard
+                  </div>
+                  <div className="text-[0.6rem] tracking-(--tracking-spaced) text-(--wood-light)/55 mb-2">
+                    番付
+                  </div>
+
+                  <Leaderboard
+                    fid={fcUser?.fid ?? null}
+                    seededBest={submitResult?.personalBest ?? null}
+                    isNewPersonalBest={submitResult?.isNewPersonalBest}
+                  />
+
                   {/* 3.5L — motivational message only when below the
                       mint threshold (and ceremony wasn't dismissed; the
                       gate above ensures that). */}
@@ -743,6 +932,46 @@ export default function GameCanvas() {
             )}
           </div>
         </>
+      )}
+
+      {/* 7A — in-game leaderboard overlay. Reuses the game-over wood-scroll
+          chrome (rods + parchment). Sim is paused while open (openLeaderboard
+          → engine.pause); tap-outside or × closes + resumes. Reads anon, so
+          it works in standalone web too. */}
+      {showLeaderboardOverlay && (
+        <div
+          data-game-overlay
+          onClick={closeLeaderboard}
+          className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          style={{ pointerEvents: "auto" }}
+        >
+          <div
+            className="relative mx-4 w-[min(320px,90%)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="wooden-rod absolute -top-1 left-3 right-3 h-3 rounded-full pointer-events-none" />
+            <div className="scroll-panel px-6 py-7 text-center text-(--wood-dark) border-x border-(--gold-700)/40">
+              <button
+                type="button"
+                onClick={closeLeaderboard}
+                aria-label="Close leaderboard"
+                className="absolute top-1.5 right-3 kami-serif text-(--wood-light)/70 text-xl leading-none"
+                style={{ touchAction: "manipulation", pointerEvents: "auto" }}
+              >
+                ×
+              </button>
+              <div className="kami-serif text-xl font-bold tracking-(--tracking-extra) mb-1">
+                LEADERBOARD
+              </div>
+              <div className="text-[0.65rem] tracking-(--tracking-spaced) text-(--wood-light)/60 mb-3">
+                番付
+              </div>
+              <div className="h-px bg-gradient-to-r from-transparent via-(--gold-700)/50 to-transparent mb-3" />
+              <Leaderboard fid={fcUser?.fid ?? null} />
+            </div>
+            <div className="wooden-rod absolute -bottom-1 left-3 right-3 h-3 rounded-full pointer-events-none" />
+          </div>
+        </div>
       )}
 
       {showSettings && (

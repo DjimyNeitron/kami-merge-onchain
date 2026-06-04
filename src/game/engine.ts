@@ -49,7 +49,7 @@ const PARTICLE_GRAVITY = 400; // px/sec^2
 export type EngineCallbacks = {
   onScoreChange?: (score: number, highScore: number) => void;
   onNextChange?: (current: YokaiType, next: YokaiType) => void;
-  onGameOver?: (finalScore: number) => void;
+  onGameOver?: (finalScore: number, mergeCount: number) => void;
   onReachedChange?: (reachedIds: number[]) => void;
   onUnlockChange?: (unlockedIds: number[]) => void;
 };
@@ -145,12 +145,19 @@ export class GameEngine {
   private lastMergeTime = 0;
   private shake: Shake | null = null;
   private lastFrameTime = 0;
+  // performance.now() at the moment pause() ran, or null when running.
+  // Used by resume() to rebase wall-clock timers past the paused gap.
+  private pausedAt: number | null = null;
 
   // Sprite cache — preloaded PNG images keyed by yokai id
   private spriteCache = new Map<number, HTMLImageElement>();
 
   // Yokai ids that have been created (spawned or merged-into) this run
   private reached = new Set<number>();
+
+  // Total merge events this run — leaderboard telemetry only. Reset on
+  // restart; surfaced to the host via onGameOver's second arg.
+  private mergeCount = 0;
 
   // Persistent "collection" — yokai ids the player has ever seen merge into
   // across all sessions. Initialized from localStorage in the constructor.
@@ -503,6 +510,7 @@ export class GameEngine {
         // Combo tracking + score with multiplier
         const now = performance.now();
         this.registerMergeForCombo(now);
+        this.mergeCount += 1;
         const mult = this.comboMultiplier();
         this.score += Math.round(next.score * mult);
 
@@ -558,7 +566,7 @@ export class GameEngine {
   private triggerGameOver() {
     this.gameOver = true;
     this.audio.playGameOver();
-    this.callbacks.onGameOver?.(this.score);
+    this.callbacks.onGameOver?.(this.score, this.mergeCount);
   }
 
   private updateVfx(dt: number) {
@@ -859,6 +867,7 @@ export class GameEngine {
     this.shake = null;
     this.render.canvas.style.transform = "";
     this.score = 0;
+    this.mergeCount = 0;
     this.lastDropTime = 0;
     this.gameOver = false;
     this.reached.clear();
@@ -937,10 +946,25 @@ export class GameEngine {
   }
 
   pause() {
+    if (this.pausedAt === null) this.pausedAt = performance.now();
     Matter.Runner.stop(this.runner);
   }
 
   resume() {
+    if (this.pausedAt !== null) {
+      const elapsed = performance.now() - this.pausedAt;
+      this.pausedAt = null;
+      // Rebase every wall-clock anchor forward by the paused duration so
+      // the combo window, drop cooldown, danger-zone grace, and VFX dt
+      // all behave as if no time passed while paused. Timer baselines
+      // only — no physics / scoring / balance change.
+      this.lastMergeTime += elapsed;
+      this.lastDropTime += elapsed;
+      this.lastFrameTime += elapsed;
+      for (const [id, t] of this.dangerSince) {
+        this.dangerSince.set(id, t + elapsed);
+      }
+    }
     Matter.Runner.run(this.runner, this.engine);
   }
 
