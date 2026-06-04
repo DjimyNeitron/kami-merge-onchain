@@ -279,9 +279,22 @@ export class GameEngine {
       if (stored) this.highScore = parseInt(stored, 10) || 0;
     }
 
-    // Preload yokai sprites
+    // Preload yokai sprites. A sprite is drawn each frame only while
+    // `img.complete && img.naturalWidth > 0`; if a load FAILS (transient
+    // network / a poisoned WebView cache entry) the body falls back to a
+    // flat coloured circle — and, with no recovery, stays that way until
+    // a full reload. Retry on error (cache-busting to dodge a bad cache
+    // entry) so a failed load self-heals: the per-frame draw check picks
+    // the sprite up automatically once a retry succeeds.
     for (const y of YOKAI_CHAIN) {
       const img = new Image();
+      let retries = 0;
+      img.onerror = () => {
+        if (retries < 3) {
+          retries += 1;
+          img.src = `${y.sprite}?reload=${retries}`;
+        }
+      };
       img.src = y.sprite;
       this.spriteCache.set(y.id, img);
     }
