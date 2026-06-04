@@ -145,6 +145,9 @@ export class GameEngine {
   private lastMergeTime = 0;
   private shake: Shake | null = null;
   private lastFrameTime = 0;
+  // performance.now() at the moment pause() ran, or null when running.
+  // Used by resume() to rebase wall-clock timers past the paused gap.
+  private pausedAt: number | null = null;
 
   // Sprite cache — preloaded PNG images keyed by yokai id
   private spriteCache = new Map<number, HTMLImageElement>();
@@ -943,10 +946,25 @@ export class GameEngine {
   }
 
   pause() {
+    if (this.pausedAt === null) this.pausedAt = performance.now();
     Matter.Runner.stop(this.runner);
   }
 
   resume() {
+    if (this.pausedAt !== null) {
+      const elapsed = performance.now() - this.pausedAt;
+      this.pausedAt = null;
+      // Rebase every wall-clock anchor forward by the paused duration so
+      // the combo window, drop cooldown, danger-zone grace, and VFX dt
+      // all behave as if no time passed while paused. Timer baselines
+      // only — no physics / scoring / balance change.
+      this.lastMergeTime += elapsed;
+      this.lastDropTime += elapsed;
+      this.lastFrameTime += elapsed;
+      for (const [id, t] of this.dangerSince) {
+        this.dangerSince.set(id, t + elapsed);
+      }
+    }
     Matter.Runner.run(this.runner, this.engine);
   }
 

@@ -585,6 +585,23 @@ export default function GameCanvas() {
     if (!showSplash) engineRef.current?.resume();
   };
 
+  // In-game leaderboard overlay — pause the sim on open, resume on close.
+  // Mirrors the settings pause/resume pair; the engine's resume() rebases
+  // its wall-clock timers so combo/drop/danger timing survives the pause.
+  const openLeaderboard = () => {
+    engineRef.current?.pause();
+    setShowLeaderboardOverlay(true);
+  };
+
+  const closeLeaderboard = () => {
+    setShowLeaderboardOverlay(false);
+    // Same guard as closeSettings: resume whenever we're not on the
+    // splash. This also runs at game-over (the runner is normally live
+    // there anyway), which clears the engine's pausedAt so a later
+    // Restart isn't left with a stopped runner / stale timer baseline.
+    if (!showSplash) engineRef.current?.resume();
+  };
+
   const dismissSplash = () => {
     const eng = engineRef.current;
     eng?.unlockAudio();
@@ -695,7 +712,7 @@ export default function GameCanvas() {
           <SuzuIcon muted={muted} size={18} />
         </button>
         <button
-          onClick={() => setShowLeaderboardOverlay(true)}
+          onClick={openLeaderboard}
           type="button"
           title="Leaderboard"
           aria-label="Leaderboard"
@@ -915,6 +932,46 @@ export default function GameCanvas() {
             )}
           </div>
         </>
+      )}
+
+      {/* 7A — in-game leaderboard overlay. Reuses the game-over wood-scroll
+          chrome (rods + parchment). Sim is paused while open (openLeaderboard
+          → engine.pause); tap-outside or × closes + resumes. Reads anon, so
+          it works in standalone web too. */}
+      {showLeaderboardOverlay && (
+        <div
+          data-game-overlay
+          onClick={closeLeaderboard}
+          className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          style={{ pointerEvents: "auto" }}
+        >
+          <div
+            className="relative mx-4 w-[min(320px,90%)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="wooden-rod absolute -top-1 left-3 right-3 h-3 rounded-full pointer-events-none" />
+            <div className="scroll-panel px-6 py-7 text-center text-(--wood-dark) border-x border-(--gold-700)/40">
+              <button
+                type="button"
+                onClick={closeLeaderboard}
+                aria-label="Close leaderboard"
+                className="absolute top-1.5 right-3 kami-serif text-(--wood-light)/70 text-xl leading-none"
+                style={{ touchAction: "manipulation", pointerEvents: "auto" }}
+              >
+                ×
+              </button>
+              <div className="kami-serif text-xl font-bold tracking-(--tracking-extra) mb-1">
+                LEADERBOARD
+              </div>
+              <div className="text-[0.65rem] tracking-(--tracking-spaced) text-(--wood-light)/60 mb-3">
+                番付
+              </div>
+              <div className="h-px bg-gradient-to-r from-transparent via-(--gold-700)/50 to-transparent mb-3" />
+              <Leaderboard fid={fcUser?.fid ?? null} />
+            </div>
+            <div className="wooden-rod absolute -bottom-1 left-3 right-3 h-3 rounded-full pointer-events-none" />
+          </div>
+        </div>
       )}
 
       {showSettings && (
