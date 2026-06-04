@@ -44,6 +44,18 @@ const SPAWN_ANIM_MS = 150;
 const SHAKE_LIFE_MS = 200;
 const COMBO_WINDOW_MS = 1500;
 const COMBO_TEXT_LIFE_MS = 1000;
+
+// Per-yokai optical render multiplier (keyed by lowercase yokai name).
+// Some sprites' visible art under-fills the 512×512 canvas (the art is
+// already trimmed + centered — kappa fills only ~80% vs ~94% for most),
+// so on the physics body the character reads smaller than its collision
+// circle and leaves a visible gap when balls touch. This bumps ONLY the
+// drawn sprite size — the physics body, the 2.2 base, collision, scoring,
+// and balance are all untouched. Mirrors the embed-hero optical tuning.
+// Anything not listed defaults to 1.0 (no change).
+const OPTICAL_MULTIPLIER: Record<string, number> = {
+  kappa: 1.15,
+};
 const PARTICLE_GRAVITY = 400; // px/sec^2
 
 export type EngineCallbacks = {
@@ -671,7 +683,8 @@ export class GameEngine {
         else spawnScale = 1.15 - ((p - 0.7) / 0.3) * 0.15;
       }
 
-      const baseSize = yokai.radius * 2.2;
+      const baseSize =
+        yokai.radius * 2.2 * (OPTICAL_MULTIPLIER[yokai.name.toLowerCase()] ?? 1);
       const pos = body.position;
       const img = this.spriteCache.get(yokai.id);
       ctx.save();
@@ -722,9 +735,11 @@ export class GameEngine {
       ctx.stroke();
       ctx.restore();
 
-      // Ghost preview — sprite at 0.3 opacity
+      // Ghost preview — sprite at 0.3 opacity. Same optical multiplier as
+      // the placed-body render so the preview matches the dropped ball.
       const y = this.currentYokai;
-      const size = y.radius * 2.2;
+      const size =
+        y.radius * 2.2 * (OPTICAL_MULTIPLIER[y.name.toLowerCase()] ?? 1);
       const img = this.spriteCache.get(y.id);
       ctx.save();
       ctx.globalAlpha = 0.3;
