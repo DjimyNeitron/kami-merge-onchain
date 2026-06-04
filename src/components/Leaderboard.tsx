@@ -8,7 +8,46 @@
 // pure list. Styled to the parchment palette (wood-ink text, gold-700
 // accents) so it sits cleanly inside the wood-scroll chrome.
 
+import { useState } from "react";
 import { useLeaderboard } from "@/hooks/useLeaderboard";
+
+// Avatar — pfp with a graceful fallback. Shows the image only while it
+// loads; on a network/404 error (onError) or a null/empty pfp_url, swaps
+// to a parchment letter-circle (first char of username/display name) so a
+// missing avatar never renders a broken-image glyph.
+function Avatar({
+  pfpUrl,
+  username,
+  displayName,
+}: {
+  pfpUrl: string | null;
+  username: string | null;
+  displayName: string | null;
+}) {
+  const [errored, setErrored] = useState(false);
+  const letter =
+    (username ?? displayName ?? "").trim().charAt(0).toUpperCase() || "?";
+
+  if (pfpUrl && !errored) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={pfpUrl}
+        alt=""
+        onError={() => setErrored(true)}
+        className="w-5 h-5 rounded-full object-cover shrink-0"
+      />
+    );
+  }
+  return (
+    <div
+      aria-hidden="true"
+      className="w-5 h-5 rounded-full shrink-0 flex items-center justify-center bg-(--gold-200)/25 border border-(--gold-700)/30 text-(--wood-dark) text-[0.6rem] font-bold kami-serif leading-none"
+    >
+      {letter}
+    </div>
+  );
+}
 
 type LeaderboardProps = {
   /** Viewer's Farcaster id — own-row highlight + rank. null in web. */
@@ -82,16 +121,11 @@ export default function Leaderboard({
               <span className="kami-serif text-[0.7rem] font-bold text-(--wood-light)/70 w-5 text-right tabular-nums">
                 {entry.rank}
               </span>
-              {entry.pfpUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={entry.pfpUrl}
-                  alt=""
-                  className="w-5 h-5 rounded-full object-cover shrink-0"
-                />
-              ) : (
-                <div className="w-5 h-5 rounded-full bg-(--wood-light)/20 shrink-0" />
-              )}
+              <Avatar
+                pfpUrl={entry.pfpUrl}
+                username={entry.username}
+                displayName={entry.displayName}
+              />
               <span className="kami-serif text-[0.72rem] text-(--wood-dark) truncate flex-1 text-left">
                 {name}
               </span>
