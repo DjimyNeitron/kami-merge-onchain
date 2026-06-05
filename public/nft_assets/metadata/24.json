@@ -1,0 +1,43 @@
+{
+  "name": "Tengu — Common",
+  "description": "Tengu (天狗) — winged mountain warriors of Japanese folklore. Once vengeful spirits of the proud, now guardians of sacred peaks. Their crimson faces and long noses appear in temple iconography across the archipelago.\n\nCommon tier: At rest in quiet form. Presence felt, not asserted.",
+  "image": "https://kami-merge.vercel.app/nft_assets/static/tengu_common.png",
+  "animation_url": "https://kami-merge.vercel.app/nft_assets/animated/tengu_common.webp",
+  "external_url": "https://kami-merge.vercel.app",
+  "background_color": "0F1626",
+  "attributes": [
+    {
+      "trait_type": "Yokai",
+      "value": "Tengu"
+    },
+    {
+      "trait_type": "Kanji",
+      "value": "天狗"
+    },
+    {
+      "trait_type": "Tier",
+      "value": "Common"
+    },
+    {
+      "trait_type": "Element",
+      "value": "Sky"
+    },
+    {
+      "trait_type": "Yokai Rank",
+      "display_type": "number",
+      "value": 7,
+      "max_value": 11
+    },
+    {
+      "trait_type": "Tier Rank",
+      "display_type": "number",
+      "value": 1,
+      "max_value": 4
+    },
+    {
+      "trait_type": "Aurora Opacity",
+      "display_type": "number",
+      "value": 0.45
+    }
+  ]
+}

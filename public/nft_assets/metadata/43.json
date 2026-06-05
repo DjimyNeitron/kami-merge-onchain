@@ -1,0 +1,43 @@
+{
+  "name": "Amaterasu — Legendary",
+  "description": "Amaterasu (天照) — goddess of the sun and ruler of Takamagahara, the high celestial plain. She is the most revered kami in Shinto tradition, ancestor of the Imperial line. Her retreat into a cave once plunged the world into darkness.\n\nLegendary tier: Apex form. The shape that legends remember.",
+  "image": "https://kami-merge.vercel.app/nft_assets/static/amaterasu_legendary.png",
+  "animation_url": "https://kami-merge.vercel.app/nft_assets/animated/amaterasu_legendary.webp",
+  "external_url": "https://kami-merge.vercel.app",
+  "background_color": "0F1626",
+  "attributes": [
+    {
+      "trait_type": "Yokai",
+      "value": "Amaterasu"
+    },
+    {
+      "trait_type": "Kanji",
+      "value": "天照"
+    },
+    {
+      "trait_type": "Tier",
+      "value": "Legendary"
+    },
+    {
+      "trait_type": "Element",
+      "value": "Sun"
+    },
+    {
+      "trait_type": "Yokai Rank",
+      "display_type": "number",
+      "value": 11,
+      "max_value": 11
+    },
+    {
+      "trait_type": "Tier Rank",
+      "display_type": "number",
+      "value": 4,
+      "max_value": 4
+    },
+    {
+      "trait_type": "Aurora Opacity",
+      "display_type": "number",
+      "value": 0.9
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "name": "Kitsune — Common",
+  "description": "Kitsune (狐) — fox spirits gaining tails with age, up to nine for the most powerful. They serve Inari, deity of rice and prosperity, often guarding shrine gates. Shapeshifters and illusionists, their gaze sees through deception and weaves it.\n\nCommon tier: At rest in quiet form. Presence felt, not asserted.",
+  "image": "https://kami-merge.vercel.app/nft_assets/static/kitsune_common.png",
+  "animation_url": "https://kami-merge.vercel.app/nft_assets/animated/kitsune_common.webp",
+  "external_url": "https://kami-merge.vercel.app",
+  "background_color": "0F1626",
+  "attributes": [
+    {
+      "trait_type": "Yokai",
+      "value": "Kitsune"
+    },
+    {
+      "trait_type": "Kanji",
+      "value": "狐"
+    },
+    {
+      "trait_type": "Tier",
+      "value": "Common"
+    },
+    {
+      "trait_type": "Element",
+      "value": "Fox"
+    },
+    {
+      "trait_type": "Yokai Rank",
+      "display_type": "number",
+      "value": 5,
+      "max_value": 11
+    },
+    {
+      "trait_type": "Tier Rank",
+      "display_type": "number",
+      "value": 1,
+      "max_value": 4
+    },
+    {
+      "trait_type": "Aurora Opacity",
+      "display_type": "number",
+      "value": 0.45
+    }
+  ]
+}

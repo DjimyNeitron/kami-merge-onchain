@@ -1,0 +1,43 @@
+{
+  "name": "Kodama — Epic",
+  "description": "Kodama (木霊) — the gentle spirits of ancient trees in Japanese folklore. They embody the quiet wisdom of the forest, and the rustle of leaves is said to be their voice. Felling a kodama-inhabited tree brings misfortune.\n\nEpic tier: Elemental command made visible. Force, voice, and presence converge.",
+  "image": "https://kami-merge.vercel.app/nft_assets/static/kodama_epic.png",
+  "animation_url": "https://kami-merge.vercel.app/nft_assets/animated/kodama_epic.webp",
+  "external_url": "https://kami-merge.vercel.app",
+  "background_color": "0F1626",
+  "attributes": [
+    {
+      "trait_type": "Yokai",
+      "value": "Kodama"
+    },
+    {
+      "trait_type": "Kanji",
+      "value": "木霊"
+    },
+    {
+      "trait_type": "Tier",
+      "value": "Epic"
+    },
+    {
+      "trait_type": "Element",
+      "value": "Forest"
+    },
+    {
+      "trait_type": "Yokai Rank",
+      "display_type": "number",
+      "value": 1,
+      "max_value": 11
+    },
+    {
+      "trait_type": "Tier Rank",
+      "display_type": "number",
+      "value": 3,
+      "max_value": 4
+    },
+    {
+      "trait_type": "Aurora Opacity",
+      "display_type": "number",
+      "value": 0.75
+    }
+  ]
+}
