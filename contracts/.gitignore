@@ -1,0 +1,13 @@
+# Foundry build artifacts
+out/
+cache/
+
+# Installed dependencies (reinstall with `forge install` — see README)
+lib/
+
+# Secrets — never commit keys / .env / keystores
+.env
+.env.*
+*.key
+keystore/
+broadcast/
