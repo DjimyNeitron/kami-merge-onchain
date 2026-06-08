@@ -1,0 +1,10 @@
+{
+  "contract": "KamiMergeNFT",
+  "address": "0x9c21C01a52481a68dB6fad5960d5366D0779983a",
+  "chainId": 1868,
+  "rpc": "https://rpc.soneium.org/",
+  "explorer": "https://soneium.blockscout.com/address/0x9c21C01a52481a68dB6fad5960d5366D0779983a",
+  "royaltyReceiver": "0xc6C83dE905D439004733E2C3f430f08621031Aa8",
+  "deployedAt": "2026-06-08T18:55:21Z",
+  "verified": true
+}
