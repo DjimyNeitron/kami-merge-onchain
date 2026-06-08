@@ -26,11 +26,81 @@
 // are all consumed read-only.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useAccount,
+  usePublicClient,
+  useSwitchChain,
+  useWriteContract,
+} from "wagmi";
+import { parseEventLogs } from "viem";
+import { sdk } from "@farcaster/miniapp-sdk";
 import NFTCard from "@/components/NFTCard";
 import styles from "./MintCeremony.module.css";
-import { TIER_ORDER, type Tier, type YokaiName } from "@/config/yokai";
-import { useInventory, type InventoryNFT } from "@/hooks/useInventory";
+import {
+  TIER_ORDER,
+  YOKAI_ORDER,
+  type Tier,
+  type YokaiName,
+} from "@/config/yokai";
+import { type InventoryNFT } from "@/hooks/useInventory";
+import {
+  KAMI_NFT_ABI,
+  NFT_CONTRACT_ADDRESS,
+  SONEIUM_CHAIN_ID,
+} from "@/config/contract";
 import { playTick, playChime, playMintSuccess } from "@/lib/ceremonySound";
+
+// Map a wallet/tx error into a short, human ceremony message.
+function mintErrorMessage(e: unknown): string {
+  const msg = (e instanceof Error ? e.message : String(e)).toLowerCase();
+  if (
+    msg.includes("user rejected") ||
+    msg.includes("user denied") ||
+    msg.includes("rejected the request")
+  ) {
+    return "Mint cancelled.";
+  }
+  if (msg.includes("alreadyminted")) {
+    return "You've already bound this kami.";
+  }
+  if (msg.includes("insufficient funds") || msg.includes("insufficient gas")) {
+    return "Not enough ETH for gas on Soneium.";
+  }
+  if (msg.includes("chain") && (msg.includes("match") || msg.includes("switch"))) {
+    return "Wrong network — switch to Soneium.";
+  }
+  return "Mint failed. Please try again.";
+}
+
+// Best-effort off-chain record of the mint (links the NFT to the player's
+// personal best). Never blocks the ceremony — the NFT is minted on-chain
+// regardless of whether this POST lands.
+async function recordMint(body: {
+  tokenId: number;
+  txHash: string;
+  typeId: number;
+  scoreId: string;
+}): Promise<void> {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!baseUrl) return;
+    const { token } = await sdk.quickAuth.getToken();
+    if (!token) return;
+    await fetch(`${baseUrl}/functions/v1/confirm-mint`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    console.warn(
+      "[mint] confirm-mint record failed (NFT minted on-chain regardless)",
+      e,
+    );
+  }
+}
 
 export type CeremonyPhase =
   | "intro"
@@ -46,6 +116,11 @@ interface MintCeremonyProps {
   yokai: YokaiName;
   tier: Tier;
   score: number;
+  /** The player's persisted score row id (from the submit-score response).
+   *  Threaded to confirm-mint so the mint binds to their personal best.
+   *  null in standalone web / when submit-score didn't run → mint still
+   *  works, the off-chain record is just skipped. */
+  scoreId?: string | null;
   onMintComplete?: (nft: InventoryNFT) => void;
   onClose?: () => void;
   cardWidth?: number;          // default 200 (smaller than PR #37 — scene needs the breathing room)
@@ -58,7 +133,6 @@ const INTRO_MS = 1500;
 const MATERIALIZE_MS = 500;
 const AURORA_MS = 600;
 const BANNER_MS = 250;
-const MINT_MOCK_MS = 2000;
 const SUCCESS_HOLD_MS = 2000;
 
 // Spin sequence: [tierIndex, durationMs]. 12 fast cycles, 4
@@ -179,6 +253,7 @@ export default function MintCeremony({
   yokai,
   tier,
   score,
+  scoreId = null,
   onMintComplete,
   onClose,
   cardWidth = 200,
@@ -187,8 +262,18 @@ export default function MintCeremony({
 }: MintCeremonyProps) {
   const [phase, setPhase] = useState<CeremonyPhase>("intro");
   const [spinIdx, setSpinIdx] = useState(0);
+  const [mintError, setMintError] = useState<string | null>(null);
   const timers = useRef<number[]>([]);
-  const inventory = useInventory();
+
+  // On-chain mint wiring. The connected wallet signs; no key in app code.
+  const { address, isConnected, chainId: walletChainId } = useAccount();
+  const { writeContractAsync } = useWriteContract();
+  const { switchChainAsync } = useSwitchChain();
+  const publicClient = usePublicClient({ chainId: SONEIUM_CHAIN_ID });
+
+  // typeId 0..43 = yokaiIndex * 4 + tierIndex (matches the metadata files
+  // and the contract's typeId space).
+  const typeId = YOKAI_ORDER.indexOf(yokai) * 4 + TIER_ORDER.indexOf(tier);
 
   const soundRef = useRef(soundEnabled);
   soundRef.current = soundEnabled;
@@ -242,31 +327,122 @@ export default function MintCeremony({
     };
   }, [tier]);
 
-  const handleMint = useCallback(() => {
+  // Real on-chain mint: the player's wallet signs `mint(typeId)` on the
+  // KamiMergeNFT contract (Soneium 1868). The "minting" phase covers wallet
+  // approval → tx broadcast → receipt. On success we read the tokenId back
+  // from the Minted event, fire a best-effort confirm-mint record, then
+  // advance the ceremony to "success" exactly like the old mock did.
+  const handleMint = useCallback(async () => {
     if (phase !== "mint-ready") return;
+    setMintError(null);
+
+    if (!isConnected || !address) {
+      setMintError("Connect a wallet to mint.");
+      return;
+    }
+
+    // Chain guard — must be on Soneium mainnet. Prompt a switch if not.
+    if (walletChainId !== SONEIUM_CHAIN_ID) {
+      try {
+        await switchChainAsync({ chainId: SONEIUM_CHAIN_ID });
+      } catch {
+        setMintError("Switch to Soneium to mint.");
+        return;
+      }
+    }
+
     setPhase("minting");
-    const id = window.setTimeout(() => {
-      inventory._devAddMock(yokai, tier, score);
-      const nft: InventoryNFT = {
-        tokenId: `mock_${yokai}_${tier}_${Date.now()}`,
-        yokai,
-        tier,
-        mintedAt: Date.now(),
-        score,
-      };
-      if (soundRef.current) playMintSuccess();
-      setPhase("success");
-      const holdId = window.setTimeout(() => {
-        onMintComplete?.(nft);
-      }, SUCCESS_HOLD_MS);
-      timers.current.push(holdId);
-    }, MINT_MOCK_MS);
-    timers.current.push(id);
-  }, [phase, yokai, tier, score, inventory, onMintComplete]);
+
+    // 1. Sign + send the mint tx (wallet approval happens here).
+    let hash: `0x${string}`;
+    try {
+      hash = await writeContractAsync({
+        address: NFT_CONTRACT_ADDRESS,
+        abi: KAMI_NFT_ABI,
+        functionName: "mint",
+        args: [typeId],
+        chainId: SONEIUM_CHAIN_ID,
+      });
+    } catch (e) {
+      setMintError(mintErrorMessage(e));
+      setPhase("mint-ready");
+      return;
+    }
+
+    // 2. Wait for the receipt.
+    let receipt;
+    try {
+      receipt = await publicClient!.waitForTransactionReceipt({ hash });
+    } catch {
+      setMintError("Couldn't confirm the transaction. Check your wallet.");
+      setPhase("mint-ready");
+      return;
+    }
+    if (receipt.status !== "success") {
+      setMintError("Mint transaction reverted.");
+      setPhase("mint-ready");
+      return;
+    }
+
+    // 3. Read tokenId back from the Minted event.
+    let tokenId: bigint | null = null;
+    try {
+      const events = parseEventLogs({
+        abi: KAMI_NFT_ABI,
+        logs: receipt.logs,
+        eventName: "Minted",
+      });
+      if (events.length > 0) {
+        tokenId = (events[0].args as { tokenId: bigint }).tokenId;
+      }
+    } catch {
+      /* tokenId stays null; success still proceeds off the confirmed tx */
+    }
+
+    // 4. Best-effort off-chain record (links NFT → personal best). Never
+    //    blocks success — the NFT is minted on-chain regardless.
+    if (tokenId !== null && scoreId) {
+      void recordMint({
+        tokenId: Number(tokenId),
+        txHash: hash,
+        typeId,
+        scoreId,
+      });
+    }
+
+    // 5. Advance the ceremony to success (same UX as before).
+    if (soundRef.current) playMintSuccess();
+    setPhase("success");
+    const nft: InventoryNFT = {
+      tokenId: tokenId !== null ? tokenId.toString() : hash,
+      yokai,
+      tier,
+      mintedAt: Date.now(),
+      score,
+    };
+    const holdId = window.setTimeout(() => {
+      onMintComplete?.(nft);
+    }, SUCCESS_HOLD_MS);
+    timers.current.push(holdId);
+  }, [
+    phase,
+    isConnected,
+    address,
+    walletChainId,
+    switchChainAsync,
+    writeContractAsync,
+    publicClient,
+    typeId,
+    scoreId,
+    yokai,
+    tier,
+    score,
+    onMintComplete,
+  ]);
 
   const handleButton = () => {
     if (phase === "success") onClose?.();
-    else handleMint();
+    else void handleMint();
   };
 
   // Silhouette kanji + tier accent: intro shows the central 神
@@ -437,6 +613,11 @@ export default function MintCeremony({
             </button>
             <p className={styles.mintSub}>A blessing — only the network fee</p>
             <p className={styles.mintSubJp}>御祭 · 無料</p>
+            {mintError && (
+              <p className={styles.mintError} role="alert">
+                {mintError}
+              </p>
+            )}
           </>
         )}
       </div>

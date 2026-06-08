@@ -110,6 +110,9 @@ export default function GameCanvas() {
   const [submitResult, setSubmitResult] = useState<{
     isNewPersonalBest: boolean;
     personalBest: number | null;
+    // The persisted score row id — threaded into the mint ceremony so a
+    // successful mint can bind the NFT to this run's personal best.
+    scoreId: string | null;
   } | null>(null);
   // 3.5L — ceremony eligibility resolved once on game-over and cached
   // here so re-renders don't re-roll the tier. null means "no ceremony
@@ -472,6 +475,7 @@ export default function GameCanvas() {
             isNewPersonalBest: Boolean(json.isNewPersonalBest),
             personalBest:
               typeof json.personalBest === "number" ? json.personalBest : null,
+            scoreId: typeof json.scoreId === "string" ? json.scoreId : null,
           });
         } else {
           // 409 duplicate / 429 rate-limited are benign; everything else
@@ -775,6 +779,7 @@ export default function GameCanvas() {
                 yokai={ceremonyRun.yokai}
                 tier={ceremonyRun.tier}
                 score={ceremonyRun.score}
+                scoreId={submitResult?.scoreId ?? null}
                 cardWidth={190}
                 soundEnabled={sfxEnabled}
                 onClose={() => setCeremonyDismissed(true)}
