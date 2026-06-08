@@ -1,0 +1,43 @@
+{
+  "name": "Raijin — Legendary",
+  "description": "Raijin (雷神) — god of thunder and storms, ringed by taiko drums that beat the heavens. Depicted as a fierce, demon-like figure on classical screens, he commands lightning with each strike. Folk belief says he eats the navels of careless children during storms.\n\nLegendary tier: Apex form. The shape that legends remember.",
+  "image": "https://kami-merge.vercel.app/nft_assets/static/raijin_legendary.png",
+  "animation_url": "https://kami-merge.vercel.app/nft_assets/animated/raijin_legendary.webp",
+  "external_url": "https://kami-merge.vercel.app",
+  "background_color": "0F1626",
+  "attributes": [
+    {
+      "trait_type": "Yokai",
+      "value": "Raijin"
+    },
+    {
+      "trait_type": "Kanji",
+      "value": "雷神"
+    },
+    {
+      "trait_type": "Tier",
+      "value": "Legendary"
+    },
+    {
+      "trait_type": "Element",
+      "value": "Storm"
+    },
+    {
+      "trait_type": "Yokai Rank",
+      "display_type": "number",
+      "value": 9,
+      "max_value": 11
+    },
+    {
+      "trait_type": "Tier Rank",
+      "display_type": "number",
+      "value": 4,
+      "max_value": 4
+    },
+    {
+      "trait_type": "Aurora Opacity",
+      "display_type": "number",
+      "value": 0.9
+    }
+  ]
+}

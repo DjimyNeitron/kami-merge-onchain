@@ -28,6 +28,7 @@
     "@types/react-dom": "^19",
     "supabase": "^2.96.0",
     "tailwindcss": "^4",
+    "tsx": "^4.22.4",
     "typescript": "^5"
   }
 }

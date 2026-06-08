@@ -1,0 +1,43 @@
+{
+  "name": "Hitodama — Common",
+  "description": "Hitodama (人魂) — wandering soul-flames glimpsed at dusk above graveyards and forgotten paths. In folklore they are the spirits of the recently departed, drifting before the journey beyond. A pale blue-white glow, unmistakable to those who have lost someone.\n\nCommon tier: At rest in quiet form. Presence felt, not asserted.",
+  "image": "https://kami-merge.vercel.app/nft_assets/static/hitodama_common.png",
+  "animation_url": "https://kami-merge.vercel.app/nft_assets/animated/hitodama_common.webp",
+  "external_url": "https://kami-merge.vercel.app",
+  "background_color": "0F1626",
+  "attributes": [
+    {
+      "trait_type": "Yokai",
+      "value": "Hitodama"
+    },
+    {
+      "trait_type": "Kanji",
+      "value": "人魂"
+    },
+    {
+      "trait_type": "Tier",
+      "value": "Common"
+    },
+    {
+      "trait_type": "Element",
+      "value": "Spirit"
+    },
+    {
+      "trait_type": "Yokai Rank",
+      "display_type": "number",
+      "value": 2,
+      "max_value": 11
+    },
+    {
+      "trait_type": "Tier Rank",
+      "display_type": "number",
+      "value": 1,
+      "max_value": 4
+    },
+    {
+      "trait_type": "Aurora Opacity",
+      "display_type": "number",
+      "value": 0.45
+    }
+  ]
+}

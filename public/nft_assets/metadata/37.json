@@ -1,0 +1,43 @@
+{
+  "name": "Ryujin — Rare",
+  "description": "Ryujin (龍神) — dragon king of the deep, ruler of all sea creatures from his palace at the ocean floor. He commands the tides with the kanju and manju jewels, raising or stilling waves at will. Sailors prayed to him before any long voyage.\n\nRare tier: Power gathers. Aurora deepens, focus sharpens, intent begins to stir.",
+  "image": "https://kami-merge.vercel.app/nft_assets/static/ryujin_rare.png",
+  "animation_url": "https://kami-merge.vercel.app/nft_assets/animated/ryujin_rare.webp",
+  "external_url": "https://kami-merge.vercel.app",
+  "background_color": "0F1626",
+  "attributes": [
+    {
+      "trait_type": "Yokai",
+      "value": "Ryujin"
+    },
+    {
+      "trait_type": "Kanji",
+      "value": "龍神"
+    },
+    {
+      "trait_type": "Tier",
+      "value": "Rare"
+    },
+    {
+      "trait_type": "Element",
+      "value": "Sea"
+    },
+    {
+      "trait_type": "Yokai Rank",
+      "display_type": "number",
+      "value": 10,
+      "max_value": 11
+    },
+    {
+      "trait_type": "Tier Rank",
+      "display_type": "number",
+      "value": 2,
+      "max_value": 4
+    },
+    {
+      "trait_type": "Aurora Opacity",
+      "display_type": "number",
+      "value": 0.6
+    }
+  ]
+}
