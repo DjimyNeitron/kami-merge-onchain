@@ -28,6 +28,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   useAccount,
+  useConnect,
   usePublicClient,
   useSwitchChain,
   useWriteContract,
@@ -48,7 +49,24 @@ import {
   NFT_CONTRACT_ADDRESS,
   SONEIUM_CHAIN_ID,
 } from "@/config/contract";
+import { walletConnectConnectorId } from "@/lib/wagmi";
+import { useMiniAppContext } from "@/hooks/useMiniAppContext";
 import { playTick, playChime, playMintSuccess } from "@/lib/ceremonySound";
+
+// True when a chain switch failed because the wallet simply can't do the
+// target chain (the Farcaster Wallet has no Soneium 1868 support) — as
+// opposed to the user rejecting the switch. Drives the external-wallet
+// escape hatch.
+function isUnsupportedChainError(e: unknown): boolean {
+  const msg = (e instanceof Error ? e.message : String(e)).toLowerCase();
+  if (msg.includes("reject") || msg.includes("denied")) return false;
+  return (
+    msg.includes("unsupported") ||
+    msg.includes("unknown") ||
+    msg.includes("not configured") ||
+    msg.includes("1868")
+  );
+}
 
 // Map a wallet/tx error into a short, human ceremony message.
 function mintErrorMessage(e: unknown): string {
@@ -263,13 +281,21 @@ export default function MintCeremony({
   const [phase, setPhase] = useState<CeremonyPhase>("intro");
   const [spinIdx, setSpinIdx] = useState(0);
   const [mintError, setMintError] = useState<string | null>(null);
+  // True once the connected (Farcaster) wallet has proven it can't reach
+  // Soneium — the CTA switches to the external-wallet "summon" step.
+  const [awaitingExternalWallet, setAwaitingExternalWallet] = useState(false);
+  // Set on a successful browser-path mint where no Quick Auth was available
+  // to record it — surfaces a gentle "open in Farcaster" note.
+  const [unrecorded, setUnrecorded] = useState(false);
   const timers = useRef<number[]>([]);
 
   // On-chain mint wiring. The connected wallet signs; no key in app code.
   const { address, isConnected, chainId: walletChainId } = useAccount();
   const { writeContractAsync } = useWriteContract();
   const { switchChainAsync } = useSwitchChain();
+  const { connectAsync, connectors } = useConnect();
   const publicClient = usePublicClient({ chainId: SONEIUM_CHAIN_ID });
+  const { isMiniApp } = useMiniAppContext();
 
   // typeId 0..43 = yokaiIndex * 4 + tierIndex (matches the metadata files
   // and the contract's typeId space).
@@ -327,30 +353,13 @@ export default function MintCeremony({
     };
   }, [tier]);
 
-  // Real on-chain mint: the player's wallet signs `mint(typeId)` on the
-  // KamiMergeNFT contract (Soneium 1868). The "minting" phase covers wallet
-  // approval → tx broadcast → receipt. On success we read the tokenId back
-  // from the Minted event, fire a best-effort confirm-mint record, then
-  // advance the ceremony to "success" exactly like the old mock did.
-  const handleMint = useCallback(async () => {
-    if (phase !== "mint-ready") return;
-    setMintError(null);
-
-    if (!isConnected || !address) {
-      setMintError("Connect a wallet to mint.");
-      return;
-    }
-
-    // Chain guard — must be on Soneium mainnet. Prompt a switch if not.
-    if (walletChainId !== SONEIUM_CHAIN_ID) {
-      try {
-        await switchChainAsync({ chainId: SONEIUM_CHAIN_ID });
-      } catch {
-        setMintError("Switch to Soneium to mint.");
-        return;
-      }
-    }
-
+  // The on-chain mint itself, assuming the active wallet can reach Soneium.
+  // Signs `mint(typeId)` on KamiMergeNFT (1868) → waits for the receipt →
+  // reads tokenId from the Minted event → best-effort confirm-mint record →
+  // advances the ceremony to "success". Shared by the in-host path and the
+  // external-wallet path (the connected account differs; everything else is
+  // identical — the wallet that signs need not be the Farcaster identity).
+  const executeMint = useCallback(async () => {
     setPhase("minting");
 
     // 1. Sign + send the mint tx (wallet approval happens here).
@@ -399,15 +408,18 @@ export default function MintCeremony({
       /* tokenId stays null; success still proceeds off the confirmed tx */
     }
 
-    // 4. Best-effort off-chain record (links NFT → personal best). Never
-    //    blocks success — the NFT is minted on-chain regardless.
-    if (tokenId !== null && scoreId) {
+    // 4. Off-chain record (links NFT → personal best). Only possible with a
+    //    Quick Auth JWT + a scoreId — i.e. inside a Farcaster host. Outside
+    //    it we flag `unrecorded` so the success screen can nudge the player.
+    if (tokenId !== null && scoreId && isMiniApp) {
       void recordMint({
         tokenId: Number(tokenId),
         txHash: hash,
         typeId,
         scoreId,
       });
+    } else {
+      setUnrecorded(true);
     }
 
     // 5. Advance the ceremony to success (same UX as before).
@@ -425,20 +437,65 @@ export default function MintCeremony({
     }, SUCCESS_HOLD_MS);
     timers.current.push(holdId);
   }, [
-    phase,
-    isConnected,
-    address,
-    walletChainId,
-    switchChainAsync,
     writeContractAsync,
     publicClient,
     typeId,
     scoreId,
+    isMiniApp,
     yokai,
     tier,
     score,
     onMintComplete,
   ]);
+
+  // Tap "Bind the spirit": guard the chain, then mint. If the connected
+  // wallet can't reach Soneium (the Farcaster Wallet has no 1868 support),
+  // surface the external-wallet escape hatch instead of a raw failure.
+  const handleMint = useCallback(async () => {
+    if (phase !== "mint-ready") return;
+    setMintError(null);
+
+    if (!isConnected || !address) {
+      setMintError("Connect a wallet to mint.");
+      return;
+    }
+
+    if (walletChainId !== SONEIUM_CHAIN_ID) {
+      try {
+        await switchChainAsync({ chainId: SONEIUM_CHAIN_ID });
+      } catch (e) {
+        if (isUnsupportedChainError(e)) {
+          setAwaitingExternalWallet(true);
+          return;
+        }
+        setMintError("Switch to Soneium to mint.");
+        return;
+      }
+    }
+
+    await executeMint();
+  }, [phase, isConnected, address, walletChainId, switchChainAsync, executeMint]);
+
+  // External-wallet path: connect a Soneium-capable wallet over
+  // WalletConnect (QR / mobile deep-link), then run the same mint. Quick
+  // Auth identity still comes from the Farcaster host — only the tx signer
+  // changes (confirm-mint already binds by fid/scoreId, not tx sender).
+  const connectExternalWallet = useCallback(async () => {
+    setMintError(null);
+    const wc = connectors.find((c) => c.id === walletConnectConnectorId);
+    if (!wc) {
+      setMintError("No external wallet available.");
+      return;
+    }
+    try {
+      await connectAsync({ connector: wc, chainId: SONEIUM_CHAIN_ID });
+    } catch (e) {
+      setMintError(mintErrorMessage(e));
+      return;
+    }
+    setAwaitingExternalWallet(false);
+    await executeMint();
+  }, [connectors, connectAsync, executeMint]);
 
   const handleButton = () => {
     if (phase === "success") onClose?.();
@@ -591,9 +648,38 @@ export default function MintCeremony({
           a light ghost button (secondary, no urgency) on success. */}
       <div className={styles.mintButtonContainer}>
         {phase === "success" ? (
-          <button type="button" className={`btn-ghost ${styles.ghostBtn}`} onClick={handleButton}>
-            Visit the Shrine
-          </button>
+          <>
+            <button type="button" className={`btn-ghost ${styles.ghostBtn}`} onClick={handleButton}>
+              Visit the Shrine
+            </button>
+            {unrecorded && (
+              <p className={styles.mintSub}>
+                Minted on-chain — open in Farcaster to record it to your shrine.
+              </p>
+            )}
+          </>
+        ) : awaitingExternalWallet ? (
+          // The Farcaster Wallet can't reach Soneium — route the mint
+          // through an external wallet via WalletConnect.
+          <>
+            <p className={styles.mintSub}>
+              Your Farcaster wallet doesn&apos;t speak Soneium — summon an
+              external wallet to bind this kami.
+            </p>
+            <button
+              type="button"
+              className={`btn-on-dark ${styles.mintButton}`}
+              onClick={() => void connectExternalWallet()}
+            >
+              Summon an external wallet
+            </button>
+            <p className={styles.mintSubJp}>外の財布を招く</p>
+            {mintError && (
+              <p className={styles.mintError} role="alert">
+                {mintError}
+              </p>
+            )}
+          </>
         ) : (
           <>
             <button

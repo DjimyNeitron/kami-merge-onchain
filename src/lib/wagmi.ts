@@ -40,6 +40,7 @@ import {
 import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
 import { soneium } from "viem/chains";
 import { createConfig, http } from "wagmi";
+import { walletConnect } from "wagmi/connectors";
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
 
@@ -76,13 +77,32 @@ const rainbowKitConnectors = connectorsForWallets(
   }
 );
 
+// Standalone WalletConnect connector (id "walletConnect"), separate from
+// RainbowKit's wallet-wrapped WC. Placed 2nd so a direct
+// `connect({ connector })` resolves to THIS one (find-by-id returns the
+// earliest match). It is the mint escape hatch INSIDE Farcaster: the
+// built-in Farcaster Wallet can't do Soneium (chainId 1868), so when the
+// chain switch fails the ceremony routes the mint tx through an external
+// Soneium-capable wallet via this connector. `showQrModal: true` so the
+// pairing QR / mobile deep-link surfaces on direct connect (RainbowKit's
+// own WC connector suppresses its modal in favour of the RainbowKit UI,
+// which isn't shown inside a Farcaster host).
+export const walletConnectConnectorId = "walletConnect";
+
 // Order matters for wagmi's auto-connect heuristic: the Farcaster Mini
 // App connector goes first so when we're inside a Farcaster / Startale
 // host, wagmi prefers it over any cached injected connector. In the
 // standalone browser path the connector simply fails to find a host
 // and stays dormant — RainbowKit handles the rest.
 export const wagmiConfig = createConfig({
-  connectors: [farcasterMiniApp(), ...rainbowKitConnectors],
+  connectors: [
+    farcasterMiniApp(),
+    walletConnect({
+      projectId: projectId || "kami-merge-dev",
+      showQrModal: true,
+    }),
+    ...rainbowKitConnectors,
+  ],
   chains: [soneium],
   transports: {
     [soneium.id]: http("https://rpc.soneium.org"),
