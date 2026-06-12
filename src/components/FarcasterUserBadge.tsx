@@ -121,6 +121,19 @@ function FarcasterUserBadgeInner() {
           width={SIZE}
           height={SIZE}
           onError={() => setImgFailed(true)}
+          onLoad={(e) => {
+            // imgur's regional-block / removed placeholders load as a
+            // 200 (so onError never fires) but are small. Real Farcaster
+            // pfps are >=128px square — treat an implausibly small image
+            // as a failed load so the gradient-initial fallback shows.
+            const img = e.currentTarget;
+            if (
+              img.naturalWidth > 0 &&
+              (img.naturalWidth < 100 || img.naturalHeight < 100)
+            ) {
+              setImgFailed(true);
+            }
+          }}
           className="rounded-full"
           style={{
             width: SIZE,

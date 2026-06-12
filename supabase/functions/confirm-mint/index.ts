@@ -15,9 +15,12 @@
 //   1. fetch the tx receipt for `txHash`,
 //   2. confirm it succeeded and was sent to OUR contract,
 //   3. confirm it emitted a `Minted` event whose tokenId matches.
-// Then we bind the mint to the user via `scoreId` ownership (the wallet
-// that signed the mint need not equal the FID, so the binding is through
-// the player's own personal-best row, not the tx sender).
+// Then we bind the mint to the user via `scoreId` ownership — the scoreId
+// must be one of the verified FID's score rows (v2: any qualifying run,
+// not only the PB). The wallet that signed the mint need not equal the
+// FID; binding is through score ownership, not the tx sender. The mint is
+// recorded in `mints` (one row per token); personal_bests is stamped only
+// when the scoreId is the current PB row (shrine display).
 //
 // Environment (set via `npx supabase secrets set …`):
 //   SUPABASE_URL                — project URL
@@ -180,29 +183,56 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  // The scoreId must belong to the verified FID's personal best. This is
-  // what binds the on-chain mint to *this* user (tx sender ≠ fid).
-  const { data: pb, error: pbErr } = await supabase
-    .from("personal_bests")
-    .select("fid, score_id")
+  // mint-economy-v2 binds by *any* of the verified FID's score rows (not
+  // just their PB — every qualifying run is mintable). The wallet that
+  // signed the mint need not equal the FID; binding is through the score
+  // ownership, not the tx sender.
+  const { data: scoreRow, error: scoreErr } = await supabase
+    .from("scores")
+    .select("id, fid")
+    .eq("id", scoreId)
     .eq("fid", verifiedFid)
-    .eq("score_id", scoreId)
     .maybeSingle();
-  if (pbErr) {
-    return json({ error: "record_lookup_failed", detail: pbErr.message }, 500);
+  if (scoreErr) {
+    return json({ error: "record_lookup_failed", detail: scoreErr.message }, 500);
   }
-  if (!pb) {
+  if (!scoreRow) {
     return json({ error: "score_mismatch" }, 403);
   }
 
   const mintedAt = new Date().toISOString();
-  const { error: updErr } = await supabase
+  const minterAddress = receipt.from;
+
+  // Record the mint. Idempotent: a retry with the same tx_hash / token_id
+  // (unique constraints) is a benign no-op success, not an error.
+  const { error: insErr } = await supabase.from("mints").insert({
+    fid: verifiedFid,
+    score_id: scoreId,
+    token_id: tokenId,
+    type_id: typeId,
+    tx_hash: txHash,
+    minter_address: minterAddress,
+    minted_at: mintedAt,
+  });
+  if (insErr && insErr.code !== "23505") {
+    return json({ error: "record_insert_failed", detail: insErr.message }, 500);
+  }
+  const alreadyRecorded = insErr?.code === "23505";
+
+  // Backwards-compatible shrine display: stamp personal_bests with the NFT
+  // only when this scoreId IS the user's current PB row. Non-PB runs leave
+  // personal_bests untouched (their NFT lives in `mints`).
+  const { data: pb } = await supabase
     .from("personal_bests")
-    .update({ nft_token_id: tokenId, nft_minted_at: mintedAt })
-    .eq("fid", verifiedFid);
-  if (updErr) {
-    return json({ error: "record_update_failed", detail: updErr.message }, 500);
+    .select("score_id")
+    .eq("fid", verifiedFid)
+    .maybeSingle();
+  if (pb?.score_id === scoreId) {
+    await supabase
+      .from("personal_bests")
+      .update({ nft_token_id: tokenId, nft_minted_at: mintedAt })
+      .eq("fid", verifiedFid);
   }
 
-  return json({ ok: true, tokenId, mintedAt }, 200);
+  return json({ ok: true, tokenId, mintedAt, alreadyRecorded }, 200);
 });
