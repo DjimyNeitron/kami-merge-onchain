@@ -229,9 +229,11 @@ export default function GameCanvas() {
           // Fire-and-forget leaderboard submit — never blocks the
           // game-over UI; skips itself silently in standalone web.
           void submitScore(final, mergeCount);
-          // Eligibility: ≥ MIN_MINT_SCORE and the player merged at
-          // least one yokai (defensive — at 500+ they almost certainly
-          // have, but better than crashing on Math.max(...[])).
+          // Eligibility is per-run (NOT gated on a new personal best):
+          // any run with score ≥ MIN_MINT_SCORE and at least one merge
+          // opens the ceremony. The merge check is defensive — at the
+          // threshold they almost certainly have, but it avoids
+          // Math.max(...[]) on an empty reached set.
           const reachedNow = reachedRef.current;
           if (final < MIN_MINT_SCORE || reachedNow.length === 0) {
             setCeremonyRun(null);

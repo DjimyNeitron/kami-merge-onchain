@@ -18,24 +18,26 @@
 
 import { TIER_ORDER, type Tier } from "@/config/yokai";
 
-// Brief v13 locked drop matrix. Each row sums to 100. Keyed by the
-// lower bound of the score bracket for readability; bracketFor()
-// does the actual range mapping.
+// Mint-economy-v2 drop matrix (rarity scales with score). Each row sums
+// to 100. Keyed by the lower bound of the score bracket for readability;
+// bracketFor() does the actual range mapping. Higher score → meaningfully
+// better odds, but Legendary is never guaranteed — the small tail keeps
+// every reveal genuinely uncertain (per the locked design spirit).
 const DROP_MATRIX: Record<string, Record<Tier, number>> = {
-  "500-1499": { common: 50, rare: 37, epic: 11, legendary: 2 },
-  "1500-2999": { common: 22, rare: 48, epic: 25, legendary: 5 },
-  "3000-4999": { common: 5, rare: 25, epic: 50, legendary: 20 },
-  "5000+": { common: 1, rare: 9, epic: 35, legendary: 55 },
+  "1000-1999": { common: 50, rare: 38, epic: 10, legendary: 2 },
+  "2000-3499": { common: 25, rare: 45, epic: 24, legendary: 6 },
+  "3500-4999": { common: 10, rare: 35, epic: 40, legendary: 15 },
+  "5000+": { common: 5, rare: 22, epic: 45, legendary: 28 },
 };
 
 /** Minimum score for an NFT drop. Below this, no ceremony. */
-export const MIN_MINT_SCORE = 500;
+export const MIN_MINT_SCORE = 1000;
 
 function bracketFor(score: number): Record<Tier, number> {
   if (score >= 5000) return DROP_MATRIX["5000+"];
-  if (score >= 3000) return DROP_MATRIX["3000-4999"];
-  if (score >= 1500) return DROP_MATRIX["1500-2999"];
-  return DROP_MATRIX["500-1499"];
+  if (score >= 3500) return DROP_MATRIX["3500-4999"];
+  if (score >= 2000) return DROP_MATRIX["2000-3499"];
+  return DROP_MATRIX["1000-1999"];
 }
 
 // FNV-1a-style string hash → float in [0, 1). Deterministic: the same

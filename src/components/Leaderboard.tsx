@@ -35,6 +35,18 @@ function Avatar({
         src={pfpUrl}
         alt=""
         onError={() => setErrored(true)}
+        onLoad={(e) => {
+          // imgur regional-block / removed placeholders load as a 200
+          // (onError never fires) but are small. Real pfps are >=128px;
+          // treat an implausibly small image as failed.
+          const img = e.currentTarget;
+          if (
+            img.naturalWidth > 0 &&
+            (img.naturalWidth < 100 || img.naturalHeight < 100)
+          ) {
+            setErrored(true);
+          }
+        }}
         className="w-5 h-5 rounded-full object-cover shrink-0"
       />
     );
