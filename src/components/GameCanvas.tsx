@@ -11,6 +11,7 @@ import {
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/config/constants";
 import MintCeremony from "@/components/MintCeremony";
 import Shrine from "@/components/Shrine";
+import HelpOverlay from "@/components/HelpOverlay";
 import { tierFromScore, MIN_MINT_SCORE } from "@/lib/tierFromScore";
 import gcStyles from "./GameCanvas.module.css";
 
@@ -157,6 +158,8 @@ export default function GameCanvas() {
   // Shrine collection gallery overlay. Same pause/resume + z-index as the
   // leaderboard overlay.
   const [showShrine, setShowShrine] = useState(false);
+  // How-to-play help overlay (parchment skin). Same pause/resume contract.
+  const [showHelp, setShowHelp] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [godMode, setGodMode] = useState(false);
   const isDev = useDevMode();
@@ -627,6 +630,16 @@ export default function GameCanvas() {
     if (!showSplash) engineRef.current?.resume();
   };
 
+  const openHelp = () => {
+    engineRef.current?.pause();
+    setShowHelp(true);
+  };
+
+  const closeHelp = () => {
+    setShowHelp(false);
+    if (!showSplash) engineRef.current?.resume();
+  };
+
   const dismissSplash = () => {
     const eng = engineRef.current;
     eng?.unlockAudio();
@@ -785,6 +798,38 @@ export default function GameCanvas() {
             <path d="M5 9.2 H19" />
             <path d="M6.5 6 V20" />
             <path d="M17.5 6 V20" />
+          </svg>
+        </button>
+        <button
+          onClick={openHelp}
+          type="button"
+          title="How to Play"
+          aria-label="How to Play"
+          className="icon-btn flex items-center justify-center rounded-full"
+          style={{
+            width: 28,
+            height: 28,
+            color: "var(--gold-200)",
+            background: "rgba(var(--indigo-rgb) / 0.3)",
+            border: "1px solid rgba(var(--gold-rgb) / 0.25)",
+            opacity: 0.9,
+            touchAction: "manipulation",
+          }}
+        >
+          {/* Info glyph: ring + dot + stem. */}
+          <svg
+            viewBox="0 0 24 24"
+            width={18}
+            height={18}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.6}
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="9" />
+            <circle cx="12" cy="8" r="0.6" fill="currentColor" stroke="none" />
+            <path d="M12 11 V16.5" />
           </svg>
         </button>
         <button
@@ -1000,6 +1045,9 @@ export default function GameCanvas() {
       {/* Shrine — full-screen collection gallery. Same pause/resume +
           z-index contract as the leaderboard overlay; ceremony-bg skin. */}
       {showShrine && <Shrine onClose={closeShrine} />}
+
+      {/* How to Play — rules overlay (parchment skin). Same pause/resume. */}
+      {showHelp && <HelpOverlay onClose={closeHelp} />}
 
       {/* 7A — in-game leaderboard overlay. Reuses the game-over wood-scroll
           chrome (rods + parchment). Sim is paused while open (openLeaderboard
