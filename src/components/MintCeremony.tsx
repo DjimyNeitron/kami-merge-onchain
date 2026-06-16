@@ -141,6 +141,8 @@ interface MintCeremonyProps {
   scoreId?: string | null;
   onMintComplete?: (nft: InventoryNFT) => void;
   onClose?: () => void;
+  /** "Visit the Shrine" (success screen). Falls back to onClose if absent. */
+  onVisitShrine?: () => void;
   cardWidth?: number;          // default 200 (smaller than PR #37 — scene needs the breathing room)
   soundEnabled?: boolean;
   onPhaseChange?: (phase: CeremonyPhase) => void;
@@ -274,6 +276,7 @@ export default function MintCeremony({
   scoreId = null,
   onMintComplete,
   onClose,
+  onVisitShrine,
   cardWidth = 200,
   soundEnabled = true,
   onPhaseChange,
@@ -498,7 +501,7 @@ export default function MintCeremony({
   }, [connectors, connectAsync, executeMint]);
 
   const handleButton = () => {
-    if (phase === "success") onClose?.();
+    if (phase === "success") (onVisitShrine ?? onClose)?.();
     else void handleMint();
   };
 

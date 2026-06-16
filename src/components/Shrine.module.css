@@ -1,0 +1,244 @@
+/* Shrine collection gallery overlay. Reuses the ceremony background
+ * (/ceremony_bg.jpg — single source of truth) with a #0F1626 scrim,
+ * NOT the parchment leaderboard skin. z-index matches the leaderboard
+ * overlay (Tailwind z-30 = 30). */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  background-image: url("/ceremony_bg.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  overflow: hidden;
+  /* iOS notch / host chrome clearance. */
+  padding-top: max(8px, env(safe-area-inset-top));
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Darkening gradient toward #0F1626 — lighter at the top so the moon /
+ * torii read behind the title, darker over the grid for card contrast.
+ * Cheap gradient, NOT a live backdrop-filter blur. */
+.scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(15, 22, 38, 0.55) 0%,
+    rgba(15, 22, 38, 0.72) 32%,
+    rgba(15, 22, 38, 0.9) 100%
+  );
+}
+
+/* ─── Header (pinned above the scrolling grid) ─────────────────────── */
+.header {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  padding: 8px 12px 6px;
+  text-align: center;
+}
+
+.title {
+  margin: 4px 0 2px;
+  font-size: 1.9rem;
+  line-height: 1.15;
+}
+
+.counter {
+  margin: 0;
+  color: var(--gold-50);
+  font-size: 0.95rem;
+  letter-spacing: var(--tracking-wide);
+}
+
+.connectRow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.connectHint {
+  margin: 0;
+  color: var(--gold-50);
+  opacity: 0.75;
+  font-size: 0.75rem;
+}
+
+.connectBtn {
+  font-size: 0.8rem;
+  padding: 6px 18px;
+}
+
+/* 4-column header aligned to the grid below (same side padding + gap). */
+.tierHeaders {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 8px 4px 0;
+  margin-top: 8px;
+}
+
+.tierHeader {
+  text-align: center;
+  color: var(--gold-200);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-cap);
+}
+
+/* ─── Scrolling grid ───────────────────────────────────────────────── */
+.scrollArea {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 4px 16px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.cell {
+  position: relative;
+  display: block;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* NFTCard sizes from a width prop / size class; force it to fill the
+ * grid cell. Aspect-ratio (5:7) is owned by NFTCard's CSS, so height
+ * follows automatically. */
+.cardFill {
+  width: 100% !important;
+}
+
+.owned {
+  /* full colour */
+}
+
+/* Desaturate locked cards WITHOUT touching NFTCard, via the design-system
+ * escape hatch: NFTCard's root carries role="img". */
+.locked :global([role="img"]) {
+  filter: grayscale(1) brightness(0.42);
+  transition: filter 0.2s ease;
+}
+
+.lock {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 34%;
+  max-width: 40px;
+  color: var(--gold-200);
+  opacity: 0.55;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.7));
+  pointer-events: none;
+}
+
+/* Close button — mirrors the HUD icon-button style. */
+.close {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  z-index: 3;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  color: var(--gold-200);
+  background: rgba(var(--indigo-rgb) / 0.4);
+  border: 1px solid rgba(var(--gold-rgb) / 0.35);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.close:active {
+  transform: scale(0.94);
+}
+
+/* ─── Detail / zoom ────────────────────────────────────────────────── */
+.detail {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(6, 10, 22, 0.86);
+  padding: 24px;
+}
+
+.detailCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: min(78vw, 340px);
+}
+
+.detailLockedWrap {
+  position: relative;
+  width: 100%;
+}
+
+.cardFillLocked {
+  width: 100% !important;
+}
+.detailLockedWrap :global([role="img"]) {
+  filter: grayscale(1) brightness(0.42);
+}
+
+.detailLock {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 22%;
+  max-width: 64px;
+  color: var(--gold-200);
+  opacity: 0.6;
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.75));
+  pointer-events: none;
+}
+
+.detailBadge {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-cap);
+}
+.badgeOwned {
+  color: var(--gold-200);
+}
+.badgeLocked {
+  color: var(--gold-50);
+  opacity: 0.55;
+}
+
+.detailSubtitle {
+  margin: 0;
+  color: var(--gold-50);
+  opacity: 0.8;
+  font-size: 0.8rem;
+  letter-spacing: var(--tracking-wide);
+}

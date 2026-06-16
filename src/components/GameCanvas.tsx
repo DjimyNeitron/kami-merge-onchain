@@ -10,6 +10,7 @@ import {
 } from "@/config/yokai";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "@/config/constants";
 import MintCeremony from "@/components/MintCeremony";
+import Shrine from "@/components/Shrine";
 import { tierFromScore, MIN_MINT_SCORE } from "@/lib/tierFromScore";
 import gcStyles from "./GameCanvas.module.css";
 
@@ -153,6 +154,9 @@ export default function GameCanvas() {
   // In-game leaderboard overlay (pauses the sim while open — see the
   // pause/resume effect below). Distinct from the game-over leaderboard.
   const [showLeaderboardOverlay, setShowLeaderboardOverlay] = useState(false);
+  // Shrine collection gallery overlay. Same pause/resume + z-index as the
+  // leaderboard overlay.
+  const [showShrine, setShowShrine] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [godMode, setGodMode] = useState(false);
   const isDev = useDevMode();
@@ -608,6 +612,21 @@ export default function GameCanvas() {
     if (!showSplash) engineRef.current?.resume();
   };
 
+  // Shrine — identical pause/resume contract to the leaderboard overlay.
+  // The !showSplash resume guard also covers opening from the ceremony
+  // (game is over): closing returns to the game-over panel without
+  // restarting play (gameOver stays true; the runner just steps settled
+  // bodies).
+  const openShrine = () => {
+    engineRef.current?.pause();
+    setShowShrine(true);
+  };
+
+  const closeShrine = () => {
+    setShowShrine(false);
+    if (!showSplash) engineRef.current?.resume();
+  };
+
   const dismissSplash = () => {
     const eng = engineRef.current;
     eng?.unlockAudio();
@@ -736,6 +755,39 @@ export default function GameCanvas() {
           <LeaderboardIcon size={18} />
         </button>
         <button
+          onClick={openShrine}
+          type="button"
+          title="The Shrine"
+          aria-label="The Shrine"
+          className="icon-btn flex items-center justify-center rounded-full"
+          style={{
+            width: 28,
+            height: 28,
+            color: "var(--gold-200)",
+            background: "rgba(var(--indigo-rgb) / 0.3)",
+            border: "1px solid rgba(var(--gold-rgb) / 0.25)",
+            opacity: 0.9,
+            touchAction: "manipulation",
+          }}
+        >
+          {/* Torii: two stacked horizontal beams + two posts. */}
+          <svg
+            viewBox="0 0 24 24"
+            width={18}
+            height={18}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.6}
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
+            <path d="M3 6 H21" />
+            <path d="M5 9.2 H19" />
+            <path d="M6.5 6 V20" />
+            <path d="M17.5 6 V20" />
+          </svg>
+        </button>
+        <button
           onClick={openSettings}
           type="button"
           title="Settings"
@@ -785,6 +837,10 @@ export default function GameCanvas() {
                 cardWidth={190}
                 soundEnabled={sfxEnabled}
                 onClose={() => setCeremonyDismissed(true)}
+                onVisitShrine={() => {
+                  setCeremonyDismissed(true);
+                  openShrine();
+                }}
               />
               <button
                 type="button"
@@ -940,6 +996,10 @@ export default function GameCanvas() {
           </div>
         </>
       )}
+
+      {/* Shrine — full-screen collection gallery. Same pause/resume +
+          z-index contract as the leaderboard overlay; ceremony-bg skin. */}
+      {showShrine && <Shrine onClose={closeShrine} />}
 
       {/* 7A — in-game leaderboard overlay. Reuses the game-over wood-scroll
           chrome (rods + parchment). Sim is paused while open (openLeaderboard
