@@ -1,71 +1,10 @@
-/* HelpOverlay — "How to Play" parchment overlay. Reuses the global
- * .scroll-panel + .wooden-rod chrome (the Settings / leaderboard skin),
- * wood-ink palette. z-index 30 matches the leaderboard overlay. */
-
-.backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-  padding: max(16px, env(safe-area-inset-top)) 12px
-    max(16px, env(safe-area-inset-bottom));
-}
-
-.panelWrap {
-  position: relative;
-  width: min(420px, 92%);
-  max-height: 88vh;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Composed with the global .scroll-panel (parchment background). This adds
- * the scroll + padding; the panel itself scrolls, the wooden rods don't. */
-.panel {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding: 22px 22px 26px;
-  text-align: center;
-  color: var(--wood-dark);
-  border-left: 1px solid rgba(var(--gold-rgb) / 0.4);
-  border-right: 1px solid rgba(var(--gold-rgb) / 0.4);
-}
-
-.close {
-  position: absolute;
-  top: 6px;
-  right: 14px;
-  z-index: 2;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 1.5rem;
-  line-height: 1;
-  color: rgba(92, 58, 30, 0.7); /* wood-light ~70% */
-  cursor: pointer;
-  background: none;
-  border: none;
-  touch-action: manipulation;
-}
-
-.title {
-  margin: 0 0 2px;
-  font-size: 1.9rem;
-  line-height: 1.15;
-  /* Lift the gold gradient off the cream parchment. */
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
-}
-
-.subtitle {
-  margin: 0 0 6px;
-  font-size: 0.85rem;
-  color: var(--gold-700);
-  letter-spacing: var(--tracking-spaced);
-}
+/* HelpOverlay — content-only styles. All chrome (backdrop, scroll-panel,
+ * wooden rods, heading, sticky Close footer, section dividers) is rendered
+ * with the SAME global classes + Tailwind utilities Settings uses
+ * (.scroll-panel · .wooden-rod · .kami-serif · .btn-on-light), reused
+ * directly — not duplicated here — so the two panels stay in lockstep.
+ * This module only styles the help-specific body: section headings, copy,
+ * the ascension chain, and the rarity table. */
 
 .section {
   margin-top: 6px;
@@ -98,17 +37,6 @@
   font-weight: 700;
   letter-spacing: var(--tracking-wide);
   color: var(--gold-700);
-}
-
-.divider {
-  height: 1px;
-  margin: 14px 0;
-  background: linear-gradient(
-    to right,
-    transparent,
-    rgba(var(--gold-rgb) / 0.5),
-    transparent
-  );
 }
 
 /* ─── Ascension chain ─────────────────────────────────────────────── */
