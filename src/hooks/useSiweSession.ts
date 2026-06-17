@@ -61,6 +61,13 @@ export type SiweSession = {
   ensureSession: () => Promise<string | null>;
   /** Synchronous read of the in-memory token (null if absent). */
   getToken: () => string | null;
+  /**
+   * Synchronous read of a *valid* token — returns it only if it was issued
+   * for the currently-connected address and hasn't expired. Returns null
+   * otherwise WITHOUT signing. Use this to decide "is the player already
+   * signed in?" without ever triggering a signature prompt.
+   */
+  getValidToken: () => string | null;
   /** Drop the session (used on disconnect / address change). */
   reset: () => void;
 };
@@ -178,15 +185,28 @@ export function SiweSessionProvider({ children }: { children: ReactNode }) {
 
   const getToken = useCallback(() => token, [token]);
 
-  // Auto-start sign-in once per freshly connected address so the session is
-  // ready by game-over (scores then auto-save). Only fires from `idle`: a
-  // rejected sign-in lands in `error` and is NOT re-prompted in a loop — the
-  // player re-signs via the game-over "Sign in to save your score" button.
-  useEffect(() => {
-    if (address && status === "idle" && !token) {
-      void signIn();
+  // Valid-or-null read with NO side effects — never signs. A token counts as
+  // valid only if it was issued for the currently-connected address and is
+  // still within its expiry (minus a small skew margin).
+  const getValidToken = useCallback((): string | null => {
+    if (
+      token &&
+      sessionAddress &&
+      address &&
+      sessionAddress.toLowerCase() === address.toLowerCase() &&
+      Date.now() < expiresAtRef.current - EXPIRY_SKEW_MS
+    ) {
+      return token;
     }
-  }, [address, status, token, signIn]);
+    return null;
+  }, [token, sessionAddress, address]);
+
+  // NOTE: sign-in is fully lazy / user-initiated — there is intentionally NO
+  // auto-sign-on-connect effect here. A signature is only ever requested when
+  // the player taps "Sign in to save your score" (game-over) or Mint, both of
+  // which call signIn()/ensureSession() directly. Auto-signing on connect
+  // produced an unprompted on-load popup AND raced the connect handshake
+  // (two-tries-to-connect). Reset-on-disconnect/address-change still applies.
 
   const value = useMemo<SiweSession>(
     () => ({
@@ -196,9 +216,19 @@ export function SiweSessionProvider({ children }: { children: ReactNode }) {
       signIn,
       ensureSession,
       getToken,
+      getValidToken,
       reset,
     }),
-    [token, sessionAddress, status, signIn, ensureSession, getToken, reset],
+    [
+      token,
+      sessionAddress,
+      status,
+      signIn,
+      ensureSession,
+      getToken,
+      getValidToken,
+      reset,
+    ],
   );
 
   return createElement(SiweContext.Provider, { value }, children);
