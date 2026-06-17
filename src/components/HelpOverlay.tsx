@@ -20,7 +20,7 @@ import {
   YOKAI_ORDER,
   type Tier,
 } from "@/config/yokai";
-import { MIN_MINT_SCORE } from "@/lib/tierFromScore";
+import { MIN_MINT_SCORE, DROP_MATRIX } from "@/lib/tierFromScore";
 import {
   SuzuIcon,
   LeaderboardIcon,
@@ -32,14 +32,22 @@ import styles from "./HelpOverlay.module.css";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-// Mirror of tierFromScore.ts DROP_MATRIX + bracketFor() ranges (that const
-// is not exported). Each row sums to 100.
-const RARITY_BRACKETS: { label: string; odds: Record<Tier, number> }[] = [
-  { label: "1,000–1,999", odds: { common: 50, rare: 38, epic: 10, legendary: 2 } },
-  { label: "2,000–3,499", odds: { common: 25, rare: 45, epic: 24, legendary: 6 } },
-  { label: "3,500–4,999", odds: { common: 10, rare: 35, epic: 40, legendary: 15 } },
-  { label: "5,000+", odds: { common: 5, rare: 22, epic: 45, legendary: 28 } },
-];
+// Rarity table rows derived from the single-source DROP_MATRIX
+// (tierFromScore.ts) so the Help odds always match the live gacha — no
+// copied-in numbers. The matrix keys ("1000-1999", "5000+") are formatted
+// into display labels; the odds come straight from the matrix.
+const fmtBracket = (key: string): string => {
+  if (key.endsWith("+")) {
+    return `${Number(key.slice(0, -1)).toLocaleString("en-US")}+`;
+  }
+  const [lo, hi] = key.split("-");
+  return `${Number(lo).toLocaleString("en-US")}–${Number(hi).toLocaleString("en-US")}`;
+};
+const RARITY_BRACKETS: { label: string; odds: Record<Tier, number> }[] =
+  Object.entries(DROP_MATRIX).map(([key, odds]) => ({
+    label: fmtBracket(key),
+    odds,
+  }));
 
 // HUD control legend — the 5 HUD icons in HUD (left→right) order, rendered
 // from the SAME shared components the HUD uses (@/components/HudIcons).

@@ -27,6 +27,7 @@ import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
 import { wagmiConfig } from "@/lib/wagmi";
+import { SiweSessionProvider } from "@/hooks/useSiweSession";
 import "@rainbow-me/rainbowkit/styles.css";
 import { useEffect, useState } from "react";
 
@@ -60,7 +61,10 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
            * status messages, error text) always renders in English
            * regardless of the browser's Accept-Language header. The rest
            * of the app's user-facing strings are also hard-coded English. */}
-          {children}
+          {/* SIWE session lives inside the wagmi tree (it uses useAccount +
+           * useSignMessage) so submit-score / confirm-mint can grab a
+           * Bearer token app-wide. In-memory only — no storage. */}
+          <SiweSessionProvider>{children}</SiweSessionProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

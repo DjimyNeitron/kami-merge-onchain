@@ -44,11 +44,8 @@ import { soneium } from "viem/chains";
 import { useDevSkipWallet } from "@/hooks/useDevSkipWallet";
 import { useActualChainId } from "@/hooks/useActualChainId";
 import { saveTrack, type BgmTrackId } from "@/game/bgmTracks";
-import { sdk } from "@farcaster/miniapp-sdk";
-import {
-  useMiniAppContext,
-  type FarcasterUser,
-} from "@/hooks/useMiniAppContext";
+import { useSiweSession } from "@/hooks/useSiweSession";
+import { useMiniAppContext } from "@/hooks/useMiniAppContext";
 import Leaderboard from "@/components/Leaderboard";
 
 // Plain import — previous conditional `require(...)` gated by
@@ -106,10 +103,12 @@ export default function GameCanvas() {
   const runStartRef = useRef<number>(0);
   const nonceRef = useRef<string>("");
   // The engine's onGameOver closure is captured once at mount, so the
-  // live values the submit needs (Farcaster identity, wallet address)
-  // are mirrored into refs — same stale-closure workaround as reachedRef.
-  const fcUserRef = useRef<FarcasterUser | null>(null);
+  // live values the submit needs (wallet address, SIWE session, the last
+  // run's numbers) are mirrored into refs — same stale-closure workaround
+  // as reachedRef.
   const walletRef = useRef<string | undefined>(undefined);
+  const ensureSessionRef = useRef<(() => Promise<string | null>) | null>(null);
+  const lastRunRef = useRef<{ score: number; mergeCount: number } | null>(null);
   // Submit response, surfaced to the leaderboard UI: seeds the player's
   // own rank and drives the "new personal best!" flourish. null until a
   // run is submitted (or in standalone web, where submit is skipped).
@@ -187,9 +186,17 @@ export default function GameCanvas() {
   // wrong-chain detection. See src/hooks/useActualChainId.ts and the
   // matching write-up in SplashScreen.tsx for the full story.
   const { isConnected: walletConnected, address } = useAccount();
-  // Farcaster identity (fid/username/pfp) for the leaderboard submit
-  // payload. null in standalone web → submit is skipped (reads still work).
+  // Farcaster identity (fid/username/pfp) — used only for the leaderboard
+  // own-row highlight now; identity for the submit is the SIWE address.
   const { user: fcUser } = useMiniAppContext();
+  // SIWE session — auth for the score submit (Bearer token). ensureSession
+  // returns a valid token, signing in if needed; mirrored into a ref so the
+  // mount-captured onGameOver closure can reach it.
+  const { ensureSession, status: siweStatus } = useSiweSession();
+  // True when a finished run couldn't be saved because there's no SIWE
+  // session yet (e.g. the signature was rejected) → game-over shows a
+  // "Sign in to save your score" retry button.
+  const [needsSignIn, setNeedsSignIn] = useState(false);
   const actualChainId = useActualChainId();
   const devSkipWallet = useDevSkipWallet();
   const isValidSession =
@@ -238,7 +245,9 @@ export default function GameCanvas() {
           setGameOver(true);
           setCeremonyDismissed(false);
           // Fire-and-forget leaderboard submit — never blocks the
-          // game-over UI; skips itself silently in standalone web.
+          // game-over UI. Stash the run so the "Sign in to save your
+          // score" retry can re-submit the same numbers.
+          lastRunRef.current = { score: final, mergeCount };
           void submitScore(final, mergeCount);
           // Eligibility is per-run (NOT gated on a new personal best):
           // any run with score ≥ MIN_MINT_SCORE and at least one merge
@@ -410,11 +419,11 @@ export default function GameCanvas() {
   // Keep the refs the engine's mount-captured onGameOver closure reads
   // in sync with live React state.
   useEffect(() => {
-    fcUserRef.current = fcUser;
-  }, [fcUser]);
-  useEffect(() => {
     walletRef.current = address;
   }, [address]);
+  useEffect(() => {
+    ensureSessionRef.current = ensureSession;
+  }, [ensureSession]);
 
   // Anchor a new run: stamp the start time + mint a fresh replay nonce.
   // Called at every run start (splash dismiss, restart).
@@ -428,18 +437,20 @@ export default function GameCanvas() {
   }, []);
 
   // Submit a finished run to the leaderboard. Fire-and-forget: never
-  // blocks or crashes the game-over UI. Skips silently when there's no
-  // Farcaster identity (standalone web) or Quick Auth is unavailable —
-  // the read-only leaderboard still renders for everyone. All inputs are
-  // read from refs so this stays stable and closure-safe.
+  // blocks or crashes the game-over UI. Auth is a SIWE session (Bearer
+  // token) — identity is the signed-in wallet address, NOT Quick Auth, so
+  // it works in any browser / the Startale App. Skips silently for guests
+  // with no connected wallet; a connected wallet whose signature was
+  // rejected gets the game-over "Sign in to save your score" retry. All
+  // inputs are read from refs so this stays stable and closure-safe.
   const submitScore = useCallback(
     async (score: number, mergeCount: number) => {
-      const user = fcUserRef.current;
-      // No fid → not in a Mini App host. Reads still work; skip the write.
-      if (!user || typeof user.fid !== "number") return;
-
       const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       if (!baseUrl) return;
+
+      // No connected wallet → guest / standalone web. Reads still work;
+      // skip the write silently (no sign-in prompt), as before SIWE.
+      if (!walletRef.current) return;
 
       const reachedNow = reachedRef.current;
       const highestYokai = reachedNow.length
@@ -450,14 +461,19 @@ export default function GameCanvas() {
         Math.round(performance.now() - runStartRef.current),
       );
 
-      // Acquire a Quick Auth JWT (aud = our domain). Throws outside a
-      // host or if the user dismisses — treat as "skip submit".
-      let token: string;
+      // Ensure a SIWE session (signs in if needed). On rejection/failure,
+      // surface the game-over retry and bail — never crash the UI.
+      let token: string | null = null;
       try {
-        ({ token } = await sdk.quickAuth.getToken());
+        token = (await ensureSessionRef.current?.()) ?? null;
       } catch {
+        token = null;
+      }
+      if (!token) {
+        setNeedsSignIn(true);
         return;
       }
+      setNeedsSignIn(false);
 
       try {
         const res = await fetch(`${baseUrl}/functions/v1/submit-score`, {
@@ -472,13 +488,6 @@ export default function GameCanvas() {
             mergeCount,
             highestYokai,
             clientNonce: nonceRef.current,
-            walletAddress: walletRef.current,
-            user: {
-              fid: user.fid,
-              username: user.username,
-              displayName: user.displayName,
-              pfpUrl: user.pfpUrl,
-            },
           }),
         });
 
@@ -918,6 +927,28 @@ export default function GameCanvas() {
                     seededBest={submitResult?.personalBest ?? null}
                     isNewPersonalBest={submitResult?.isNewPersonalBest}
                   />
+
+                  {/* Sign-in fallback — shown only when a finished run
+                      couldn't be saved (connected wallet, but no SIWE
+                      session yet / signature rejected). Re-runs the submit,
+                      which signs in then POSTs the same run. */}
+                  {needsSignIn && (
+                    <button
+                      data-game-overlay
+                      type="button"
+                      onClick={() => {
+                        const run = lastRunRef.current;
+                        if (run) void submitScore(run.score, run.mergeCount);
+                      }}
+                      disabled={siweStatus === "signing"}
+                      className="btn-on-light mt-3 px-4 py-1.5 text-[0.72rem] font-semibold disabled:opacity-60"
+                      style={{ touchAction: "manipulation" }}
+                    >
+                      {siweStatus === "signing"
+                        ? "Signing…"
+                        : "Sign in to save your score"}
+                    </button>
+                  )}
 
                   {/* 3.5L — motivational message only when below the
                       mint threshold (and ceremony wasn't dismissed; the

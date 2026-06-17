@@ -23,7 +23,10 @@ import { TIER_ORDER, type Tier } from "@/config/yokai";
 // bracketFor() does the actual range mapping. Higher score → meaningfully
 // better odds, but Legendary is never guaranteed — the small tail keeps
 // every reveal genuinely uncertain (per the locked design spirit).
-const DROP_MATRIX: Record<string, Record<Tier, number>> = {
+//
+// Exported so the Help overlay's rarity table renders from this single
+// source (no copied-in values) — keep the keys range-formatted as below.
+export const DROP_MATRIX: Record<string, Record<Tier, number>> = {
   "1000-1999": { common: 50, rare: 38, epic: 10, legendary: 2 },
   "2000-3499": { common: 25, rare: 45, epic: 24, legendary: 6 },
   "3500-4999": { common: 10, rare: 35, epic: 40, legendary: 15 },
