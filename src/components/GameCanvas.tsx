@@ -108,6 +108,7 @@ export default function GameCanvas() {
   // as reachedRef.
   const walletRef = useRef<string | undefined>(undefined);
   const ensureSessionRef = useRef<(() => Promise<string | null>) | null>(null);
+  const getValidTokenRef = useRef<(() => string | null) | null>(null);
   const lastRunRef = useRef<{ score: number; mergeCount: number } | null>(null);
   // Submit response, surfaced to the leaderboard UI: seeds the player's
   // own rank and drives the "new personal best!" flourish. null until a
@@ -189,10 +190,14 @@ export default function GameCanvas() {
   // Farcaster identity (fid/username/pfp) — used only for the leaderboard
   // own-row highlight now; identity for the submit is the SIWE address.
   const { user: fcUser } = useMiniAppContext();
-  // SIWE session — auth for the score submit (Bearer token). ensureSession
-  // returns a valid token, signing in if needed; mirrored into a ref so the
-  // mount-captured onGameOver closure can reach it.
-  const { ensureSession, status: siweStatus } = useSiweSession();
+  // SIWE session — auth for the score submit (Bearer token). The auto
+  // game-over submit uses getValidToken() (a valid cached token, or null —
+  // NEVER signs), so a finished run only auto-saves when the player is
+  // already signed in. ensureSession() (which DOES sign) is reached only via
+  // the user-tapped "Sign in to save your score" button. Both are mirrored
+  // into refs so the mount-captured onGameOver closure can reach them.
+  const { ensureSession, getValidToken, status: siweStatus } =
+    useSiweSession();
   // True when a finished run couldn't be saved because there's no SIWE
   // session yet (e.g. the signature was rejected) → game-over shows a
   // "Sign in to save your score" retry button.
@@ -424,6 +429,9 @@ export default function GameCanvas() {
   useEffect(() => {
     ensureSessionRef.current = ensureSession;
   }, [ensureSession]);
+  useEffect(() => {
+    getValidTokenRef.current = getValidToken;
+  }, [getValidToken]);
 
   // Anchor a new run: stamp the start time + mint a fresh replay nonce.
   // Called at every run start (splash dismiss, restart).
@@ -440,11 +448,16 @@ export default function GameCanvas() {
   // blocks or crashes the game-over UI. Auth is a SIWE session (Bearer
   // token) — identity is the signed-in wallet address, NOT Quick Auth, so
   // it works in any browser / the Startale App. Skips silently for guests
-  // with no connected wallet; a connected wallet whose signature was
-  // rejected gets the game-over "Sign in to save your score" retry. All
-  // inputs are read from refs so this stays stable and closure-safe.
+  // with no connected wallet. All inputs are read from refs so this stays
+  // stable and closure-safe.
+  //
+  // `interactive` controls whether a signature may be requested:
+  //   • false (default — the automatic game-over submit): use ONLY a valid
+  //     cached token (getValidToken, never signs). If none, surface the
+  //     "Sign in to save your score" button and bail — no popup.
+  //   • true (the user tapped that button): ensureSession() may sign once.
   const submitScore = useCallback(
-    async (score: number, mergeCount: number) => {
+    async (score: number, mergeCount: number, interactive = false) => {
       const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       if (!baseUrl) return;
 
@@ -461,11 +474,14 @@ export default function GameCanvas() {
         Math.round(performance.now() - runStartRef.current),
       );
 
-      // Ensure a SIWE session (signs in if needed). On rejection/failure,
-      // surface the game-over retry and bail — never crash the UI.
+      // Auto path: a valid cached token only (no signature prompt). Tap
+      // path: ensureSession() may sign. On no-token/rejection, surface the
+      // game-over retry button and bail — never crash the UI.
       let token: string | null = null;
       try {
-        token = (await ensureSessionRef.current?.()) ?? null;
+        token = interactive
+          ? ((await ensureSessionRef.current?.()) ?? null)
+          : (getValidTokenRef.current?.() ?? null);
       } catch {
         token = null;
       }
@@ -938,7 +954,8 @@ export default function GameCanvas() {
                       type="button"
                       onClick={() => {
                         const run = lastRunRef.current;
-                        if (run) void submitScore(run.score, run.mergeCount);
+                        // interactive=true → this tap may request one signature.
+                        if (run) void submitScore(run.score, run.mergeCount, true);
                       }}
                       disabled={siweStatus === "signing"}
                       className="btn-on-light mt-3 px-4 py-1.5 text-[0.72rem] font-semibold disabled:opacity-60"
