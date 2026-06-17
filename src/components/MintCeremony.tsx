@@ -735,8 +735,8 @@ export default function MintCeremony({
             >
               Visit the Shrine
             </button>
-            <p className={styles.mintSub}>Already in your Shrine</p>
-            <p className={styles.mintSubJp}>奉納済み</p>
+            <p className={styles.ownedTitle}>Already in your Shrine</p>
+            <p className={styles.ownedTitleJp}>奉納済み</p>
           </>
         ) : ownershipChecking ? (
           // Brief: never show an enabled "Bind the spirit" that then flips

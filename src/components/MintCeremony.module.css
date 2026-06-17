@@ -388,6 +388,30 @@
   color: var(--gold-50);
   opacity: 0.4;
 }
+
+/* Owned-state status — the PRIMARY message of the owned block ("Already in
+ * your Shrine"), so it reads brighter/larger than the dim secondary .mintSub
+ * caption. Same ceremony serif (Georgia EN / CJK JP) + gold; full-strength
+ * (no 0.4–0.6 opacity), with the subtle gold glow .successTextInline uses so
+ * it stays legible over the photographic background. No outlined box. */
+.ownedTitle {
+  margin: 10px 0 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: center;
+  color: var(--gold-50);
+  text-shadow: 0 0 8px rgba(255, 218, 110, 0.45);
+}
+.ownedTitleJp {
+  margin: 3px 0 0;
+  font-family:
+    "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", serif;
+  font-size: 12px;
+  color: var(--gold-200);
+  opacity: 0.9;
+}
 .mintError {
   margin: 8px 0 0;
   font-family: Georgia, "Times New Roman", serif;

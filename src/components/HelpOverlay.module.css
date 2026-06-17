@@ -99,18 +99,21 @@
   color: var(--gold-700);
   font-weight: 700;
   text-transform: uppercase;
-  /* normal tracking (not --tracking-wide) + wrap so "LEGENDARY" stays fully
-   * readable within its narrow column rather than being clipped. */
-  letter-spacing: var(--tracking-normal);
-  font-size: 0.6rem;
-  white-space: normal;
+  /* One line per header (no two-line wrap). Smaller size + tight tracking +
+   * minimal padding so the longest, "LEGENDARY", fits its column without
+   * clipping. SCORE column was narrowed (below) to widen the tier columns. */
+  letter-spacing: -0.02em;
+  font-size: 0.56rem;
+  padding: 4px 2px;
+  white-space: nowrap;
   line-height: 1.15;
 }
-/* SCORE column holds the "1,000–1,999" ranges — give it the largest share;
- * table-layout:fixed splits the remaining ~66% equally across the 4 tiers. */
+/* SCORE column holds the "1,000–1,999" ranges (still fits one line at 26%);
+ * narrowed from 34% so the four tier columns each get ~18.5% — enough for
+ * the one-line "LEGENDARY" header. table-layout:fixed splits the rest. */
 .thScore,
 .tdScore {
-  width: 34%;
+  width: 26%;
   text-align: left;
 }
 .tdScore {
