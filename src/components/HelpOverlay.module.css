@@ -77,32 +77,45 @@
   overflow-x: auto;
 }
 .table {
+  /* fixed layout + width:100% → the 5 columns share the panel width instead
+   * of growing to content and overflowing (which clipped LEGENDARY). */
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   color: var(--wood-dark);
 }
 .table th,
 .table td {
   border: 1px solid rgba(var(--gold-rgb) / 0.4);
-  padding: 5px 6px;
+  /* tighter horizontal padding reclaims room for the four tier columns */
+  padding: 4px 3px;
   text-align: center;
   white-space: nowrap;
+  overflow-wrap: break-word;
 }
 .table thead th {
   background: rgba(var(--gold-rgb) / 0.18);
   color: var(--gold-700);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
-  font-size: 0.66rem;
+  /* normal tracking (not --tracking-wide) + wrap so "LEGENDARY" stays fully
+   * readable within its narrow column rather than being clipped. */
+  letter-spacing: var(--tracking-normal);
+  font-size: 0.6rem;
+  white-space: normal;
+  line-height: 1.15;
 }
+/* SCORE column holds the "1,000–1,999" ranges — give it the largest share;
+ * table-layout:fixed splits the remaining ~66% equally across the 4 tiers. */
 .thScore,
 .tdScore {
+  width: 34%;
   text-align: left;
 }
 .tdScore {
   font-weight: 700;
+  white-space: nowrap; /* keep the score range on one line */
 }
 
 /* ─── Controls legend ─────────────────────────────────────────────── */
