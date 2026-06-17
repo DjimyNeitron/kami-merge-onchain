@@ -447,40 +447,11 @@
   text-shadow: 0 0 8px rgba(255, 218, 110, 0.5);
 }
 
-/* ─── "Already in your Shrine" — calm enshrined badge (D2 owned guard) ─ */
-/* Shown in place of the Bind-the-Spirit button when the wallet already owns
- * this kami. Celebratory, not an error — gold-on-parchment ceremony tokens,
- * bilingual JP + EN like the rest of the ceremony chrome. */
-.alreadyOwned {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 4px;
-  padding: 10px 22px;
-  border-radius: 12px;
-  border: 1px solid rgba(var(--gold-rgb) / 0.4);
-  background: rgba(var(--indigo-rgb) / 0.35);
-  box-shadow: 0 0 16px rgba(255, 218, 110, 0.18);
-}
-.alreadyOwnedKanji {
-  font-family:
-    "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", serif;
-  font-size: 20px;
-  line-height: 1;
-  color: var(--gold-200);
-  text-shadow: 0 0 10px rgba(255, 218, 110, 0.45);
-}
-.alreadyOwnedText {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  white-space: nowrap;
-  color: var(--gold-50);
-  text-shadow: 0 0 8px rgba(255, 218, 110, 0.4);
-}
+/* "Already in your Shrine" (D2 owned guard) reuses the ceremony's own
+ * treatments — the success "Visit the Shrine" ghost button (.ghostBtn) +
+ * the mint-available subtitle lines (.mintSub / .mintSubJp) — so it needs
+ * no bespoke styles of its own. (The earlier .alreadyOwned* outlined-box
+ * rules were removed here for that reason.) */
 
 /* ─── 12a′. Anticipation subtitle (intro + spinning) ─────────────── */
 /* 3.5h: moved to 60% — BELOW the forming card — to fix the overlap with
