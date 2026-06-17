@@ -104,3 +104,60 @@
 .tdScore {
   font-weight: 700;
 }
+
+/* ─── Controls legend ─────────────────────────────────────────────── */
+/* Small kanji accent beside the "Controls" section heading. Resets the
+ * .h3 uppercase tracking so the CJK glyphs sit naturally. */
+.h3Kanji {
+  margin-left: 6px;
+  font-weight: 400;
+  font-size: 0.78rem;
+  letter-spacing: var(--tracking-normal);
+  text-transform: none;
+  color: rgba(92, 58, 30, 0.55); /* wood-light ~55% */
+}
+
+.controls {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.controlRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+/* Circular chip echoing the HUD's icon buttons. The HUD glyphs inherit
+ * gold via currentColor; on cream parchment that reads too light, so the
+ * legend re-tints them to wood-ink here (NOT in HudIcons.tsx). */
+.controlIcon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 9999px;
+  color: var(--wood-dark);
+  border: 1px solid rgba(var(--gold-rgb) / 0.4);
+  background: rgba(var(--gold-rgb) / 0.1);
+}
+.controlText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.controlName {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--wood-dark);
+}
+.controlDesc {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.74rem;
+  color: rgba(92, 58, 30, 0.85);
+}

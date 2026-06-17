@@ -13,7 +13,7 @@
 // (private, non-exported) DROP_MATRIX. If that matrix changes, update
 // RARITY_BRACKETS here too.
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, type ComponentType } from "react";
 import {
   KANJI,
   TIER_ORDER,
@@ -21,6 +21,13 @@ import {
   type Tier,
 } from "@/config/yokai";
 import { MIN_MINT_SCORE } from "@/lib/tierFromScore";
+import {
+  SuzuIcon,
+  LeaderboardIcon,
+  ToriiIcon,
+  InfoIcon,
+  MonIcon,
+} from "@/components/HudIcons";
 import styles from "./HelpOverlay.module.css";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -32,6 +39,24 @@ const RARITY_BRACKETS: { label: string; odds: Record<Tier, number> }[] = [
   { label: "2,000–3,499", odds: { common: 25, rare: 45, epic: 24, legendary: 6 } },
   { label: "3,500–4,999", odds: { common: 10, rare: 35, epic: 40, legendary: 15 } },
   { label: "5,000+", odds: { common: 5, rare: 22, epic: 45, legendary: 28 } },
+];
+
+// HUD control legend — the 5 HUD icons in HUD (left→right) order, rendered
+// from the SAME shared components the HUD uses (@/components/HudIcons).
+const CONTROLS: {
+  Icon: ComponentType<{ size?: number; className?: string }>;
+  name: string;
+  desc: string;
+}[] = [
+  { Icon: SuzuIcon, name: "Sound", desc: "Toggle sound and music on or off" },
+  { Icon: LeaderboardIcon, name: "Leaderboard", desc: "Top players by score" },
+  { Icon: ToriiIcon, name: "The Shrine", desc: "Your collection — all 44 kami" },
+  { Icon: InfoIcon, name: "How to Play", desc: "This guide" },
+  {
+    Icon: MonIcon,
+    name: "Settings",
+    desc: "Sound, music, and the yokai collection",
+  },
 ];
 
 export default function HelpOverlay({ onClose }: { onClose: () => void }) {
@@ -87,7 +112,29 @@ export default function HelpOverlay({ onClose }: { onClose: () => void }) {
 
             <div className="h-px bg-gradient-to-r from-transparent via-(--gold-700)/50 to-transparent my-3" />
 
-            {/* 2 — The Ascension Chain */}
+            {/* 2 — Controls (HUD icon legend) */}
+            <section className={styles.section}>
+              <h3 className={styles.h3}>
+                Controls <span className={styles.h3Kanji}>操作</span>
+              </h3>
+              <ul className={styles.controls}>
+                {CONTROLS.map(({ Icon, name, desc }) => (
+                  <li key={name} className={styles.controlRow}>
+                    <span className={styles.controlIcon}>
+                      <Icon size={18} />
+                    </span>
+                    <span className={styles.controlText}>
+                      <span className={styles.controlName}>{name}</span>
+                      <span className={styles.controlDesc}>{desc}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            <div className="h-px bg-gradient-to-r from-transparent via-(--gold-700)/50 to-transparent my-3" />
+
+            {/* 3 — The Ascension Chain */}
             <section className={styles.section}>
               <h3 className={styles.h3}>The Ascension Chain</h3>
               <ol className={styles.chain}>
@@ -107,7 +154,7 @@ export default function HelpOverlay({ onClose }: { onClose: () => void }) {
 
             <div className="h-px bg-gradient-to-r from-transparent via-(--gold-700)/50 to-transparent my-3" />
 
-            {/* 3 — Mint Your Kami */}
+            {/* 4 — Mint Your Kami */}
             <section className={styles.section}>
               <h3 className={styles.h3}>Mint Your Kami</h3>
               <p className={styles.body}>
@@ -120,7 +167,7 @@ export default function HelpOverlay({ onClose }: { onClose: () => void }) {
 
             <div className="h-px bg-gradient-to-r from-transparent via-(--gold-700)/50 to-transparent my-3" />
 
-            {/* 4 — Rarity Odds */}
+            {/* 5 — Rarity Odds */}
             <section className={styles.section}>
               <h3 className={styles.h3}>Rarity Odds</h3>
               <p className={styles.body}>
@@ -154,7 +201,7 @@ export default function HelpOverlay({ onClose }: { onClose: () => void }) {
 
             <div className="h-px bg-gradient-to-r from-transparent via-(--gold-700)/50 to-transparent my-3" />
 
-            {/* 5 — The Shrine */}
+            {/* 6 — The Shrine */}
             <section className={styles.section}>
               <h3 className={styles.h3}>The Shrine</h3>
               <p className={styles.body}>

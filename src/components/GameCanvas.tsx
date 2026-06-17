@@ -22,9 +22,13 @@ const yokaiNameFromId = (id: number): YokaiName =>
   YOKAI_CHAIN[id - 1].name.toLowerCase() as YokaiName;
 import SplashScreen from "@/components/SplashScreen";
 import Settings from "@/components/Settings";
-import SuzuIcon from "@/components/icons/SuzuIcon";
-import MonIcon from "@/components/icons/MonIcon";
-import LeaderboardIcon from "@/components/icons/LeaderboardIcon";
+import {
+  SuzuIcon,
+  MonIcon,
+  LeaderboardIcon,
+  ToriiIcon,
+  InfoIcon,
+} from "@/components/HudIcons";
 // FurinIcon kept in the codebase for future use (BGM / notifications);
 // the in-game mute button now uses SuzuIcon to match Settings Sound icon.
 import {
@@ -783,22 +787,7 @@ export default function GameCanvas() {
             touchAction: "manipulation",
           }}
         >
-          {/* Torii: two stacked horizontal beams + two posts. */}
-          <svg
-            viewBox="0 0 24 24"
-            width={18}
-            height={18}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.6}
-            strokeLinecap="round"
-            aria-hidden="true"
-          >
-            <path d="M3 6 H21" />
-            <path d="M5 9.2 H19" />
-            <path d="M6.5 6 V20" />
-            <path d="M17.5 6 V20" />
-          </svg>
+          <ToriiIcon size={18} />
         </button>
         <button
           onClick={openHelp}
@@ -816,21 +805,7 @@ export default function GameCanvas() {
             touchAction: "manipulation",
           }}
         >
-          {/* Info glyph: ring + dot + stem. */}
-          <svg
-            viewBox="0 0 24 24"
-            width={18}
-            height={18}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.6}
-            strokeLinecap="round"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="12" r="9" />
-            <circle cx="12" cy="8" r="0.6" fill="currentColor" stroke="none" />
-            <path d="M12 11 V16.5" />
-          </svg>
+          <InfoIcon size={18} />
         </button>
         <button
           onClick={openSettings}
