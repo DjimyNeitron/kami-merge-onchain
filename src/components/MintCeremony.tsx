@@ -34,7 +34,7 @@ import {
   useWriteContract,
 } from "wagmi";
 import { parseEventLogs } from "viem";
-import { sdk } from "@farcaster/miniapp-sdk";
+import { useSiweSession } from "@/hooks/useSiweSession";
 import NFTCard from "@/components/NFTCard";
 import styles from "./MintCeremony.module.css";
 import {
@@ -50,7 +50,6 @@ import {
   SONEIUM_CHAIN_ID,
 } from "@/config/contract";
 import { walletConnectConnectorId } from "@/lib/wagmi";
-import { useMiniAppContext } from "@/hooks/useMiniAppContext";
 import { playTick, playChime, playMintSuccess } from "@/lib/ceremonySound";
 
 // True when a chain switch failed because the wallet simply can't do the
@@ -93,17 +92,20 @@ function mintErrorMessage(e: unknown): string {
 // Best-effort off-chain record of the mint (links the NFT to the player's
 // personal best). Never blocks the ceremony — the NFT is minted on-chain
 // regardless of whether this POST lands.
-async function recordMint(body: {
-  tokenId: number;
-  txHash: string;
-  typeId: number;
-  scoreId: string;
-}): Promise<void> {
+async function recordMint(
+  body: {
+    tokenId: number;
+    txHash: string;
+    typeId: number;
+    scoreId: string;
+  },
+  token: string,
+): Promise<void> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     if (!baseUrl) return;
-    const { token } = await sdk.quickAuth.getToken();
-    if (!token) return;
+    // Auth is the SIWE session JWT (Bearer) — NOT Quick Auth — so the mint
+    // records from any browser / the Startale App, not only a Farcaster host.
     await fetch(`${baseUrl}/functions/v1/confirm-mint`, {
       method: "POST",
       headers: {
@@ -298,7 +300,9 @@ export default function MintCeremony({
   const { switchChainAsync } = useSwitchChain();
   const { connectAsync, connectors } = useConnect();
   const publicClient = usePublicClient({ chainId: SONEIUM_CHAIN_ID });
-  const { isMiniApp } = useMiniAppContext();
+  // SIWE session — auth (Bearer token) for the confirm-mint record. Works
+  // in any browser / the Startale App, not only a Farcaster host.
+  const { ensureSession } = useSiweSession();
 
   // typeId 0..43 = yokaiIndex * 4 + tierIndex (matches the metadata files
   // and the contract's typeId space).
@@ -411,16 +415,28 @@ export default function MintCeremony({
       /* tokenId stays null; success still proceeds off the confirmed tx */
     }
 
-    // 4. Off-chain record (links NFT → personal best). Only possible with a
-    //    Quick Auth JWT + a scoreId — i.e. inside a Farcaster host. Outside
-    //    it we flag `unrecorded` so the success screen can nudge the player.
-    if (tokenId !== null && scoreId && isMiniApp) {
-      void recordMint({
-        tokenId: Number(tokenId),
-        txHash: hash,
-        typeId,
-        scoreId,
-      });
+    // 4. Off-chain record (links NFT → personal best). Needs a SIWE session
+    //    (Bearer token) + a scoreId. We ensure the session here; if the user
+    //    has no session / rejects the signature, flag `unrecorded` so the
+    //    success screen can nudge them (the NFT is on-chain regardless).
+    let recordToken: string | null = null;
+    if (tokenId !== null && scoreId) {
+      try {
+        recordToken = await ensureSession();
+      } catch {
+        recordToken = null;
+      }
+    }
+    if (tokenId !== null && scoreId && recordToken) {
+      void recordMint(
+        {
+          tokenId: Number(tokenId),
+          txHash: hash,
+          typeId,
+          scoreId,
+        },
+        recordToken,
+      );
     } else {
       setUnrecorded(true);
     }
@@ -444,7 +460,7 @@ export default function MintCeremony({
     publicClient,
     typeId,
     scoreId,
-    isMiniApp,
+    ensureSession,
     yokai,
     tier,
     score,
