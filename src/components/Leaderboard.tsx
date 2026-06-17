@@ -19,14 +19,21 @@ function Avatar({
   pfpUrl,
   username,
   displayName,
+  address,
 }: {
   pfpUrl: string | null;
   username: string | null;
   displayName: string | null;
+  address?: string | null;
 }) {
   const [errored, setErrored] = useState(false);
+  // Letter circle: first char of username/display name, else the first hex
+  // nibble of an address-only entry, else "?".
+  const named = (username ?? displayName ?? "").trim();
   const letter =
-    (username ?? displayName ?? "").trim().charAt(0).toUpperCase() || "?";
+    named.charAt(0).toUpperCase() ||
+    (address ? address.replace(/^0x/i, "").charAt(0).toUpperCase() : "") ||
+    "?";
 
   if (pfpUrl && !errored) {
     return (
@@ -120,12 +127,19 @@ export default function Leaderboard({
       <div className="max-h-40 overflow-y-auto pr-1 flex flex-col gap-0.5">
         {topN.map((entry) => {
           const isMe = fid != null && entry.fid === fid;
-          const name = entry.username
-            ? `@${entry.username}`
-            : entry.displayName ?? `#${entry.fid}`;
+          const shortAddr = entry.address
+            ? `${entry.address.slice(0, 6)}…${entry.address.slice(-4)}`
+            : null;
+          // Prefer Farcaster identity; fall back to a truncated address for
+          // address-only (SIWE) entries, then to #fid, then "Anonymous".
+          const name =
+            (entry.username && `@${entry.username}`) ||
+            entry.displayName ||
+            shortAddr ||
+            (entry.fid != null ? `#${entry.fid}` : "Anonymous");
           return (
             <div
-              key={entry.fid}
+              key={entry.rank}
               className={`flex items-center gap-2 px-2 py-1 rounded ${
                 isMe ? "bg-(--gold-200)/15 border border-(--gold-700)/40" : ""
               }`}
@@ -137,6 +151,7 @@ export default function Leaderboard({
                 pfpUrl={entry.pfpUrl}
                 username={entry.username}
                 displayName={entry.displayName}
+                address={entry.address}
               />
               <span className="kami-serif text-[0.72rem] text-(--wood-dark) truncate flex-1 text-left">
                 {name}

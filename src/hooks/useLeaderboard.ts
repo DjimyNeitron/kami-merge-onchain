@@ -17,11 +17,12 @@ const TOP_N = 50;
 
 export type LeaderboardEntry = {
   rank: number; // 1-based position in the top-N list
-  fid: number;
+  fid: number | null; // null for address-only (SIWE) entries
   score: number;
   username: string | null;
   displayName: string | null;
   pfpUrl: string | null;
+  address: string | null; // wallet address — shown when there's no username
 };
 
 export type UseLeaderboardResult = {
@@ -37,6 +38,10 @@ type EmbeddedUser = {
   username: string | null;
   display_name: string | null;
   pfp_url: string | null;
+};
+
+type EmbeddedScore = {
+  wallet_address: string | null;
 };
 
 /**
@@ -60,10 +65,16 @@ export function useLeaderboard(
     setLoading(true);
     setError(null);
     try {
-      // 1 — Top-N, with the FK embed to users for display names + pfps.
+      // 1 — Top-N. Both embeds are LEFT joins (no `!inner`), so address-only
+      // rows (fid null, no users match) are KEPT — they just come back with
+      // `users: null`. The wallet address is read from the linked score
+      // (personal_bests.score_id → scores.wallet_address) so we can show an
+      // address when there's no Farcaster username.
       const { data, error: topErr } = await supabase
         .from("personal_bests")
-        .select("score, fid, users(username, display_name, pfp_url)")
+        .select(
+          "score, fid, users(username, display_name, pfp_url), scores(wallet_address)",
+        )
         .order("score", { ascending: false })
         .limit(TOP_N);
       if (topErr) throw topErr;
@@ -71,15 +82,18 @@ export function useLeaderboard(
       const rows: LeaderboardEntry[] = (data ?? []).map((r, i) => {
         // supabase-js may type a FK embed as an object or a 1-element array
         // depending on cardinality inference — handle both.
-        const raw = r.users as EmbeddedUser | EmbeddedUser[] | null;
-        const u = Array.isArray(raw) ? raw[0] ?? null : raw;
+        const rawUser = r.users as EmbeddedUser | EmbeddedUser[] | null;
+        const u = Array.isArray(rawUser) ? rawUser[0] ?? null : rawUser;
+        const rawScore = r.scores as EmbeddedScore | EmbeddedScore[] | null;
+        const s = Array.isArray(rawScore) ? rawScore[0] ?? null : rawScore;
         return {
           rank: i + 1,
-          fid: r.fid,
+          fid: r.fid ?? null,
           score: r.score,
           username: u?.username ?? null,
           displayName: u?.display_name ?? null,
           pfpUrl: u?.pfp_url ?? null,
+          address: s?.wallet_address ?? null,
         };
       });
       setTopN(rows);
