@@ -39,6 +39,7 @@ import { useSiweSession } from "@/hooks/useSiweSession";
 import NFTCard from "@/components/NFTCard";
 import styles from "./MintCeremony.module.css";
 import {
+  KANJI,
   TIER_ORDER,
   YOKAI_ORDER,
   type Tier,
@@ -322,9 +323,17 @@ export default function MintCeremony({
   // in any browser / the Startale App, not only a Farcaster host.
   const { ensureSession } = useSiweSession();
 
+  // Policy A — "mint any reached yokai". The run's peak yokai is the deepest
+  // merge; the player may bind ANY yokai at or below it (YOKAI_ORDER[0..peak])
+  // at the run's fixed, score-rolled tier (tier is NOT re-rolled). Default
+  // selection = peak, so just tapping "Bind the Spirit" mints today's kami.
+  const peakIndex = Math.max(0, YOKAI_ORDER.indexOf(yokai));
+  const tierIndex = TIER_ORDER.indexOf(tier);
+  const [selectedYokaiIndex, setSelectedYokaiIndex] = useState(peakIndex);
+  const selectedYokai: YokaiName = YOKAI_ORDER[selectedYokaiIndex] ?? yokai;
   // typeId 0..43 = yokaiIndex * 4 + tierIndex (matches the metadata files
-  // and the contract's typeId space).
-  const typeId = YOKAI_ORDER.indexOf(yokai) * 4 + TIER_ORDER.indexOf(tier);
+  // and the contract's typeId space). Follows the selection.
+  const selectedTypeId = selectedYokaiIndex * 4 + tierIndex;
 
   // Pre-mint ownership guard. D2 ("1 mint per wallet per typeId") makes a
   // re-mint of an owned kami revert ("Simulation Failed") in the wallet —
@@ -341,7 +350,7 @@ export default function MintCeremony({
     address: NFT_CONTRACT_ADDRESS,
     abi: MINTED_ABI,
     functionName: "minted",
-    args: address ? [address, typeId] : undefined,
+    args: address ? [address, selectedTypeId] : undefined,
     chainId: SONEIUM_CHAIN_ID,
     query: { enabled: !!address },
   });
@@ -419,7 +428,7 @@ export default function MintCeremony({
         address: NFT_CONTRACT_ADDRESS,
         abi: KAMI_NFT_ABI,
         functionName: "mint",
-        args: [typeId],
+        args: [selectedTypeId],
         chainId: SONEIUM_CHAIN_ID,
       });
     } catch (e) {
@@ -475,7 +484,7 @@ export default function MintCeremony({
         {
           tokenId: Number(tokenId),
           txHash: hash,
-          typeId,
+          typeId: selectedTypeId,
           scoreId,
         },
         recordToken,
@@ -489,7 +498,7 @@ export default function MintCeremony({
     setPhase("success");
     const nft: InventoryNFT = {
       tokenId: tokenId !== null ? tokenId.toString() : hash,
-      yokai,
+      yokai: selectedYokai,
       tier,
       mintedAt: Date.now(),
       score,
@@ -501,10 +510,10 @@ export default function MintCeremony({
   }, [
     writeContractAsync,
     publicClient,
-    typeId,
+    selectedTypeId,
     scoreId,
     ensureSession,
-    yokai,
+    selectedYokai,
     tier,
     score,
     onMintComplete,
@@ -620,7 +629,7 @@ export default function MintCeremony({
         style={{ width: cardWidth, ["--card-width"]: `${cardWidth}px` } as React.CSSProperties}
       >
         <NFTCard
-          yokai={yokai}
+          yokai={selectedYokai}
           tier={tier}
           width={cardWidth}
           interactive={true}
@@ -709,6 +718,38 @@ export default function MintCeremony({
       {/* 12c — action button. Primary heavy wood button before mint;
           a light ghost button (secondary, no urgency) on success. */}
       <div className={styles.mintButtonContainer}>
+        {/* Policy A — pick which reached yokai to bind (the run's tier is
+            FIXED; only the yokai changes). Shown only when there's an actual
+            choice (peak > Kodama), and hidden once the mint is in flight or
+            done so "one mint per run" reads cleanly. Hero card + ownership
+            read + mint all follow selectedTypeId. */}
+        {peakIndex > 0 && phase !== "minting" && phase !== "success" && (
+          <div className={styles.selector}>
+            <p className={styles.selectorCaption}>
+              Tier: {TIER_LABEL[tier]} — choose your kami
+            </p>
+            <div className={styles.selectorRow}>
+              {YOKAI_ORDER.slice(0, peakIndex + 1).map((yk, idx) => {
+                const isSel = idx === selectedYokaiIndex;
+                return (
+                  <button
+                    key={yk}
+                    type="button"
+                    aria-pressed={isSel}
+                    aria-label={yk}
+                    className={`${styles.selectorToken} ${
+                      isSel ? styles.selectorTokenActive : ""
+                    }`}
+                    onClick={() => setSelectedYokaiIndex(idx)}
+                    style={{ touchAction: "manipulation" }}
+                  >
+                    <span className={styles.selectorKanji}>{KANJI[yk]}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {phase === "success" ? (
           <>
             <button type="button" className={`btn-ghost ${styles.ghostBtn}`} onClick={handleButton}>
