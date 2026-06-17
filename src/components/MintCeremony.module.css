@@ -412,6 +412,73 @@
   color: var(--gold-200);
   opacity: 0.9;
 }
+
+/* ─── Yokai selector (Policy A — bind any reached yokai) ───────────── */
+/* Compact gold-on-indigo kanji chips above the mint button. Horizontally
+ * scrollable for a deep run (up to 11). The run's tier is fixed — only the
+ * yokai changes — so the caption states the tier. On-brand ceremony tokens. */
+.selector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 10px;
+  max-width: min(330px, 88vw);
+}
+.selectorCaption {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 10px;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--gold-50);
+  opacity: 0.8;
+  text-align: center;
+  white-space: nowrap;
+}
+.selectorRow {
+  display: flex;
+  gap: 6px;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 2px 2px 4px;
+  scrollbar-width: none; /* Firefox */
+  -webkit-overflow-scrolling: touch;
+}
+.selectorRow::-webkit-scrollbar {
+  display: none; /* WebKit */
+}
+.selectorToken {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid rgba(var(--gold-rgb) / 0.4);
+  background: rgba(var(--indigo-rgb) / 0.4);
+  color: var(--gold-50);
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    transform 120ms ease;
+}
+.selectorToken:active {
+  transform: scale(0.94);
+}
+.selectorTokenActive {
+  border-color: var(--gold-200);
+  background: rgba(var(--gold-rgb) / 0.22);
+  box-shadow: 0 0 10px rgba(255, 218, 110, 0.35);
+}
+.selectorKanji {
+  font-family:
+    "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", serif;
+  font-size: 17px;
+  line-height: 1;
+}
 .mintError {
   margin: 8px 0 0;
   font-family: Georgia, "Times New Roman", serif;
