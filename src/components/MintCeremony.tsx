@@ -724,13 +724,10 @@ export default function MintCeremony({
           // D2: this wallet already minted this kami — minting again would
           // revert ("Simulation Failed"). Show a calm enshrined state + a
           // route to the Shrine instead of a doomed mint button. No tx.
+          // Reuses the ceremony's own treatments — the success "Visit the
+          // Shrine" ghost button + the mint-available subtitle lines
+          // (.mintSub / .mintSubJp) — so it matches the rest of the flow.
           <>
-            <div className={styles.alreadyOwned}>
-              <span className={styles.alreadyOwnedKanji}>奉納済み</span>
-              <span className={styles.alreadyOwnedText}>
-                Already in your Shrine
-              </span>
-            </div>
             <button
               type="button"
               className={`btn-ghost ${styles.ghostBtn}`}
@@ -738,6 +735,8 @@ export default function MintCeremony({
             >
               Visit the Shrine
             </button>
+            <p className={styles.mintSub}>Already in your Shrine</p>
+            <p className={styles.mintSubJp}>奉納済み</p>
           </>
         ) : ownershipChecking ? (
           // Brief: never show an enabled "Bind the spirit" that then flips
