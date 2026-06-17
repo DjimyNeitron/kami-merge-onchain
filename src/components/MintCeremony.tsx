@@ -30,6 +30,7 @@ import {
   useAccount,
   useConnect,
   usePublicClient,
+  useReadContract,
   useSwitchChain,
   useWriteContract,
 } from "wagmi";
@@ -88,6 +89,23 @@ function mintErrorMessage(e: unknown): string {
   }
   return "Mint failed. Please try again.";
 }
+
+// minted(address, uint8) -> bool — the public auto-getter on KamiMergeNFT's
+// `mapping(address => mapping(uint8 => bool)) minted` (D2: one mint per
+// wallet per typeId). Same fragment useOwnedTypeIds.ts reads; mirrored here
+// for a single-typeId pre-mint ownership check.
+const MINTED_ABI = [
+  {
+    type: "function",
+    name: "minted",
+    stateMutability: "view",
+    inputs: [
+      { name: "", type: "address" },
+      { name: "", type: "uint8" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+] as const;
 
 // Best-effort off-chain record of the mint (links the NFT to the player's
 // personal best). Never blocks the ceremony — the NFT is minted on-chain
@@ -307,6 +325,31 @@ export default function MintCeremony({
   // typeId 0..43 = yokaiIndex * 4 + tierIndex (matches the metadata files
   // and the contract's typeId space).
   const typeId = YOKAI_ORDER.indexOf(yokai) * 4 + TIER_ORDER.indexOf(tier);
+
+  // Pre-mint ownership guard. D2 ("1 mint per wallet per typeId") makes a
+  // re-mint of an owned kami revert ("Simulation Failed") in the wallet —
+  // which reads as a crash. We read minted(address, typeId) up front and, if
+  // the player already owns this kami, show a calm "Already in your Shrine"
+  // state instead of a doomed mint button. Forced onto the Soneium client so
+  // it resolves even if the wallet is on the wrong chain. Fails OPEN: on
+  // error we fall back to the normal mint (the contract is the final guard).
+  const {
+    data: mintedFlag,
+    isLoading: ownershipLoading,
+    isError: ownershipError,
+  } = useReadContract({
+    address: NFT_CONTRACT_ADDRESS,
+    abi: MINTED_ABI,
+    functionName: "minted",
+    args: address ? [address, typeId] : undefined,
+    chainId: SONEIUM_CHAIN_ID,
+    query: { enabled: !!address },
+  });
+  // Already owned only when the read succeeded and returned true.
+  const alreadyOwned = !ownershipError && mintedFlag === true;
+  // Brief "checking" window: connected, read in flight, no result/err yet.
+  const ownershipChecking =
+    !!address && ownershipLoading && !ownershipError && mintedFlag === undefined;
 
   const soundRef = useRef(soundEnabled);
   soundRef.current = soundEnabled;
@@ -677,6 +720,36 @@ export default function MintCeremony({
               </p>
             )}
           </>
+        ) : alreadyOwned ? (
+          // D2: this wallet already minted this kami — minting again would
+          // revert ("Simulation Failed"). Show a calm enshrined state + a
+          // route to the Shrine instead of a doomed mint button. No tx.
+          <>
+            <div className={styles.alreadyOwned}>
+              <span className={styles.alreadyOwnedKanji}>奉納済み</span>
+              <span className={styles.alreadyOwnedText}>
+                Already in your Shrine
+              </span>
+            </div>
+            <button
+              type="button"
+              className={`btn-ghost ${styles.ghostBtn}`}
+              onClick={() => (onVisitShrine ?? onClose)?.()}
+            >
+              Visit the Shrine
+            </button>
+          </>
+        ) : ownershipChecking ? (
+          // Brief: never show an enabled "Bind the spirit" that then flips
+          // to the owned state once the read lands.
+          <button
+            type="button"
+            className={`btn-on-dark ${styles.mintButton}`}
+            disabled
+          >
+            <span className={styles.spinner} />
+            Checking the shrine…
+          </button>
         ) : awaitingExternalWallet ? (
           // The Farcaster Wallet can't reach Soneium — route the mint
           // through an external wallet via WalletConnect.
