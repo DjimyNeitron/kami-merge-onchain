@@ -421,9 +421,13 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
-  margin-bottom: 10px;
+  gap: 6px;
+  margin: 0 0 12px;
   max-width: min(330px, 88vw);
+  /* Glyphs are decorative labels — never selectable/draggable on long-press. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 .selectorCaption {
   margin: 0;
@@ -438,9 +442,13 @@
 }
 .selectorRow {
   display: flex;
+  align-items: center;
   gap: 6px;
   max-width: 100%;
+  /* Scroll horizontally within the panel when the run is deep; never spill
+   * vertically and never create a page-wide horizontal scroll. */
   overflow-x: auto;
+  overflow-y: hidden;
   padding: 2px 2px 4px;
   scrollbar-width: none; /* Firefox */
   -webkit-overflow-scrolling: touch;
@@ -448,10 +456,14 @@
 .selectorRow::-webkit-scrollbar {
   display: none; /* WebKit */
 }
+/* Content-sized pill (fixed height, width grows with the name) so 1-, 2-,
+ * and 3-character kanji (狐 / 河童 / 絡新婦) all sit fully inside the border.
+ * overflow:hidden is a belt-and-braces guard against any glyph spill. */
 .selectorToken {
   flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
+  min-width: 34px;
+  height: 30px;
+  padding: 0 11px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -460,6 +472,10 @@
   background: rgba(var(--indigo-rgb) / 0.4);
   color: var(--gold-50);
   cursor: pointer;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   transition:
     border-color 150ms ease,
     background 150ms ease,
@@ -476,8 +492,9 @@
 .selectorKanji {
   font-family:
     "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", serif;
-  font-size: 17px;
+  font-size: 15px;
   line-height: 1;
+  white-space: nowrap;
 }
 .mintError {
   margin: 8px 0 0;
