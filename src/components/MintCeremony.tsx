@@ -705,8 +705,11 @@ export default function MintCeremony({
 
       {/* 12b — tier banner (─ 上 EPIC ─). Unmounted on success so it
           can't crossfade against the inline success banner at the same
-          slot — the success banner takes over cleanly. */}
-      {phase !== "success" && (
+          slot. Also suppressed during mint-ready WHEN the yokai selector is
+          shown (peakIndex > 0) — the selector's own "Tier: X — choose your
+          kami" caption carries the tier there, so the floating banner would
+          only collide with it. Single-choice runs (no selector) keep it. */}
+      {phase !== "success" && !(peakIndex > 0 && phase === "mint-ready") && (
         <div className={styles.tierBanner} style={tierBannerStyle}>
           <div className={styles.tierBannerDash} />
           <span className={styles.tierBannerKanji}>{TIER_KANJI[tier]}</span>
@@ -735,6 +738,7 @@ export default function MintCeremony({
                   <button
                     key={yk}
                     type="button"
+                    draggable={false}
                     aria-pressed={isSel}
                     aria-label={yk}
                     className={`${styles.selectorToken} ${
