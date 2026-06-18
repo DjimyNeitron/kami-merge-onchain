@@ -120,6 +120,12 @@ export default function GameCanvas() {
     // successful mint can bind the NFT to this run's personal best.
     scoreId: string | null;
   } | null>(null);
+  // Mirror of submitResult for the closure-safe ensureScoreSaved() below
+  // (lets the mint flow read the latest scoreId without re-subscribing).
+  const submitResultRef = useRef(submitResult);
+  useEffect(() => {
+    submitResultRef.current = submitResult;
+  }, [submitResult]);
   // 3.5L — ceremony eligibility resolved once on game-over and cached
   // here so re-renders don't re-roll the tier. null means "no ceremony
   // this run" (below threshold or no reached yokai); the player then
@@ -457,13 +463,17 @@ export default function GameCanvas() {
   //     "Sign in to save your score" button and bail — no popup.
   //   • true (the user tapped that button): ensureSession() may sign once.
   const submitScore = useCallback(
-    async (score: number, mergeCount: number, interactive = false) => {
+    async (
+      score: number,
+      mergeCount: number,
+      interactive = false,
+    ): Promise<string | null> => {
       const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      if (!baseUrl) return;
+      if (!baseUrl) return null;
 
       // No connected wallet → guest / standalone web. Reads still work;
       // skip the write silently (no sign-in prompt), as before SIWE.
-      if (!walletRef.current) return;
+      if (!walletRef.current) return null;
 
       const reachedNow = reachedRef.current;
       const highestYokai = reachedNow.length
@@ -487,7 +497,7 @@ export default function GameCanvas() {
       }
       if (!token) {
         setNeedsSignIn(true);
-        return;
+        return null;
       }
       setNeedsSignIn(false);
 
@@ -509,25 +519,42 @@ export default function GameCanvas() {
 
         if (res.ok) {
           const json = await res.json();
+          const newScoreId =
+            typeof json.scoreId === "string" ? json.scoreId : null;
           setSubmitResult({
             isNewPersonalBest: Boolean(json.isNewPersonalBest),
             personalBest:
               typeof json.personalBest === "number" ? json.personalBest : null,
-            scoreId: typeof json.scoreId === "string" ? json.scoreId : null,
+            scoreId: newScoreId,
           });
-        } else {
-          // 409 duplicate / 429 rate-limited are benign; everything else
-          // is logged and ignored. Never throw — game-over UI must stand.
-          console.warn(
-            `[leaderboard] submit-score ${res.status} — leaderboard still renders read-only`,
-          );
+          return newScoreId;
         }
+        // 409 duplicate / 429 rate-limited are benign; everything else
+        // is logged and ignored. Never throw — game-over UI must stand.
+        console.warn(
+          `[leaderboard] submit-score ${res.status} — leaderboard still renders read-only`,
+        );
+        return null;
       } catch (e) {
         console.warn("[leaderboard] submit-score network error", e);
+        return null;
       }
     },
     [],
   );
+
+  // Mint-flow coupling: guarantee THIS run's score is saved so confirm-mint
+  // has the scoreId it requires (and the run reaches the leaderboard).
+  // Idempotent — reuses an already-saved scoreId; never re-submits the same
+  // run (the same clientNonce would 409). Returns the scoreId, or null if
+  // there's no run / the SIWE signature was rejected. May prompt one sign.
+  const ensureScoreSaved = useCallback(async (): Promise<string | null> => {
+    const existing = submitResultRef.current?.scoreId;
+    if (existing) return existing;
+    const run = lastRunRef.current;
+    if (!run) return null;
+    return submitScore(run.score, run.mergeCount, true);
+  }, [submitScore]);
 
   const handleRestart = () => {
     console.log("[GameCanvas] restart clicked");
@@ -879,6 +906,7 @@ export default function GameCanvas() {
                 tier={ceremonyRun.tier}
                 score={ceremonyRun.score}
                 scoreId={submitResult?.scoreId ?? null}
+                ensureScoreSaved={ensureScoreSaved}
                 cardWidth={190}
                 soundEnabled={sfxEnabled}
                 onClose={() => setCeremonyDismissed(true)}

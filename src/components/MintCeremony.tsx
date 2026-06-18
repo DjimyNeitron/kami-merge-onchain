@@ -160,6 +160,11 @@ interface MintCeremonyProps {
    *  null in standalone web / when submit-score didn't run → mint still
    *  works, the off-chain record is just skipped. */
   scoreId?: string | null;
+  /** Saves this run's score (if not already saved) and returns its scoreId —
+   *  idempotent. The mint flow calls this BEFORE minting so confirm-mint
+   *  always has a scoreId and the run reaches the leaderboard. Provided by
+   *  GameCanvas; may prompt one SIWE signature. */
+  ensureScoreSaved?: () => Promise<string | null>;
   onMintComplete?: (nft: InventoryNFT) => void;
   onClose?: () => void;
   /** "Visit the Shrine" (success screen). Falls back to onClose if absent. */
@@ -295,6 +300,7 @@ export default function MintCeremony({
   tier,
   score,
   scoreId = null,
+  ensureScoreSaved,
   onMintComplete,
   onClose,
   onVisitShrine,
@@ -308,8 +314,9 @@ export default function MintCeremony({
   // True once the connected (Farcaster) wallet has proven it can't reach
   // Soneium — the CTA switches to the external-wallet "summon" step.
   const [awaitingExternalWallet, setAwaitingExternalWallet] = useState(false);
-  // Set on a successful browser-path mint where no Quick Auth was available
-  // to record it — surfaces a gentle "open in Farcaster" note.
+  // True when an on-chain mint couldn't be recorded off-chain (no scoreId /
+  // no SIWE session) — the success screen then shows a neutral "it will appear
+  // shortly" note instead of confirming the Shrine record.
   const [unrecorded, setUnrecorded] = useState(false);
   const timers = useRef<number[]>([]);
 
@@ -421,6 +428,22 @@ export default function MintCeremony({
   const executeMint = useCallback(async () => {
     setPhase("minting");
 
+    // 0. Save the run's score FIRST (idempotent) so confirm-mint has the
+    //    scoreId it requires and the run reaches the leaderboard — even if
+    //    the on-chain mint below is then cancelled. Reuses an already-saved
+    //    scoreId (no double-submit); the SIWE signature here is the same
+    //    session used for the confirm-mint record, so the player signs at
+    //    most once. If the save is rejected we still mint on-chain; the
+    //    record is just skipped (unrecorded).
+    let mintScoreId: string | null = scoreId ?? null;
+    if (!mintScoreId && ensureScoreSaved) {
+      try {
+        mintScoreId = await ensureScoreSaved();
+      } catch {
+        mintScoreId = null;
+      }
+    }
+
     // 1. Sign + send the mint tx (wallet approval happens here).
     let hash: `0x${string}`;
     try {
@@ -468,28 +491,32 @@ export default function MintCeremony({
     }
 
     // 4. Off-chain record (links NFT → personal best). Needs a SIWE session
-    //    (Bearer token) + a scoreId. We ensure the session here; if the user
-    //    has no session / rejects the signature, flag `unrecorded` so the
-    //    success screen can nudge them (the NFT is on-chain regardless).
+    //    (Bearer token) + the scoreId from step 0. ensureSession() returns the
+    //    same session's cached token (no extra signature). Fire-and-forget —
+    //    confirm-mint re-verifies on-chain (can take a few seconds), so we
+    //    never block the success screen on it.
     let recordToken: string | null = null;
-    if (tokenId !== null && scoreId) {
+    if (tokenId !== null && mintScoreId) {
       try {
         recordToken = await ensureSession();
       } catch {
         recordToken = null;
       }
     }
-    if (tokenId !== null && scoreId && recordToken) {
+    if (tokenId !== null && mintScoreId && recordToken) {
+      setUnrecorded(false);
       void recordMint(
         {
           tokenId: Number(tokenId),
           txHash: hash,
           typeId: selectedTypeId,
-          scoreId,
+          scoreId: mintScoreId,
         },
         recordToken,
       );
     } else {
+      // No scoreId (the score save was rejected) or no session → can't record
+      // now. The NFT is on-chain regardless; the success copy stays neutral.
       setUnrecorded(true);
     }
 
@@ -512,6 +539,7 @@ export default function MintCeremony({
     publicClient,
     selectedTypeId,
     scoreId,
+    ensureScoreSaved,
     ensureSession,
     selectedYokai,
     tier,
@@ -759,10 +787,12 @@ export default function MintCeremony({
             <button type="button" className={`btn-ghost ${styles.ghostBtn}`} onClick={handleButton}>
               Visit the Shrine
             </button>
-            {unrecorded && (
+            {unrecorded ? (
               <p className={styles.mintSub}>
-                Minted on-chain — open in Farcaster to record it to your shrine.
+                Minted on-chain — it will appear in your Shrine shortly.
               </p>
+            ) : (
+              <p className={styles.mintSub}>Recorded to your Shrine ✦</p>
             )}
           </>
         ) : alreadyOwned ? (
