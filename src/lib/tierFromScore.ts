@@ -18,29 +18,36 @@
 
 import { TIER_ORDER, type Tier } from "@/config/yokai";
 
-// Mint-economy-v2 drop matrix (rarity scales with score). Each row sums
-// to 100. Keyed by the lower bound of the score bracket for readability;
-// bracketFor() does the actual range mapping. Higher score → meaningfully
-// better odds, but Legendary is never guaranteed — the small tail keeps
-// every reveal genuinely uncertain (per the locked design spirit).
+// Drop matrix (rarity scales with score). Each row sums to 100. Keyed by
+// the lower bound of the score bracket for readability; bracketFor() does
+// the actual range mapping. Higher score → meaningfully better odds, but
+// Legendary is never guaranteed — the small tail keeps every reveal
+// genuinely uncertain (per the locked design spirit).
+//
+// Recalibrated to the achievable score range: live data (13 runs / 3
+// wallets) clustered 1000–2650 (median ~1963, p90 ~2483), so the old
+// 3500–4999 / 5000+ brackets were never reached and Epic/Legendary leaked
+// out of the low brackets. The brackets below re-fit the gradient to that
+// range so Epic/Legendary require genuinely high scores. PROVISIONAL — fit
+// to a small sample; pure data, fully reversible as more scores accumulate.
 //
 // Exported so the Help overlay's rarity table renders from this single
 // source (no copied-in values) — keep the keys range-formatted as below.
 export const DROP_MATRIX: Record<string, Record<Tier, number>> = {
-  "1000-1999": { common: 50, rare: 38, epic: 10, legendary: 2 },
-  "2000-3499": { common: 25, rare: 45, epic: 24, legendary: 6 },
-  "3500-4999": { common: 10, rare: 35, epic: 40, legendary: 15 },
-  "5000+": { common: 5, rare: 22, epic: 45, legendary: 28 },
+  "1000-1799": { common: 68, rare: 30, epic: 2, legendary: 0 },
+  "1800-2399": { common: 42, rare: 44, epic: 13, legendary: 1 },
+  "2400-2999": { common: 22, rare: 45, epic: 28, legendary: 5 },
+  "3000+": { common: 8, rare: 32, epic: 45, legendary: 15 },
 };
 
 /** Minimum score for an NFT drop. Below this, no ceremony. */
 export const MIN_MINT_SCORE = 1000;
 
 function bracketFor(score: number): Record<Tier, number> {
-  if (score >= 5000) return DROP_MATRIX["5000+"];
-  if (score >= 3500) return DROP_MATRIX["3500-4999"];
-  if (score >= 2000) return DROP_MATRIX["2000-3499"];
-  return DROP_MATRIX["1000-1999"];
+  if (score >= 3000) return DROP_MATRIX["3000+"];
+  if (score >= 2400) return DROP_MATRIX["2400-2999"];
+  if (score >= 1800) return DROP_MATRIX["1800-2399"];
+  return DROP_MATRIX["1000-1799"];
 }
 
 // FNV-1a-style string hash → float in [0, 1). Deterministic: the same
