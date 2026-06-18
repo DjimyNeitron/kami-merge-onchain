@@ -166,10 +166,15 @@ export default function HelpOverlay({ onClose }: { onClose: () => void }) {
             <section className={styles.section}>
               <h3 className={styles.h3}>Mint Your Kami</h3>
               <p className={styles.body}>
-                When a run reaches{" "}
-                <strong>{MIN_MINT_SCORE.toLocaleString()}</strong> points, you
-                can mint that run&apos;s kami as an NFT on Soneium — an on-chain
-                claim. One mint per kami type per wallet.
+                Reach{" "}
+                <strong>{MIN_MINT_SCORE.toLocaleString()}</strong> points and you
+                can mint <strong>one</strong> kami from that run as an NFT on
+                Soneium — on-chain, just the network fee. Pick{" "}
+                <strong>any kami you reached</strong> in the selector — from
+                Kodama up to your deepest merge — so the smaller ones you merged
+                past stay claimable. Its <strong>tier</strong> (Common →
+                Legendary) is rolled from your score (higher score → better
+                odds); one mint per run.
               </p>
             </section>
 
@@ -214,7 +219,9 @@ export default function HelpOverlay({ onClose }: { onClose: () => void }) {
               <h3 className={styles.h3}>The Shrine</h3>
               <p className={styles.body}>
                 Your collection of all 44 kami (11 yokai × 4 tiers) lives in the
-                Shrine. Minted kami unlock there.
+                Shrine, and minted kami unlock there. Because you can bind any
+                kami you reach, you complete the Shrine by minting different
+                yokai and tiers across many runs.
               </p>
             </section>
           </div>
