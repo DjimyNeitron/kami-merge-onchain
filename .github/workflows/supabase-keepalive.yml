@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Ping weekly_leaderboard (1 row)
+      - name: Ping personal_bests
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
@@ -28,11 +28,17 @@ jobs:
             echo "::error::Missing SUPABASE_URL or SUPABASE_ANON_KEY repo secret."
             exit 1
           fi
-          # Anon key is public-safe; kept as a secret only to keep the
-          # workflow file clean and the project ref out of source.
+          # Strip any trailing slash on the base so we never build "//rest/v1".
+          BASE="${SUPABASE_URL%/}"
+          # personal_bests is a real table with a permissive public SELECT RLS
+          # policy, so the anon key (public-safe; kept secret only to keep the
+          # project ref out of source) can read it. A plain HTTP-200 read is
+          # enough DB activity to keep the free-tier project from pausing —
+          # no row-count assertion, so an empty table can't make it brittle.
+          # (The old step queried weekly_leaderboard, which does not exist.)
           curl -fsS \
-            "${SUPABASE_URL}/rest/v1/weekly_leaderboard?select=fid&limit=1" \
+            "${BASE}/rest/v1/personal_bests?select=id&limit=1" \
             -H "apikey: ${SUPABASE_ANON_KEY}" \
             -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
             -o /dev/null
-          echo "Supabase keep-alive ping OK."
+          echo "Supabase keep-alive ping OK (personal_bests)."
