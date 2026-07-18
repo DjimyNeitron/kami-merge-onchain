@@ -39,6 +39,8 @@ import MonIcon from "@/components/icons/MonIcon";
 import { useDevSkipWallet } from "@/hooks/useDevSkipWallet";
 import { useActualChainId } from "@/hooks/useActualChainId";
 import { useMiniAppContext } from "@/hooks/useMiniAppContext";
+// TEMP DEBUG — remove after diagnosis (branch diag/farcaster-splash).
+import { diag } from "@/lib/diagLog";
 import {
   SUPPORTED_CHAIN_IDS,
   SONEIUM_CHAIN_ID,
@@ -124,6 +126,19 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
   // / Startale-App / Warpcast host, false for standalone web. The hook
   // also fires its own connect() when host is detected.
   const { isMiniApp, isReady: miniAppReady } = useMiniAppContext();
+
+  // TEMP DEBUG — remove after diagnosis (branch diag/farcaster-splash).
+  // Fires whenever the splash APPEARS (mount) — the moment we're trying to
+  // catch. If this fires right after [GAMEOVER], the player was bounced.
+  useEffect(() => {
+    diag("[SPLASH-MOUNT] shown", {
+      isMiniApp,
+      miniAppReady,
+      isConnected,
+      actualChainId: actualChainId ?? null,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Two-video crossfade for a seamless splash loop. The MJ-generated
   // source clip's first/last frames don't visually match, so a single

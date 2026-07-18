@@ -3,6 +3,8 @@ import "./globals.css";
 import { Web3Provider } from "@/components/Web3Provider";
 import FarcasterUserBadge from "@/components/FarcasterUserBadge";
 import DebugConsole from "@/components/DebugConsole";
+// TEMP DEBUG — remove after diagnosis (branch diag/farcaster-splash).
+import DiagOverlay from "@/components/DiagOverlay";
 
 // Canonical site origin — used by every absolute URL in the embed
 // metadata below. Exposing it as a const keeps the occurrences
@@ -116,6 +118,8 @@ export default function RootLayout({
          * no listeners) unless the URL has `?debug=1`, so the prod
          * path is zero-cost. */}
         <DebugConsole />
+        {/* TEMP DEBUG — remove after diagnosis (branch diag/farcaster-splash). */}
+        <DiagOverlay />
         {/* Web3Provider is a client component nested inside this server
          * component — valid in the Next.js App Router. Everything below
          * (game canvas, settings, dev panel) can freely use wagmi hooks. */}
