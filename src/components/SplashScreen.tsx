@@ -34,19 +34,48 @@
 import { useEffect, useRef } from "react";
 import { useAccount, useDisconnect, useSwitchChain } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { soneium } from "viem/chains";
 import { YOKAI_CHAIN } from "@/config/yokai";
 import MonIcon from "@/components/icons/MonIcon";
 import { useDevSkipWallet } from "@/hooks/useDevSkipWallet";
 import { useActualChainId } from "@/hooks/useActualChainId";
 import { useMiniAppContext } from "@/hooks/useMiniAppContext";
+import {
+  SUPPORTED_CHAIN_IDS,
+  SONEIUM_CHAIN_ID,
+  BASE_CHAIN_ID,
+  chainName,
+  isSupportedChainId,
+  type SupportedChainId,
+} from "@/config/chains";
 
-// Only chain accepted by the MVP. We previously targeted Soneium Minato
-// (testnet, 1946), but the Farcaster preview wallet does not support
-// it — every Mini App test session errored with "Unsupported chainId
-// 1946". Switching to Soneium mainnet (1868) for Phase 3C onwards;
-// gameplay testing uses a small dev-funded mainnet wallet.
-const REQUIRED_CHAIN_ID = soneium.id; // 1868
+// Both editions' chains are accepted — Soneium (1868) + Base (8453), from
+// SUPPORTED_CHAIN_IDS in @/config/chains (the #75 registry). The gate below
+// only blocks a genuinely UNSUPPORTED chain. wallet_addEthereumChain params
+// per supported chain, for the "switch to a supported network" buttons
+// (wallets often don't know Soneium; some don't know Base either).
+type AddChainParams = {
+  chainId: string;
+  chainName: string;
+  nativeCurrency: { name: string; symbol: string; decimals: number };
+  rpcUrls: string[];
+  blockExplorerUrls: string[];
+};
+const ADD_CHAIN_PARAMS: Record<SupportedChainId, AddChainParams> = {
+  [SONEIUM_CHAIN_ID]: {
+    chainId: "0x" + SONEIUM_CHAIN_ID.toString(16), // 0x74c
+    chainName: "Soneium",
+    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+    rpcUrls: ["https://rpc.soneium.org"],
+    blockExplorerUrls: ["https://soneium.blockscout.com"],
+  },
+  [BASE_CHAIN_ID]: {
+    chainId: "0x" + BASE_CHAIN_ID.toString(16), // 0x2105
+    chainName: "Base",
+    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+    rpcUrls: ["https://mainnet.base.org"],
+    blockExplorerUrls: ["https://basescan.org"],
+  },
+};
 
 // Friendly names for the most common EVM chains a user might land on
 // when they first hit the splash. Anything outside this map falls back
@@ -163,17 +192,15 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
   }, []);
 
   /**
-   * Switch to Soneium mainnet. If the wallet doesn't know about the
-   * chain yet (MetaMask returns code 4902 / "Unrecognized chain ID"
-   * when asked to switch to a chain it has never seen), we follow up
-   * with `wallet_addEthereumChain` using the full Soneium parameters.
-   * After a successful add, MetaMask switches into the new chain
-   * automatically and `chainChanged` fires, so the splash advances
-   * to Welcome on the next render.
+   * Switch to a supported chain (Soneium 1868 or Base 8453). If the wallet
+   * doesn't know it yet (MetaMask returns code 4902 / "Unrecognized chain
+   * ID"), we follow up with `wallet_addEthereumChain` using that chain's
+   * params. After a successful add the wallet switches in and `chainChanged`
+   * fires, so the splash advances to Welcome on the next render.
    */
-  const handleSwitchChain = async () => {
+  const handleSwitchChain = async (target: SupportedChainId) => {
     try {
-      await switchChainAsync({ chainId: REQUIRED_CHAIN_ID });
+      await switchChainAsync({ chainId: target });
     } catch (err: unknown) {
       console.error("[SplashScreen] switch failed:", err);
       const e = err as { code?: number; message?: string } | null;
@@ -193,15 +220,7 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
 
         await provider.request({
           method: "wallet_addEthereumChain",
-          params: [
-            {
-              chainId: "0x" + REQUIRED_CHAIN_ID.toString(16), // 0x74c
-              chainName: "Soneium",
-              nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-              rpcUrls: ["https://rpc.soneium.org"],
-              blockExplorerUrls: ["https://soneium.blockscout.com"],
-            },
-          ],
+          params: [ADD_CHAIN_PARAMS[target]],
         });
         // wallet_addEthereumChain auto-switches in MetaMask after the
         // user approves. chainChanged should fire next; useActualChainId
@@ -220,7 +239,12 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
 
   const walletConnected = isConnected && !!address;
   const chainKnown = actualChainId !== undefined;
-  const onRequiredChain = actualChainId === REQUIRED_CHAIN_ID;
+  // Accept BOTH editions' chains (Soneium 1868 + Base 8453). The gate fires
+  // only for a chain outside SUPPORTED_CHAIN_IDS. NOTE: we keep reading the
+  // wallet's TRUE chain via useActualChainId (direct EIP-1193), not
+  // useAccount().chainId — the latter returns wagmi's default chain for a
+  // chain not in config, which would let an unsupported wallet slip the gate.
+  const onSupportedChain = isSupportedChainId(actualChainId);
   // Mini App hosts manage chain switching themselves and only ever
   // present the correct chain to the embedded app, so the EIP-1193
   // chain plumbing is irrelevant in that path. Gate every chain-side
@@ -240,13 +264,13 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
   // as ready in that environment.
   const walletReady = inMiniApp
     ? walletConnected
-    : walletConnected && chainKnown && onRequiredChain;
+    : walletConnected && chainKnown && onSupportedChain;
   const effectivelyConnected = walletReady || devSkipWallet;
   const wrongChain =
     !inMiniApp &&
     walletConnected &&
     chainKnown &&
-    !onRequiredChain &&
+    !onSupportedChain &&
     !devSkipWallet;
   // Probing state: the SDK promise hasn't resolved yet. We don't know
   // whether to show "Connect Wallet" (would confuse a Mini App user
@@ -265,9 +289,8 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
       probing,
       isConnected,
       actualChainId,
-      REQUIRED_CHAIN_ID,
       chainLoading,
-      onRequiredChain,
+      onSupportedChain,
       walletReady,
       wrongChain,
       devSkipWallet,
@@ -280,7 +303,7 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
     isConnected,
     actualChainId,
     chainLoading,
-    onRequiredChain,
+    onSupportedChain,
     walletReady,
     wrongChain,
     devSkipWallet,
@@ -442,7 +465,9 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
               </h2>
               <p className="kami-serif text-white/85 text-sm sm:text-base leading-relaxed text-center">
                 Kami Merge runs on{" "}
-                <strong className="text-(--gold-200)">Soneium</strong>.
+                <strong className="text-(--gold-200)">Soneium</strong> or{" "}
+                <strong className="text-(--gold-200)">Base</strong> — switch to
+                a supported network.
                 <br />
                 You&rsquo;re currently on{" "}
                 {actualChainId !== undefined &&
@@ -451,19 +476,24 @@ export default function SplashScreen({ onStart, onOpenSettings }: Props) {
                   : `chain ID ${actualChainId}`}
                 .
               </p>
-              <button
-                type="button"
-                onClick={handleSwitchChain}
-                onTouchEnd={(e) => {
-                  e.preventDefault();
-                  handleSwitchChain();
-                }}
-                disabled={isSwitching}
-                className="btn-on-dark splash-pulse text-base sm:text-lg font-semibold px-6 py-2.5 disabled:opacity-60 disabled:animation-none disabled:cursor-wait"
-                style={{ touchAction: "manipulation" }}
-              >
-                {isSwitching ? "Switching…" : "Switch to Soneium"}
-              </button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {SUPPORTED_CHAIN_IDS.map((cid) => (
+                  <button
+                    key={cid}
+                    type="button"
+                    onClick={() => handleSwitchChain(cid)}
+                    onTouchEnd={(e) => {
+                      e.preventDefault();
+                      handleSwitchChain(cid);
+                    }}
+                    disabled={isSwitching}
+                    className="btn-on-dark splash-pulse text-base sm:text-lg font-semibold px-6 py-2.5 disabled:opacity-60 disabled:animation-none disabled:cursor-wait"
+                    style={{ touchAction: "manipulation" }}
+                  >
+                    {isSwitching ? "Switching…" : `Switch to ${chainName(cid)}`}
+                  </button>
+                ))}
+              </div>
               <button
                 type="button"
                 onClick={() => disconnect()}
