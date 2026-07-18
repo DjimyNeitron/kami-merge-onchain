@@ -662,14 +662,23 @@ export default function GameCanvas() {
       wasValidRef.current = true;
       return;
     }
-    // isValidSession is false here. Only bounce on a DEFINITE invalidation —
-    // a disconnect, or (browser only) a KNOWN unsupported chain. A
-    // momentarily-unknown chain (EIP-1193 read pending, common in the
-    // Farcaster miniapp at the game-over transition) is treated as pending,
-    // NOT invalid, so we never false-bounce a legitimate on-chain player.
+    // isValidSession is false here. Only bounce on a DEFINITE invalidation,
+    // and ONLY in the standalone browser. In a Farcaster / Startale mini-app
+    // the HOST owns the wallet + connection: both the chain read (EIP-1193,
+    // async postMessage) AND wagmi's `isConnected` can blip false/undefined
+    // during the game-over→ceremony re-render burst without the user having
+    // actually disconnected. Confirmed from diag PR #79 runtime logs — the
+    // ceremony was `willRenderCeremony:true`, yet `walletConnected:false`
+    // (with isMiniApp:true, chainKnown:true, supported:true) fired this
+    // watcher's not-connected branch and bounced to splash. So in a mini-app
+    // we treat BOTH not-connected and unknown-chain as pending, never a
+    // definite invalidation — if the wallet is truly gone, the ceremony's own
+    // mint button surfaces that when tapped. In the browser, a genuine
+    // disconnect or a known-unsupported chain still resets exactly as before.
     const definitelyInvalid =
-      !walletConnected ||
-      (!isMiniApp && chainKnown && !isSupportedChainId(actualChainId));
+      !isMiniApp &&
+      (!walletConnected ||
+        (chainKnown && !isSupportedChainId(actualChainId)));
     // TEMP DEBUG — every time isValidSession is false, record why (and whether
     // it will bounce). If Farcaster still bounces via this watcher, this line
     // shows the branch + state.
