@@ -765,7 +765,11 @@ export default function MintCeremony({
 
       {/* 12c — action button. Primary heavy wood button before mint;
           a light ghost button (secondary, no urgency) on success. */}
-      <div className={styles.mintButtonContainer}>
+      <div
+        className={`${styles.mintButtonContainer} ${
+          showSwitcher ? styles.mintButtonContainerBrowser : ""
+        }`}
+      >
         {/* Chain switcher — browser only (mini-app hosts force their own
             chain). Picks WHERE the same (yokai, tier) is minted; never
             rerolls the tier. Owned-badge + button label follow it. */}

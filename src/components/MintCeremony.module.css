@@ -343,6 +343,15 @@
   opacity: 1;
   pointer-events: auto;
 }
+/* Browser context (the only place the chain toggle shows) has NO host chrome
+ * bar at the bottom — the 140px buffer only applies inside Farcaster/Startale.
+ * So drop the whole control stack lower here, giving the toggle its own row
+ * below the card without overlapping the card's tier sub-label on a narrow
+ * mobile viewport. Mini-app hosts keep bottom:160 (above their chrome); the
+ * toggle is hidden there, so the shorter stack doesn't collide. */
+.mintButtonContainerBrowser {
+  bottom: 100px;
+}
 /* Bind-the-Spirit sizing + pulse ring. Family DNA (font/border/radius/
  * tracking/active-scale) lives on the global .btn-on-dark. Only the
  * ceremony-specific size + uppercase + pulse glow stay here. */
