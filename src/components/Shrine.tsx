@@ -17,6 +17,7 @@ import {
   type YokaiName,
 } from "@/config/yokai";
 import { useOwnedTypeIds } from "@/hooks/useOwnedTypeIds";
+import { chainName } from "@/config/chains";
 import styles from "./Shrine.module.css";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -64,7 +65,7 @@ function LockIcon() {
 
 export default function Shrine({ onClose }: { onClose: () => void }) {
   const { address } = useAccount();
-  const { ownedTypeIds, ownedCount, isLoading, hasAddress } =
+  const { ownedTypeIds, ownedCount, isLoading, hasAddress, chainsFor } =
     useOwnedTypeIds(address);
   const { openConnectModal } = useConnectModal();
   const [selected, setSelected] = useState<Selected | null>(null);
@@ -135,6 +136,19 @@ export default function Shrine({ onClose }: { onClose: () => void }) {
                     interactive={false}
                     className={styles.cardFill}
                   />
+                  {owned && (
+                    <span className={styles.chainBadges} aria-hidden="true">
+                      {chainsFor(typeId).map((cid) => (
+                        <span
+                          key={cid}
+                          className={styles.chainBadge}
+                          title={chainName(cid)}
+                        >
+                          {chainName(cid).charAt(0)}
+                        </span>
+                      ))}
+                    </span>
+                  )}
                   {!owned && (
                     <span className={styles.lock} aria-hidden="true">
                       <LockIcon />

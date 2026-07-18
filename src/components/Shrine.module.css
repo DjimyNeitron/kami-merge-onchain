@@ -152,6 +152,32 @@
   pointer-events: none;
 }
 
+/* Chain badge(s) on owned cards — which edition (Soneium "S" / Base "B")
+ * holds this kami. Two editions = two badges. Top-right corner, unobtrusive. */
+.chainBadges {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: flex;
+  gap: 2px;
+  pointer-events: none;
+}
+.chainBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--gold-50);
+  background: rgba(var(--indigo-rgb) / 0.85);
+  border: 1px solid rgba(var(--gold-rgb) / 0.6);
+}
+
 /* Close button — mirrors the HUD icon-button style. */
 .close {
   position: absolute;
