@@ -12,14 +12,22 @@
 // If the contract is ever redeployed, update soneium-mainnet.json AND
 // either this default or the env var.
 
-import { soneium } from "viem/chains";
+import {
+  SONEIUM_CHAIN_ID,
+  BASE_CHAIN_ID,
+  contractFor,
+} from "@/config/chains";
 
-/** Soneium mainnet chain id. Mirrors `wagmiConfig` in src/lib/wagmi.ts. */
-export const SONEIUM_CHAIN_ID = soneium.id; // 1868
+// Chain ids + the per-chain contract registry now live in @/config/chains
+// (single source for the Soneium + Base editions). Re-exported here so
+// existing importers (useSiweSession, etc.) keep working unchanged.
+export { SONEIUM_CHAIN_ID, BASE_CHAIN_ID };
 
-/** KamiMergeNFT, deployed + Blockscout-verified on Soneium mainnet. */
-export const NFT_CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_NFT_CONTRACT_ADDRESS ??
-  "0x9c21C01a52481a68dB6fad5960d5366D0779983a") as `0x${string}`;
+/**
+ * Legacy alias for the Soneium edition's address. New multichain call-sites
+ * read `contractFor(chainId)` from @/config/chains instead of this constant.
+ */
+export const NFT_CONTRACT_ADDRESS = contractFor(SONEIUM_CHAIN_ID);
 
 // Minimal ABI — only the mint path the frontend touches: the `mint`
 // function, the `Minted` event (to read tokenId back from the receipt),

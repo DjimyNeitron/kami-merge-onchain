@@ -46,11 +46,9 @@ import {
   type YokaiName,
 } from "@/config/yokai";
 import { type InventoryNFT } from "@/hooks/useInventory";
-import {
-  KAMI_NFT_ABI,
-  NFT_CONTRACT_ADDRESS,
-  SONEIUM_CHAIN_ID,
-} from "@/config/contract";
+import { KAMI_NFT_ABI } from "@/config/contract";
+import { contractFor, chainName, SUPPORTED_CHAIN_IDS } from "@/config/chains";
+import { useTargetChain } from "@/hooks/useTargetChain";
 import { walletConnectConnectorId } from "@/lib/wagmi";
 import { playTick, playChime, playMintSuccess } from "@/lib/ceremonySound";
 
@@ -117,6 +115,9 @@ async function recordMint(
     txHash: string;
     typeId: number;
     scoreId: string;
+    // Which chain the mint happened on (confirm-mint v5 verifies against it;
+    // v4 ignores it → safe to send before v5 ships).
+    chainId: number;
   },
   token: string,
 ): Promise<void> {
@@ -321,11 +322,15 @@ export default function MintCeremony({
   const timers = useRef<number[]>([]);
 
   // On-chain mint wiring. The connected wallet signs; no key in app code.
-  const { address, isConnected, chainId: walletChainId } = useAccount();
+  const { address, isConnected } = useAccount();
   const { writeContractAsync } = useWriteContract();
   const { switchChainAsync } = useSwitchChain();
   const { connectAsync, connectors } = useConnect();
-  const publicClient = usePublicClient({ chainId: SONEIUM_CHAIN_ID });
+  // Which chain we mint on (ground-truth from the wallet + context). The
+  // browser Soneium⇄Base switcher drives setPreferred.
+  const { targetChainId, walletChainId, showSwitcher, setPreferred } =
+    useTargetChain();
+  const publicClient = usePublicClient({ chainId: targetChainId });
   // SIWE session — auth (Bearer token) for the confirm-mint record. Works
   // in any browser / the Startale App, not only a Farcaster host.
   const { ensureSession } = useSiweSession();
@@ -354,11 +359,13 @@ export default function MintCeremony({
     isLoading: ownershipLoading,
     isError: ownershipError,
   } = useReadContract({
-    address: NFT_CONTRACT_ADDRESS,
+    address: contractFor(targetChainId),
     abi: MINTED_ABI,
     functionName: "minted",
     args: address ? [address, selectedTypeId] : undefined,
-    chainId: SONEIUM_CHAIN_ID,
+    // Per-chain ownership: owned on Soneium ≠ owned on Base. Re-reads when
+    // the target chain changes (switcher / host).
+    chainId: targetChainId,
     query: { enabled: !!address },
   });
   // Already owned only when the read succeeded and returned true.
@@ -448,11 +455,11 @@ export default function MintCeremony({
     let hash: `0x${string}`;
     try {
       hash = await writeContractAsync({
-        address: NFT_CONTRACT_ADDRESS,
+        address: contractFor(targetChainId),
         abi: KAMI_NFT_ABI,
         functionName: "mint",
         args: [selectedTypeId],
-        chainId: SONEIUM_CHAIN_ID,
+        chainId: targetChainId,
       });
     } catch (e) {
       setMintError(mintErrorMessage(e));
@@ -511,6 +518,7 @@ export default function MintCeremony({
           txHash: hash,
           typeId: selectedTypeId,
           scoreId: mintScoreId,
+          chainId: targetChainId,
         },
         recordToken,
       );
@@ -545,10 +553,11 @@ export default function MintCeremony({
     tier,
     score,
     onMintComplete,
+    targetChainId,
   ]);
 
   // Tap "Bind the spirit": guard the chain, then mint. If the connected
-  // wallet can't reach Soneium (the Farcaster Wallet has no 1868 support),
+  // wallet can't reach the target chain (the Farcaster Wallet has no Soneium
   // surface the external-wallet escape hatch instead of a raw failure.
   const handleMint = useCallback(async () => {
     if (phase !== "mint-ready") return;
@@ -559,21 +568,29 @@ export default function MintCeremony({
       return;
     }
 
-    if (walletChainId !== SONEIUM_CHAIN_ID) {
+    if (walletChainId !== targetChainId) {
       try {
-        await switchChainAsync({ chainId: SONEIUM_CHAIN_ID });
+        await switchChainAsync({ chainId: targetChainId });
       } catch (e) {
         if (isUnsupportedChainError(e)) {
           setAwaitingExternalWallet(true);
           return;
         }
-        setMintError("Switch to Soneium to mint.");
+        setMintError(`Switch to ${chainName(targetChainId)} to mint.`);
         return;
       }
     }
 
     await executeMint();
-  }, [phase, isConnected, address, walletChainId, switchChainAsync, executeMint]);
+  }, [
+    phase,
+    isConnected,
+    address,
+    walletChainId,
+    targetChainId,
+    switchChainAsync,
+    executeMint,
+  ]);
 
   // External-wallet path: connect a Soneium-capable wallet over
   // WalletConnect (QR / mobile deep-link), then run the same mint. Quick
@@ -587,14 +604,14 @@ export default function MintCeremony({
       return;
     }
     try {
-      await connectAsync({ connector: wc, chainId: SONEIUM_CHAIN_ID });
+      await connectAsync({ connector: wc, chainId: targetChainId });
     } catch (e) {
       setMintError(mintErrorMessage(e));
       return;
     }
     setAwaitingExternalWallet(false);
     await executeMint();
-  }, [connectors, connectAsync, executeMint]);
+  }, [connectors, connectAsync, targetChainId, executeMint]);
 
   const handleButton = () => {
     if (phase === "success") (onVisitShrine ?? onClose)?.();
@@ -749,6 +766,31 @@ export default function MintCeremony({
       {/* 12c — action button. Primary heavy wood button before mint;
           a light ghost button (secondary, no urgency) on success. */}
       <div className={styles.mintButtonContainer}>
+        {/* Chain switcher — browser only (mini-app hosts force their own
+            chain). Picks WHERE the same (yokai, tier) is minted; never
+            rerolls the tier. Owned-badge + button label follow it. */}
+        {showSwitcher && phase !== "minting" && phase !== "success" && (
+          <div className={styles.chainSwitcher} role="group" aria-label="Mint chain">
+            <span className={styles.chainSwitcherLabel}>Mint on</span>
+            {SUPPORTED_CHAIN_IDS.map((cid) => {
+              const active = cid === targetChainId;
+              return (
+                <button
+                  key={cid}
+                  type="button"
+                  aria-pressed={active}
+                  className={`${styles.chainOption} ${
+                    active ? styles.chainOptionActive : ""
+                  }`}
+                  onClick={() => setPreferred(cid)}
+                  style={{ touchAction: "manipulation" }}
+                >
+                  {chainName(cid)}
+                </button>
+              );
+            })}
+          </div>
+        )}
         {/* Policy A — pick which reached yokai to bind (the run's tier is
             FIXED; only the yokai changes). Shown only when there's an actual
             choice (peak > Kodama), and hidden once the mint is in flight or
@@ -860,7 +902,7 @@ export default function MintCeremony({
                   鋳造中…
                 </>
               ) : (
-                "Bind the spirit"
+                `Bind on ${chainName(targetChainId)}`
               )}
             </button>
             <p className={styles.mintSub}>A blessing — only the network fee</p>

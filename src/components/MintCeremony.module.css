@@ -496,6 +496,44 @@
   line-height: 1;
   white-space: nowrap;
 }
+
+/* ─── Chain switcher (browser only — Soneium ⇄ Base) ──────────────── */
+.chainSwitcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.chainSwitcherLabel {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 10px;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--gold-50);
+  opacity: 0.7;
+}
+.chainOption {
+  flex: 0 0 auto;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  border: 1px solid rgba(var(--gold-rgb) / 0.4);
+  background: rgba(var(--indigo-rgb) / 0.4);
+  color: var(--gold-50);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease;
+}
+.chainOptionActive {
+  border-color: var(--gold-200);
+  background: rgba(var(--gold-rgb) / 0.22);
+  box-shadow: 0 0 10px rgba(255, 218, 110, 0.3);
+}
 .mintError {
   margin: 8px 0 0;
   font-family: Georgia, "Times New Roman", serif;

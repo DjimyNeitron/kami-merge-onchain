@@ -38,7 +38,7 @@ import {
   zerionWallet,
 } from "@rainbow-me/rainbowkit/wallets";
 import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
-import { soneium } from "viem/chains";
+import { base, soneium } from "viem/chains";
 import { createConfig, http } from "wagmi";
 import { walletConnect } from "wagmi/connectors";
 
@@ -103,9 +103,13 @@ export const wagmiConfig = createConfig({
     }),
     ...rainbowKitConnectors,
   ],
-  chains: [soneium],
+  // Both editions' chains are registered so the wallet can be switched to
+  // whichever the player mints on (Soneium via Startale, Base via Farcaster
+  // or the browser switcher). See src/config/chains.ts for the contract map.
+  chains: [soneium, base],
   transports: {
     [soneium.id]: http("https://rpc.soneium.org"),
+    [base.id]: http("https://mainnet.base.org"),
   },
   ssr: true,
 });
