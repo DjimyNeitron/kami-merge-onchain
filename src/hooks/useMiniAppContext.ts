@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useConnect } from "wagmi";
 import { sdk } from "@farcaster/miniapp-sdk";
 import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
-import { soneium } from "viem/chains";
 
 /**
  * Public Farcaster identity surface — projection of the SDK's
@@ -134,15 +133,14 @@ export function useMiniAppContext(): MiniAppContextValue {
             setLocation("unknown");
           }
 
-          // Auto-connect through the host wallet, pre-targeting
-          // Soneium mainnet so wagmi's chainId state lines up with
-          // gameplay expectations from the first render. (Mainnet
-          // because the Farcaster preview wallet does not currently
-          // support Soneium Minato.)
-          connect({
-            connector: farcasterMiniApp(),
-            chainId: soneium.id,
-          });
+          // Auto-connect through the host wallet WITHOUT forcing a chain, so
+          // it connects on the host's native chain — the ground-truth signal
+          // the mint flow uses to pick the target chain (Startale → Soneium
+          // 1868, Farcaster → Base 8453). See useTargetChain. (Previously we
+          // hard-forced Soneium here, which is wrong for the Base/Farcaster
+          // edition; the mint flow now switchChain()s to the target if the
+          // wallet lands on an unsupported chain.)
+          connect({ connector: farcasterMiniApp() });
           // ready() tells the host to hide its own splash. We don't
           // gate on connect() resolving because ready() is purely a
           // host-side signal; flipping isReady here lets the splash
