@@ -40,7 +40,7 @@ import { useDevMode } from "@/hooks/useDevMode";
 import DevPanel from "@/components/dev/DevPanel";
 import { useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount } from "wagmi";
-import { soneium } from "viem/chains";
+import { isSupportedChainId, SUPPORTED_CHAIN_IDS } from "@/config/chains";
 import { useDevSkipWallet } from "@/hooks/useDevSkipWallet";
 import { useActualChainId } from "@/hooks/useActualChainId";
 import { saveTrack, type BgmTrackId } from "@/game/bgmTracks";
@@ -210,8 +210,11 @@ export default function GameCanvas() {
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const actualChainId = useActualChainId();
   const devSkipWallet = useDevSkipWallet();
+  // Valid on EITHER supported chain (Soneium 1868 or Base 8453) — a Base
+  // wallet must reach + stay in the game. Uses the wallet's TRUE chain
+  // (useActualChainId) vs SUPPORTED_CHAIN_IDS from the #75 registry.
   const isValidSession =
-    walletConnected && actualChainId === soneium.id;
+    walletConnected && isSupportedChainId(actualChainId);
   const wasValidRef = useRef(false);
 
   // TEMP diagnostic — mirrors the splash's log so cross-referencing the
@@ -220,7 +223,7 @@ export default function GameCanvas() {
     console.log("[GameCanvas] session check", {
       walletConnected,
       actualChainId,
-      expected: soneium.id,
+      supported: SUPPORTED_CHAIN_IDS,
       isValidSession,
       devSkipWallet,
     });
@@ -1211,12 +1214,13 @@ function WalletChip({ maxWidth }: { maxWidth: number }) {
 
   if (!isConnected || !address) return null;
 
-  // Wrong-chain sessions never reach here in practice (the splash
-  // covers the HUD), but render defensively: a chip displaying an
-  // address while the wallet is on the wrong chain would be
-  // misleading, so we suppress it. Also covers the brief window
-  // before the EIP-1193 round-trip lands (actualChainId undefined).
-  if (actualChainId !== soneium.id) return null;
+  // Unsupported-chain sessions never reach here in practice (the splash
+  // covers the HUD), but render defensively: a chip displaying an address
+  // while the wallet is on an unsupported chain would be misleading, so we
+  // suppress it. Also covers the brief window before the EIP-1193 round-trip
+  // lands (actualChainId undefined → not supported). Both editions
+  // (Soneium/Base) are accepted.
+  if (!isSupportedChainId(actualChainId)) return null;
 
   const short = `${address.slice(0, 6)}…${address.slice(-4)}`;
   const ready = !!openAccountModal;
