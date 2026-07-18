@@ -195,7 +195,7 @@ export default function GameCanvas() {
   const { isConnected: walletConnected, address } = useAccount();
   // Farcaster identity (fid/username/pfp) — used only for the leaderboard
   // own-row highlight now; identity for the submit is the SIWE address.
-  const { user: fcUser } = useMiniAppContext();
+  const { user: fcUser, isMiniApp } = useMiniAppContext();
   // SIWE session — auth for the score submit (Bearer token). The auto
   // game-over submit uses getValidToken() (a valid cached token, or null —
   // NEVER signs), so a finished run only auto-saves when the player is
@@ -210,11 +210,19 @@ export default function GameCanvas() {
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const actualChainId = useActualChainId();
   const devSkipWallet = useDevSkipWallet();
-  // Valid on EITHER supported chain (Soneium 1868 or Base 8453) — a Base
-  // wallet must reach + stay in the game. Uses the wallet's TRUE chain
-  // (useActualChainId) vs SUPPORTED_CHAIN_IDS from the #75 registry.
+  // "Not known yet" — the EIP-1193 read hasn't answered (pending), which is
+  // common in the Farcaster miniapp where the host provider replies over
+  // async postMessage. Treated as pending, NOT unsupported (see the watcher).
+  const chainKnown = actualChainId !== undefined && actualChainId !== null;
+  // Valid on EITHER supported chain (Soneium 1868 or Base 8453). In a
+  // Farcaster / Startale mini-app the HOST owns the wallet + chain (and the
+  // miniapp connector's chain read is unreliable/delayed — it can blip
+  // undefined at the game-over→ceremony transition), so we trust
+  // `walletConnected` there — mirroring SplashScreen's `walletReady`. In the
+  // standalone browser we still require a KNOWN, supported chain.
   const isValidSession =
-    walletConnected && isSupportedChainId(actualChainId);
+    walletConnected &&
+    (isMiniApp === true || isSupportedChainId(actualChainId));
   const wasValidRef = useRef(false);
 
   // TEMP diagnostic — mirrors the splash's log so cross-referencing the
@@ -223,11 +231,18 @@ export default function GameCanvas() {
     console.log("[GameCanvas] session check", {
       walletConnected,
       actualChainId,
+      isMiniApp,
       supported: SUPPORTED_CHAIN_IDS,
       isValidSession,
       devSkipWallet,
     });
-  }, [walletConnected, actualChainId, isValidSession, devSkipWallet]);
+  }, [
+    walletConnected,
+    actualChainId,
+    isMiniApp,
+    isValidSession,
+    devSkipWallet,
+  ]);
   // Derived: umbrella muted state (both silenced) drives the emoji button
   const muted = !sfxEnabled && !bgmEnabled;
   const allUnlocked = unlockedIds.length >= 11;
@@ -588,7 +603,15 @@ export default function GameCanvas() {
       wasValidRef.current = true;
       return;
     }
-    if (wasValidRef.current) {
+    // isValidSession is false here. Only bounce on a DEFINITE invalidation —
+    // a disconnect, or (browser only) a KNOWN unsupported chain. A
+    // momentarily-unknown chain (EIP-1193 read pending, common in the
+    // Farcaster miniapp at the game-over transition) is treated as pending,
+    // NOT invalid, so we never false-bounce a legitimate on-chain player.
+    const definitelyInvalid =
+      !walletConnected ||
+      (!isMiniApp && chainKnown && !isSupportedChainId(actualChainId));
+    if (wasValidRef.current && definitelyInvalid) {
       console.log(
         "[GameCanvas] session invalidated (disconnect or wrong chain) → splash"
       );
@@ -599,7 +622,14 @@ export default function GameCanvas() {
       setShowSplash(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isValidSession, devSkipWallet]);
+  }, [
+    isValidSession,
+    devSkipWallet,
+    walletConnected,
+    isMiniApp,
+    chainKnown,
+    actualChainId,
+  ]);
 
   // ── Dev handlers (thin pass-throughs to engine). Only invoked from the
   // DevPanel, which itself only mounts when useDevMode() returns true.
