@@ -7,4 +7,17 @@ optimizer = true
 optimizer_runs = 200
 solc_version = "0.8.24"
 
+# RPCs are read from env so no secret/provider URL is committed. Soneium
+# (1868) is already deployed (Blockscout-verified via CLI flags) and is
+# reference-only — do not redeploy. Base (8453) is the target of this PR.
+[rpc_endpoints]
+base = "${BASE_RPC_URL}"
+
+# Basescan verification for the Base (8453) deploy. Key comes from env
+# (BASESCAN_API_KEY) — never hardcoded. Works with a Basescan key against the
+# legacy URL below, or an Etherscan-v2 multichain key (swap url to
+# https://api.etherscan.io/v2/api and pass --chain 8453).
+[etherscan]
+base = { key = "${BASESCAN_API_KEY}", chain = 8453, url = "https://api.basescan.org/api" }
+
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
