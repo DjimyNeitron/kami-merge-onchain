@@ -42,6 +42,17 @@ export type MiniAppContextValue = {
   isReady: boolean;
   user: FarcasterUser | null;
   location: MiniAppLocation | null;
+  /**
+   * The HOST client's fid (`ctx.client.clientFid`) — identifies WHICH
+   * mini-app host we're embedded in (Warpcast ≈ 9152, the Base app, the
+   * Startale App, etc.), as opposed to `user.fid` which is the player.
+   * Null until the SDK context resolves, or in the standalone browser.
+   *
+   * Used by useTargetChain to route the mint chain per host: every mini-app
+   * host mints on Base today; a future Startale clientFid can be allowlisted
+   * back to Soneium. See STARTALE_CLIENT_FIDS there.
+   */
+  clientFid: number | null;
 };
 
 /**
@@ -77,6 +88,7 @@ export function useMiniAppContext(): MiniAppContextValue {
   const [isReady, setIsReady] = useState(false);
   const [user, setUser] = useState<FarcasterUser | null>(null);
   const [location, setLocation] = useState<MiniAppLocation | null>(null);
+  const [clientFid, setClientFid] = useState<number | null>(null);
   const { connect } = useConnect();
 
   useEffect(() => {
@@ -109,6 +121,13 @@ export function useMiniAppContext(): MiniAppContextValue {
             clientFid: ctx.client?.clientFid,
           });
           setIsMiniApp(true);
+          // Host client fid — the discriminator useTargetChain uses to pick
+          // the mint chain per host (see STARTALE_CLIENT_FIDS there).
+          setClientFid(
+            typeof ctx.client?.clientFid === "number"
+              ? ctx.client.clientFid
+              : null,
+          );
 
           // Project the SDK's UserContext onto our narrower
           // FarcasterUser shape. ctx.user.fid is mandatory in the SDK
@@ -189,5 +208,5 @@ export function useMiniAppContext(): MiniAppContextValue {
     };
   }, [connect]);
 
-  return { isMiniApp, isReady, user, location };
+  return { isMiniApp, isReady, user, location, clientFid };
 }
