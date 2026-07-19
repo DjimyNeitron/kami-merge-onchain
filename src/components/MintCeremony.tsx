@@ -35,6 +35,7 @@ import {
   useWriteContract,
 } from "wagmi";
 import { parseEventLogs } from "viem";
+import { sdk } from "@farcaster/miniapp-sdk";
 import { useSiweSession } from "@/hooks/useSiweSession";
 import NFTCard from "@/components/NFTCard";
 import styles from "./MintCeremony.module.css";
@@ -47,7 +48,12 @@ import {
 } from "@/config/yokai";
 import { type InventoryNFT } from "@/hooks/useInventory";
 import { KAMI_NFT_ABI } from "@/config/contract";
-import { contractFor, chainName, SUPPORTED_CHAIN_IDS } from "@/config/chains";
+import {
+  contractFor,
+  chainName,
+  SUPPORTED_CHAIN_IDS,
+  BASE_CHAIN_ID,
+} from "@/config/chains";
 import { useTargetChain } from "@/hooks/useTargetChain";
 import { walletConnectConnectorId } from "@/lib/wagmi";
 import { playTick, playChime, playMintSuccess } from "@/lib/ceremonySound";
@@ -328,7 +334,7 @@ export default function MintCeremony({
   const { connectAsync, connectors } = useConnect();
   // Which chain we mint on (ground-truth from the wallet + context). The
   // browser Soneium⇄Base switcher drives setPreferred.
-  const { targetChainId, walletChainId, showSwitcher, setPreferred } =
+  const { targetChainId, walletChainId, showSwitcher, setPreferred, isMiniApp } =
     useTargetChain();
   const publicClient = usePublicClient({ chainId: targetChainId });
   // SIWE session — auth (Bearer token) for the confirm-mint record. Works
@@ -618,6 +624,59 @@ export default function MintCeremony({
     else void handleMint();
   };
 
+  // ── Share-after-mint (Task 2) ──────────────────────────────────────────
+  // Virality hook: once a kami is bound, offer a one-tap share to Farcaster
+  // (mini-app SDK composeCast) and/or X (web intent). We ALWAYS open the
+  // composer/intent for the user to confirm — never auto-post. The message
+  // names the bound kami + tier + chain and embeds the app URL so Farcaster
+  // renders the mini-app rich card.
+  const APP_URL = "https://kami-merge.vercel.app";
+  // The kami actually bound (follows the selection), Title-cased for prose.
+  const shareYokai =
+    selectedYokai.charAt(0).toUpperCase() + selectedYokai.slice(1);
+  const shareTier = TIER_LABEL[tier];
+  const shareChain = chainName(targetChainId);
+  const shareText = `I summoned ${shareYokai} (${shareTier}) in Kami Merge ⛩️ on ${shareChain}`;
+
+  // Farcaster cast — only meaningful inside a mini-app host. Fails soft: if
+  // composeCast is unavailable/throws (older host, non-Farcaster mini-app),
+  // fall back to the X intent so the button never dead-ends or crashes.
+  const shareToFarcaster = useCallback(async () => {
+    try {
+      await sdk.actions.composeCast({ text: shareText, embeds: [APP_URL] });
+    } catch {
+      window.open(
+        `https://twitter.com/intent/tweet?text=${encodeURIComponent(
+          shareText,
+        )}&url=${encodeURIComponent(APP_URL)}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+    }
+    // shareText/APP_URL are derived from render-stable inputs; deps kept explicit.
+  }, [shareText]);
+
+  // X / Twitter — a web intent, works in browser and mini-app. One on-brand
+  // hashtag for the chain keeps it non-spammy. Inside a mini-app the host
+  // webview can swallow window.open, so route through the SDK's openUrl
+  // there (fall back to window.open if it's unavailable/throws).
+  const shareToX = useCallback(async () => {
+    const hashtags =
+      targetChainId === BASE_CHAIN_ID ? "Base,onchain" : "Soneium,onchain";
+    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(
+      shareText,
+    )}&url=${encodeURIComponent(APP_URL)}&hashtags=${hashtags}`;
+    if (isMiniApp) {
+      try {
+        await sdk.actions.openUrl(url);
+        return;
+      } catch {
+        // fall through to window.open
+      }
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  }, [shareText, targetChainId, isMiniApp]);
+
   // Silhouette kanji + tier accent: intro shows the central 神
   // placeholder; once the spin starts the drum-index drives both the
   // kanji glyph and the per-tier border colour via --tier-current.
@@ -833,6 +892,27 @@ export default function MintCeremony({
             <button type="button" className={`btn-ghost ${styles.ghostBtn}`} onClick={handleButton}>
               Visit the Shrine
             </button>
+            {/* Share-after-mint (Task 2). Farcaster cast only in a mini-app
+             * host (SDK composeCast); X intent everywhere. Both open a
+             * prefilled composer for the user to send — never auto-post. */}
+            <div className={styles.shareRow}>
+              {isMiniApp && (
+                <button
+                  type="button"
+                  className={`btn-ghost ${styles.shareBtn}`}
+                  onClick={() => void shareToFarcaster()}
+                >
+                  Share on Farcaster
+                </button>
+              )}
+              <button
+                type="button"
+                className={`btn-ghost ${styles.shareBtn}`}
+                onClick={() => void shareToX()}
+              >
+                Share on X
+              </button>
+            </div>
             {unrecorded ? (
               <p className={styles.mintSub}>
                 Minted on-chain — it will appear in your Shrine shortly.

@@ -725,6 +725,23 @@
   white-space: nowrap;
 }
 
+/* Share-after-mint row (Task 2): compact ghost buttons under "Visit the
+ * Shrine". Wraps on narrow viewports so the two chips never overflow the
+ * card on mobile. */
+.shareRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+.shareBtn {
+  padding: 7px 18px;
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 /* ─── Keyframes ──────────────────────────────────────────────────── */
 @keyframes fade-in { to { opacity: 1; } }
 @keyframes fade-in-soft { to { opacity: 0.85; } }
