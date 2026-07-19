@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import { useConnect } from "wagmi";
 import { sdk } from "@farcaster/miniapp-sdk";
-// TEMP DEBUG — remove after diagnosis (branch diag/farcaster-splash).
-import { diag } from "@/lib/diagLog";
 import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
 
 /**
@@ -116,10 +114,6 @@ export function useMiniAppContext(): MiniAppContextValue {
         if (cancelled) return;
         if (ctx) {
           console.log("[useMiniAppContext] Mini App detected", ctx);
-          // TEMP DEBUG
-          diag("[MINIAPP] detected → isMiniApp=true", {
-            clientFid: ctx.client?.clientFid,
-          });
           setIsMiniApp(true);
           // Host client fid — the discriminator useTargetChain uses to pick
           // the mint chain per host (see STARTALE_CLIENT_FIDS there).
@@ -183,9 +177,6 @@ export function useMiniAppContext(): MiniAppContextValue {
           console.log(
             "[useMiniAppContext] Standalone web (no Mini App context within timeout)"
           );
-          // TEMP DEBUG — if this fires INSIDE Farcaster, detection failed and
-          // #78's isMiniApp exemption never applies.
-          diag("[MINIAPP] standalone/timeout → isMiniApp=false");
           setIsMiniApp(false);
           setIsReady(true);
         }
@@ -197,8 +188,6 @@ export function useMiniAppContext(): MiniAppContextValue {
             ? (err as { message?: string }).message
             : String(err);
         console.log("[useMiniAppContext] No Mini App context", message);
-        // TEMP DEBUG
-        diag("[MINIAPP] error → isMiniApp=false", { message: String(message) });
         setIsMiniApp(false);
         setIsReady(true);
       });
