@@ -1,6 +1,6 @@
 "use client";
 
-// Top-right Farcaster identity chip — shown ONLY when the app is
+// Top-LEFT Farcaster identity chip — shown ONLY when the app is
 // actively running inside a Mini App host AND useMiniAppContext has
 // resolved a user object. In every other surface (standalone web,
 // SSR, in-flight probe, host without an authenticated user) this
@@ -91,8 +91,17 @@ function FarcasterUserBadgeInner() {
         // env(safe-area-inset-*) keeps the chip clear of iOS notch /
         // host header bars. The 16px floor handles browsers that
         // don't expose safe-area insets at all.
+        //
+        // Anchored top-LEFT (not top-right): every screen parks its own
+        // control in the top-right corner — the game WalletChip
+        // (w-full justify-end), the Shrine close (X), and the ceremony
+        // dismiss (×) — so a top-right badge overprinted them. The
+        // top-left corner is empty on the splash, game HUD, Shrine, and
+        // ceremony, so the chip now sits clear on every surface. Below
+        // sm: it's just the 32px avatar circle; at sm+ the pill grows
+        // rightward into empty space.
         top: "max(16px, env(safe-area-inset-top))",
-        right: "max(16px, env(safe-area-inset-right))",
+        left: "max(16px, env(safe-area-inset-left))",
         zIndex: 150,
         background: "rgba(var(--indigo-rgb) / 0.72)",
         // rgb(180, 150, 90) is a slightly-tan version of --gold-200; no
