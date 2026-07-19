@@ -88,6 +88,10 @@ export const metadata: Metadata = {
     "mobile-web-app-capable": "yes",
     "apple-mobile-web-app-capable": "yes",
     "fc:miniapp": FC_MINIAPP,
+    // talent.app domain-ownership verification for kami-merge.vercel.app.
+    // Static token, rendered into <head> on the root path; additive only.
+    "talentapp:project_verification":
+      "a78e86f822f6c4c6dd25a8758ebfec432b64deab2ec635fbb3e2918a048e781fa08ce7489e9be345e6c800f52f03c66c7e5a2b522cf995d6e47860101f32cadc",
   },
 };
 
