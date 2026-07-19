@@ -569,20 +569,6 @@
  * centred (the row layout read off-centre because the heavy red kanji
  * pulled the optical centre left). Centred on both axes at 60%, in the
  * band between the card bottom and the (now glow-less) ghost button. */
-.successBannerInline {
-  position: absolute;
-  top: 60%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  z-index: 14;
-  opacity: 0;
-  pointer-events: none;
-  animation: fade-in-soft 0.6s ease-out 0.3s forwards;
-}
 .successKanjiInline {
   font-family:
     "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", serif;
@@ -725,19 +711,41 @@
   white-space: nowrap;
 }
 
-/* Share-after-mint row (Task 2): compact ghost buttons under "Visit the
- * Shrine". Wraps on narrow viewports so the two chips never overflow the
- * card on mobile. */
-.shareRow {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 2px;
+/* Post-mint success block (heading → Visit the Shrine → Share on Farcaster →
+ * Share on X → recorded note) is ONE centred flow column. Anchored a fixed
+ * gap BELOW the hero card — card centre 37% + ~half its height (190px card ×
+ * 7/5 ÷ 2 ≈ 133px) + breathing room — so the stack grows downward with even
+ * rhythm and never overlaps the card or itself, at any viewport height. This
+ * supersedes the base bottom:160 anchor (and the browser bottom:100), which
+ * grew the taller post-share stack UPWARD into the heading (#83 overlap). */
+.ceremonyScene[data-phase="success"] .mintButtonContainer {
+  top: calc(37% + 150px);
+  bottom: auto;
+  width: min(300px, 86%);
+  align-items: stretch;
+  gap: 12px;
 }
+/* Even rhythm: the note spaces off the column gap alone (drop its own top
+ * margin so it isn't pushed further than the buttons above it). */
+.ceremonyScene[data-phase="success"] .mintButtonContainer .mintSub {
+  margin-top: 0;
+}
+/* "Blessing received" heading — now the first child of the success column
+ * (was a separate mid-scene banner). Keeps the soft fade-in reveal. */
+.successHeading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  margin-bottom: 2px;
+  opacity: 0;
+  animation: fade-in-soft 0.6s ease-out 0.3s forwards;
+}
+/* Share buttons: same ghost treatment as "Visit the Shrine" (secondary, a
+ * touch smaller); full width comes from the column's align-items: stretch. */
 .shareBtn {
-  padding: 7px 18px;
-  font-size: 12.5px;
+  padding: 8px 18px;
+  font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
 }

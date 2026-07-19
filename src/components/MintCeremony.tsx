@@ -888,31 +888,40 @@ export default function MintCeremony({
           </div>
         )}
         {phase === "success" ? (
+          // Success = ONE centred flow column (heading → Visit the Shrine →
+          // Share on Farcaster → Share on X → recorded note). The container is
+          // anchored a fixed gap below the hero card in CSS ([data-phase=
+          // "success"] .mintButtonContainer), so the added share buttons grow
+          // the stack downward with even rhythm instead of upward into the
+          // heading/card (the #83 overlap). The "Blessing received" heading is
+          // the first child here rather than a separate mid-scene banner.
           <>
+            <div className={styles.successHeading}>
+              <div className={styles.successKanjiInline}>完</div>
+              <div className={styles.successTextInline}>Blessing received</div>
+            </div>
             <button type="button" className={`btn-ghost ${styles.ghostBtn}`} onClick={handleButton}>
               Visit the Shrine
             </button>
             {/* Share-after-mint (Task 2). Farcaster cast only in a mini-app
              * host (SDK composeCast); X intent everywhere. Both open a
              * prefilled composer for the user to send — never auto-post. */}
-            <div className={styles.shareRow}>
-              {isMiniApp && (
-                <button
-                  type="button"
-                  className={`btn-ghost ${styles.shareBtn}`}
-                  onClick={() => void shareToFarcaster()}
-                >
-                  Share on Farcaster
-                </button>
-              )}
+            {isMiniApp && (
               <button
                 type="button"
                 className={`btn-ghost ${styles.shareBtn}`}
-                onClick={() => void shareToX()}
+                onClick={() => void shareToFarcaster()}
               >
-                Share on X
+                Share on Farcaster
               </button>
-            </div>
+            )}
+            <button
+              type="button"
+              className={`btn-ghost ${styles.shareBtn}`}
+              onClick={() => void shareToX()}
+            >
+              Share on X
+            </button>
             {unrecorded ? (
               <p className={styles.mintSub}>
                 Minted on-chain — it will appear in your Shrine shortly.
@@ -1000,14 +1009,6 @@ export default function MintCeremony({
         )}
       </div>
 
-      {/* 12d — success banner: inline, replaces the tier banner in-place
-          on success (no top-overlay that could cover the card). */}
-      {phase === "success" && (
-        <div className={styles.successBannerInline}>
-          <div className={styles.successKanjiInline}>完</div>
-          <div className={styles.successTextInline}>Blessing received</div>
-        </div>
-      )}
     </div>
   );
 }
