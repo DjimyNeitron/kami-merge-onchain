@@ -1,180 +1,75 @@
-# Kami Merge · 神マージ
+Kami Merge (神マージ)
 
-A Japanese yokai merge puzzle game built on Soneium, Sony's Ethereum L2.
 
-Combine kodama spirits into kitsune, then into oni, then into Amaterasu
-herself — a Suika-style physics puzzle wrapped in shrine aesthetics, with
-on-chain leaderboard and dual-mode support (standalone web + Startale
-Mini App).
+A calm, onchain merge puzzle — merge yokai spirits in a moonlit forest and mint the kami you reach as an NFT.
 
-## Features
 
-- **11 yokai tiers** — Kodama → Hitodama → Tanuki → Kappa → Kitsune →
-  Jorogumo → Tengu → Oni → Raijin → Ryujin → Amaterasu
-- **Physics-based merge gameplay** — Matter.js with tuned collisions,
-  bounce and friction for a satisfying stack-and-merge feel
-- **Shrine ambiance** — koto pentatonic combo melody that ascends with
-  every merge, bonshō temple bell on game over, torii-gate background
-- **Soneium-native** — connects on Soneium Minato testnet today (mainnet
-  at launch), wagmi + viem + RainbowKit under the hood
-- **Dual-mode architecture** — runs as a standalone web app and (planned)
-  as a Farcaster Mini App inside the Startale App
-- **On-chain leaderboard (planned)** — scores linked to wallet, anti-cheat
-  via signed messages
-- **DevPanel** — URL-gated `?dev=1` mode with god mode, wallet bypass,
-  yokai spawning, and catalogue unlocks for fast iteration
 
-## Tech stack
+Kami Merge is a Suika-style physics merge puzzle set in Japanese mythology, built as a Farcaster Mini App and playable on two chains: Base and Soneium. Drop and merge yokai spirits to summon gods, then mint the kami you reach as an ERC-721 NFT.
 
-- Frontend: Next.js 16, TypeScript, React, Tailwind CSS
-- Physics: Matter.js
-- Audio: Web Audio API + sample playback (koto, bonshō, drop)
-- Web3: wagmi 2.x, viem 2.x, RainbowKit 2.x
-- Blockchain: Soneium (Ethereum L2 by Sony, OP-Stack)
-- Database (planned): Supabase for off-chain leaderboard
-- Deployment target: Vercel
+🎮 Play: https://kami-merge.vercel.app
 
-## Getting started
 
-### Prerequisites
+What it is
 
-- Node.js 20 or newer
-- A WalletConnect Project ID (free at https://cloud.reown.com)
-- Soneium Minato testnet ETH for local wallet testing
-  (faucet: https://docs.soneium.org/docs/builders/tools/faucets)
+Kami Merge takes the familiar "drop and merge" puzzle loop and grounds it in a hand-crafted world of yokai (妖怪) and kami (神). You drop spirits into a bowl; when two of the same kind touch, they merge into the next spirit up the chain — from a humble kodama all the way to Amaterasu. The higher you climb, the rarer the kami you can permanently mint onchain.
 
-### Install
+There are no timers and no pressure — just a quiet, meditative loop in a moonlit forest, with an onchain collection ("the Shrine") to grow at your own pace.
 
-```bash
-git clone https://github.com/DjimyNeitron/kami-merge-onchain.git
-cd kami-merge-onchain
-npm install
-```
+Highlights
 
-### Configure
 
-Copy the env template:
+Onchain minting on two networks. The kami you reach can be minted as an ERC-721 NFT on Base (8453) or Soneium (1868) — same art, two editions.
+Farcaster Mini App. Runs natively inside Farcaster with in-app wallet minting and one-tap share-to-cast, and also as a standalone web app with wallet connect.
+The Shrine. A personal, on-chain collection view showing every kami you own across both chains, with locked/unlocked states for the full set.
+A leaderboard tracking best scores by player identity.
+Royalty-aware NFTs (ERC-2981) with a structured, per-token trait set (yokai, kanji, tier, element, and more).
 
-```bash
-cp .env.example .env.local
-```
 
-Fill `.env.local` with your keys. At minimum
-`NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` is required for mobile / remote
-wallets; MetaMask and Rabby browser extensions still work without it.
+Tech stack
 
-### Run
+LayerTechFrontendNext.js, React, TypeScriptPhysics / renderingMatter.js + HTML5 CanvasAudioWeb Audio API (procedural marimba synthesis)Wallet / chainwagmi, viem, RainbowKit, Farcaster Mini App SDKAuthSign-In With Ethereum (SIWE)BackendSupabase (Postgres, Edge Functions)ContractsSolidity, Foundry, OpenZeppelin (ERC-721 + ERC-2981)HostingVercel
 
-```bash
-npm run dev
-```
+Onchain deployments
 
-Open http://localhost:3000
+Both contracts are verified KamiMergeNFT (ERC-721 + ERC-2981) deployments:
 
-For mobile testing on your LAN:
+ChainChain IDContractBase84530x9EDDC0156c587ace1f1636326FE7378856DeC0C4Soneium18680x9c21C01a52481a68dB6fad5960d5366D0779983a
 
-```bash
-npm run dev -- -H 0.0.0.0
-```
+Architecture
 
-Then visit `http://YOUR_LAN_IP:3000` from your phone on the same Wi-Fi.
+Kami Merge uses a dual-mode design so a single build serves both audiences:
 
-## Development
 
-### Dev mode
+Farcaster context → the Farcaster Mini App SDK provides the player's identity and an in-app wallet; minting targets Base.
+Startale / standalone web context → wallet connect via RainbowKit; minting targets Soneium (or the wallet's supported chain).
 
-Append `?dev=1` to the URL to unlock the DevPanel:
 
-- **God mode** — disables game-over detection
-- **Skip wallet** — bypasses the wallet-connect splash gate for fast
-  iteration on gameplay, audio, and visuals
-- **Clear field** — removes every yokai in play
-- **Unlock all yokai** — marks all 11 tiers as discovered in the
-  Settings catalogue
-- **Spawn any yokai** — one button per tier
+Scores are submitted to a Supabase Edge Function and verified server-side via a SIWE-issued token. Minting is fully permissionless and on-chain; a confirm-mint Edge Function records each mint (chain-aware) after reading the token id straight from the contract's Minted event, so the database never has to trust client-supplied token data. NFT ownership shown in the Shrine is always read from chain, not from the database.
 
-The dev wallet bypass is gated by `?dev=1` at the hook level, so it
-cannot be toggled on a production build even by seeding sessionStorage
-manually.
+The kami
 
-### Project structure
+Eleven spirits form the merge chain, from common woodland yokai to the sun goddess herself:
 
-```
-src/
-├── app/              Next.js App Router entry
-├── components/       React components (GameCanvas, SplashScreen, Settings, DevPanel, icons)
-├── game/             Matter.js engine, audio system, particle effects, yokai config
-├── hooks/            useDevMode, useDevSkipWallet
-├── lib/              wagmi config, (planned) supabase client
-public/
-├── yokai/            11 yokai sprites (PNG, 512x512)
-├── sfx/              Audio samples (koto A4, bonshō, celtic harp drop)
-└── bg_game.jpg       Shrine-gate background
-```
+kodama → hitodama → tanuki → kappa → kitsune → jōrōgumo → tengu → oni → raijin → ryūjin → amaterasu
 
-### Build
+Each kami is minted in one of four rarity tiers (common, rare, epic, legendary), determined by the score at which it was reached.
 
-```bash
-npm run build     # Production build
-npm run start     # Serve the production build
-```
+Status
 
-## Roadmap
+Live and playable on Base and Soneium, with onchain minting working end-to-end on both chains, an on-chain Shrine collection, share-to-cast/tweet, and a leaderboard. Actively maintained by a solo developer.
 
-- [x] Core gameplay (Matter.js, 11 yokai, tuned physics)
-- [x] Audio system (pentatonic koto combo, water-drop SFX, bonshō GO)
-- [x] Shrine UI polish, Settings, yokai catalogue, DevPanel
-- [x] Wallet connect (wagmi + RainbowKit, Soneium Minato + mainnet)
-- [x] Wallet-required splash flow with English-only RainbowKit modal
-- [x] Dev wallet-bypass toggle
-- [ ] Supabase leaderboard with signed-message submission
-- [ ] Farcaster Mini App integration for Startale App
-- [ ] Production deploy to Vercel + mainnet switch
-- [ ] Submit to the Startale App directory
+Roadmap
 
-## Backend (Supabase)
 
-Off-chain leaderboard, user profiles, and personal-best tracking live
-in Supabase. The schema, RLS policies, and the score-submission Edge
-Function are all checked into this repo and deployed via the Supabase
-CLI.
+Expanded Shrine gallery showing all 44 kami × tier combinations with locked/unlocked states
+Broader Farcaster distribution and community features
+Continued balancing, audio, and visual polish
 
-- **Schema migrations:** `supabase/migrations/`
-- **Edge functions:** `supabase/functions/`
-- **TypeScript types:** `src/types/supabase.ts` (generated; regenerate
-  after schema changes via
-  `npx supabase gen types typescript --linked > src/types/supabase.ts`)
 
-Required env vars (see `.env.local.example`):
+License
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY` — server-side only, never prefix
-  `NEXT_PUBLIC_`
+All rights reserved. The source is published for transparency and grant review; please reach out before reusing assets or code.
 
-The `submit-score` Edge Function verifies a Farcaster Quick Auth JWT,
-plausibility-checks the payload, enforces a 60-second per-FID rate
-limit, and uses `(fid, client_nonce)` for replay protection. The
-service-role key never reaches the browser; all writes go through the
-function.
 
-## Security
-
-A living security checklist lives in `docs/SECURITY_AUDIT.md` (planned).
-Developer wallet hygiene notes are in `docs/DEV_WALLET_SECURITY.md`
-(planned).
-
-Never connect a wallet holding real assets to a development environment.
-Use a fresh dev-only wallet funded exclusively with testnet ETH for
-local work.
-
-## License
-
-MIT — see [LICENSE](LICENSE).
-
-## Credits
-
-Developed by [DjimyNeitron](https://github.com/DjimyNeitron).
-Art direction: Japanese yokai mythology × modern painterly aesthetic.
-Audio: traditional Japanese instrument samples sourced under permissive
-licences (see individual file metadata).
+Built with care by @DjimyNeitron · @kodymeverik on Farcaster.
