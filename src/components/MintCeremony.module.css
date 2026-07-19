@@ -70,6 +70,23 @@
     ),
     radial-gradient(ellipse at center, transparent 30%, rgba(6, 10, 22, 0.25) 100%);
 }
+/* Success only: the heading + buttons + note sit in the mid band, where the
+ * base scrim is just 0.2 and the lotus-pond scene is brightest — light gold
+ * text washes out there. Deepen the mid band (0.2 → 0.5) so the whole success
+ * column lifts off the scene. Still translucent — the pond reads softly
+ * through it (no hard opaque block). Scoped to success, so the pre-mint /
+ * mint-ready scene is untouched. */
+.ceremonyScene[data-phase="success"] .bgOverlay {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(6, 10, 22, 0.7) 0%,
+      rgba(6, 10, 22, 0.5) 40%,
+      rgba(6, 10, 22, 0.5) 78%,
+      rgba(6, 10, 22, 0.82) 100%
+    ),
+    radial-gradient(ellipse at center, transparent 22%, rgba(6, 10, 22, 0.42) 100%);
+}
 
 /* ─── 9. Card silhouette (intro + spinning) ──────────────────────── */
 .cardSilhouette {
@@ -243,9 +260,12 @@
   pointer-events: none;
   transition: opacity 0.6s ease;
 }
-/* 3.5j: recede on success so the card is the clear hero. */
+/* Recede slightly on success so the card stays the hero, but keep the
+ * header comfortably legible over the bright scene (was 0.55 — too faint on
+ * a live device). Paired with the dark text-shadows in the success
+ * legibility block below. */
 .ceremonyScene[data-phase="success"] .headerContainer {
-  opacity: 0.55;
+  opacity: 0.92;
 }
 .headerRunComplete {
   font-family: Georgia, "Times New Roman", serif;
@@ -734,7 +754,9 @@
   gap: 3px;
   margin-bottom: 2px;
   opacity: 0;
-  animation: fade-in-soft 0.6s ease-out 0.3s forwards;
+  /* fade-in (→1), not fade-in-soft (→0.85): the heading must read fully over
+   * the bright scene. */
+  animation: fade-in 0.6s ease-out 0.3s forwards;
 }
 /* Share buttons: same ghost treatment as "Visit the Shrine" (secondary, a
  * touch smaller); full width comes from the column's align-items: stretch. */
@@ -743,6 +765,43 @@
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
+}
+
+/* ─── Success legibility (contrast pass over the bright scene) ────────
+ * All scoped to [data-phase="success"] so the pre-mint ceremony, game-over,
+ * #77 chain toggle and #82 avatar are untouched. Light gold/serif text over
+ * the lotus-pond scene needs a dark shadow to lift; the ghost buttons need a
+ * translucent dark fill so their labels read on any patch of background. */
+.ceremonyScene[data-phase="success"] .headerRunComplete,
+.ceremonyScene[data-phase="success"] .headerRunCompleteJp {
+  text-shadow: 0 1px 3px rgba(2, 5, 12, 0.8), 0 0 2px rgba(2, 5, 12, 0.6);
+}
+.ceremonyScene[data-phase="success"] .headerScore {
+  /* the score is key info — strong dark shadow so it holds over the water
+   * reflections (its own fade-in-soft settle + the brighter header container
+   * carry the opacity). */
+  text-shadow: 0 1px 4px rgba(2, 5, 12, 0.85), 0 0 2px rgba(2, 5, 12, 0.7);
+}
+.ceremonyScene[data-phase="success"] .successTextInline {
+  /* dark shadow for contrast + a faint gold glow to keep the sacred mood. */
+  text-shadow: 0 1px 3px rgba(2, 5, 12, 0.85), 0 0 8px rgba(255, 218, 110, 0.3);
+}
+.ceremonyScene[data-phase="success"] .mintSub {
+  /* readable but still secondary (was 0.6 — too faint on device). */
+  opacity: 0.85;
+  text-shadow: 0 1px 3px rgba(2, 5, 12, 0.8);
+}
+/* Buttons: translucent dark-glass fill + brighter gold border + label shadow
+ * so the ghost treatment stays but the labels/outlines read on the busy bg. */
+.ceremonyScene[data-phase="success"] .mintButtonContainer .btn-ghost {
+  background: rgba(6, 10, 22, 0.55);
+  border-color: rgba(var(--gold-rgb) / 0.7);
+  color: var(--gold-50);
+  text-shadow: 0 1px 2px rgba(2, 5, 12, 0.7);
+}
+.ceremonyScene[data-phase="success"] .mintButtonContainer .btn-ghost:hover {
+  background: rgba(6, 10, 22, 0.7);
+  border-color: var(--gold-200);
 }
 
 /* ─── Keyframes ──────────────────────────────────────────────────── */
