@@ -146,6 +146,10 @@
   opacity: 1;
   transform: translate(-50%, -50%) scale(1);
   filter: blur(0) saturate(1) brightness(1);
+  /* Raise the hero card slightly on success (37% → 36%) now that the 完
+   * below it is gone — tightens the composition above "BLESSING RECEIVED"
+   * while still clearing the score above at realistic mini-app heights. */
+  top: 36%;
 }
 .ceremonyScene[data-phase="success"] .cardWrapper {
   animation: card-success-pulse 600ms ease-out;
@@ -564,19 +568,10 @@
   animation: spin 600ms linear infinite;
 }
 
-/* ─── 12d. Success banner (inline — occupies the tier-banner slot) ─ */
-/* 3.5j: vertical stack again — 完 crowning "BLESSING RECEIVED", both
- * centred (the row layout read off-centre because the heavy red kanji
- * pulled the optical centre left). Centred on both axes at 60%, in the
- * band between the card bottom and the (now glow-less) ghost button. */
-.successKanjiInline {
-  font-family:
-    "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", serif;
-  font-size: 26px;
-  line-height: 1;
-  color: var(--torii-red);
-  text-shadow: 0 0 12px rgba(184, 54, 44, 0.5);
-}
+/* ─── 12d. Success heading ("BLESSING RECEIVED") ─────────────────── */
+/* The crowning 完 kanji was removed: it duplicated "BLESSING RECEIVED"
+ * (both mean "complete") and was the sole element colliding with the
+ * card's bottom edge. The card is now the uncontested hero. */
 .successTextInline {
   font-family: Georgia, "Times New Roman", serif;
   font-size: 12px;
@@ -713,13 +708,13 @@
 
 /* Post-mint success block (heading → Visit the Shrine → Share on Farcaster →
  * Share on X → recorded note) is ONE centred flow column. Anchored a fixed
- * gap BELOW the hero card — card centre 37% + ~half its height (190px card ×
+ * gap BELOW the hero card — card centre 36% + ~half its height (190px card ×
  * 7/5 ÷ 2 ≈ 133px) + breathing room — so the stack grows downward with even
  * rhythm and never overlaps the card or itself, at any viewport height. This
  * supersedes the base bottom:160 anchor (and the browser bottom:100), which
  * grew the taller post-share stack UPWARD into the heading (#83 overlap). */
 .ceremonyScene[data-phase="success"] .mintButtonContainer {
-  top: calc(37% + 150px);
+  top: calc(36% + 150px);
   bottom: auto;
   width: min(300px, 86%);
   align-items: stretch;

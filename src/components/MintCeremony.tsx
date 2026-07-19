@@ -897,7 +897,6 @@ export default function MintCeremony({
           // the first child here rather than a separate mid-scene banner.
           <>
             <div className={styles.successHeading}>
-              <div className={styles.successKanjiInline}>完</div>
               <div className={styles.successTextInline}>Blessing received</div>
             </div>
             <button type="button" className={`btn-ghost ${styles.ghostBtn}`} onClick={handleButton}>
