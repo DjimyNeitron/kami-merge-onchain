@@ -43,8 +43,6 @@ import { useAccount } from "wagmi";
 import { isSupportedChainId, SUPPORTED_CHAIN_IDS } from "@/config/chains";
 import { useDevSkipWallet } from "@/hooks/useDevSkipWallet";
 import { useActualChainId } from "@/hooks/useActualChainId";
-// TEMP DEBUG — remove after diagnosis (branch diag/farcaster-splash).
-import { diag } from "@/lib/diagLog";
 import { saveTrack, type BgmTrackId } from "@/game/bgmTracks";
 import { useSiweSession } from "@/hooks/useSiweSession";
 import { useMiniAppContext } from "@/hooks/useMiniAppContext";
@@ -246,52 +244,6 @@ export default function GameCanvas() {
     devSkipWallet,
   ]);
 
-  // TEMP DEBUG — remove after diagnosis (branch diag/farcaster-splash).
-  // Detects a remount (showSplash resets to its useState(true) initial), which
-  // is a distinct splash cause from the watcher below.
-  useEffect(() => {
-    diag("[MOUNT] GameCanvas");
-    return () => diag("[UNMOUNT] GameCanvas");
-  }, []);
-  // TEMP DEBUG — full session snapshot on any relevant change.
-  useEffect(() => {
-    diag("[STATE]", {
-      isMiniApp,
-      walletConnected,
-      isConnected: walletConnected,
-      actualChainId: actualChainId ?? null,
-      chainKnown,
-      supported: isSupportedChainId(actualChainId),
-      isValidSession,
-      showSplash,
-      gameOver,
-      ceremony: !!ceremonyRun,
-      dismissed: ceremonyDismissed,
-      siwe: !!getValidToken(),
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    isMiniApp,
-    walletConnected,
-    actualChainId,
-    chainKnown,
-    isValidSession,
-    showSplash,
-    gameOver,
-    ceremonyRun,
-    ceremonyDismissed,
-  ]);
-  // TEMP DEBUG — the ceremony mount gate (why "show ceremony" is true/false).
-  useEffect(() => {
-    diag("[CEREMONY-GATE]", {
-      gameOver,
-      hasCeremonyRun: !!ceremonyRun,
-      dismissed: ceremonyDismissed,
-      showSplash,
-      willRenderCeremony: gameOver && !!ceremonyRun && !ceremonyDismissed,
-    });
-  }, [gameOver, ceremonyRun, ceremonyDismissed, showSplash]);
-
   // Derived: umbrella muted state (both silenced) drives the emoji button
   const muted = !sfxEnabled && !bgmEnabled;
   const allUnlocked = unlockedIds.length >= 11;
@@ -319,12 +271,6 @@ export default function GameCanvas() {
           setNext(n);
         },
         onGameOver: (final, mergeCount) => {
-          // TEMP DEBUG — remove after diagnosis (branch diag/farcaster-splash).
-          diag("[GAMEOVER]", {
-            final,
-            reached: reachedRef.current.length,
-            threshold: MIN_MINT_SCORE,
-          });
           setFinalScore(final);
           setGameOver(true);
           setCeremonyDismissed(false);
@@ -341,8 +287,6 @@ export default function GameCanvas() {
           const reachedNow = reachedRef.current;
           if (final < MIN_MINT_SCORE || reachedNow.length === 0) {
             setCeremonyRun(null);
-            // TEMP DEBUG
-            diag("[GAMEOVER] ceremony=null (below threshold / no merges)");
             return;
           }
           // Fresh seed per game-over → tier re-rolls across runs even
@@ -361,8 +305,6 @@ export default function GameCanvas() {
             tier,
             score: final,
           });
-          // TEMP DEBUG — ceremony IS eligible + set; should now render.
-          diag("[GAMEOVER] ceremonySet", { tier });
         },
         onReachedChange: (ids) => {
           setReached(ids);
@@ -679,28 +621,7 @@ export default function GameCanvas() {
       !isMiniApp &&
       (!walletConnected ||
         (chainKnown && !isSupportedChainId(actualChainId)));
-    // TEMP DEBUG — every time isValidSession is false, record why (and whether
-    // it will bounce). If Farcaster still bounces via this watcher, this line
-    // shows the branch + state.
-    diag("[WATCHER] invalid", {
-      wasValid: wasValidRef.current,
-      definitelyInvalid,
-      reason: !walletConnected ? "not-connected" : "browser-known-unsupported",
-      isMiniApp,
-      walletConnected,
-      actualChainId: actualChainId ?? null,
-      chainKnown,
-    });
     if (wasValidRef.current && definitelyInvalid) {
-      // TEMP DEBUG — this watcher path is bouncing to splash.
-      diag("[SPLASH-BOUNCE #1 watcher] → splash", {
-        reason: !walletConnected
-          ? "not-connected"
-          : "browser-known-unsupported",
-        isMiniApp,
-        walletConnected,
-        actualChainId: actualChainId ?? null,
-      });
       console.log(
         "[GameCanvas] session invalidated (disconnect or wrong chain) → splash"
       );
