@@ -53,6 +53,7 @@ import {
   chainName,
   SUPPORTED_CHAIN_IDS,
   BASE_CHAIN_ID,
+  isSupportedChainId,
 } from "@/config/chains";
 import { useTargetChain } from "@/hooks/useTargetChain";
 import { walletConnectConnectorId } from "@/lib/wagmi";
@@ -184,7 +185,7 @@ interface MintCeremonyProps {
    *  idempotent. The mint flow calls this BEFORE minting so confirm-mint
    *  always has a scoreId and the run reaches the leaderboard. Provided by
    *  GameCanvas; may prompt one SIWE signature. */
-  ensureScoreSaved?: () => Promise<string | null>;
+  ensureScoreSaved?: (chainId?: number) => Promise<string | null>;
   onMintComplete?: (nft: InventoryNFT) => void;
   onClose?: () => void;
   /** "Visit the Shrine" (success screen). Falls back to onClose if absent. */
@@ -470,7 +471,7 @@ export default function MintCeremony({
     let mintScoreId: string | null = host ? host.scoreId : (scoreId ?? null);
     if (!host && !mintScoreId && ensureScoreSaved) {
       try {
-        mintScoreId = await ensureScoreSaved();
+        mintScoreId = await ensureScoreSaved(targetChainId);
       } catch {
         mintScoreId = null;
       }
@@ -530,7 +531,7 @@ export default function MintCeremony({
     let recordToken: string | null = host ? host.recordToken : null;
     if (!host && tokenId !== null && mintScoreId) {
       try {
-        recordToken = await ensureSession();
+        recordToken = await ensureSession(targetChainId);
       } catch {
         recordToken = null;
       }
@@ -640,17 +641,23 @@ export default function MintCeremony({
     // scores.wallet_address. ensureScoreSaved + ensureSession share one
     // session, so this is at most one signature. A rejection doesn't block
     // the mint; it just leaves it unrecorded.
+    // The host wallet couldn't switch to the target chain (that's why we're
+    // here), so it signs on the chain it's actually on when that's
+    // supported — a smart wallet's contract only exists there.
+    const hostChainId = isSupportedChainId(walletChainId)
+      ? walletChainId
+      : targetChainId;
     let hostScoreId: string | null = scoreId ?? null;
     if (!hostScoreId && ensureScoreSaved) {
       try {
-        hostScoreId = await ensureScoreSaved();
+        hostScoreId = await ensureScoreSaved(hostChainId);
       } catch {
         hostScoreId = null;
       }
     }
     let hostToken: string | null = null;
     try {
-      hostToken = await ensureSession();
+      hostToken = await ensureSession(hostChainId);
     } catch {
       hostToken = null;
     }
@@ -666,6 +673,7 @@ export default function MintCeremony({
     connectors,
     connectAsync,
     targetChainId,
+    walletChainId,
     executeMint,
     scoreId,
     ensureScoreSaved,

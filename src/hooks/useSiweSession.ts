@@ -38,10 +38,10 @@ import { useAccount, useSignMessage } from "wagmi";
 import { createSiweMessage, generateSiweNonce } from "viem/siwe";
 import { SONEIUM_CHAIN_ID } from "@/config/contract";
 
-// The siwe-verify edge function REQUIRES this exact domain in the signed
-// message (and a ≤10-min expiry) or it rejects. Keep in lockstep with the
-// deployed verifier + the production origin.
-const SIWE_DOMAIN = "kami-merge.vercel.app";
+// The SIWE domain is the page's own host (window.location.host), so the
+// wallet shows the real origin and local / preview builds can sign in too.
+// siwe-verify accepts an allow-list (production, localhost:3000, this
+// project's Vercel previews) and requires a ≤10-min expiry.
 // 5-min message expiry (well inside the verifier's 10-min ceiling).
 const SIWE_TTL_MS = 5 * 60 * 1000;
 // Small skew margin so we re-sign slightly before a token actually expires.
@@ -55,10 +55,15 @@ export type SiweSession = {
   /** The address the current token was issued for, or null. */
   address: string | null;
   status: SiweStatus;
-  /** Force a fresh sign-in (prompts a signature). Returns the token or null. */
-  signIn: () => Promise<string | null>;
-  /** Return a valid token, re-signing if missing/expired/address-changed. */
-  ensureSession: () => Promise<string | null>;
+  /**
+   * Force a fresh sign-in (prompts a signature). Returns the token or null.
+   * `chainId` is the SIWE message's chain — pass the chain the player mints
+   * on (smart wallets are verified against THAT chain). Defaults to Soneium.
+   */
+  signIn: (chainId?: number) => Promise<string | null>;
+  /** Return a valid token, re-signing (on `chainId`) if missing/expired/
+   *  address-changed. An existing session is reused whatever its chain. */
+  ensureSession: (chainId?: number) => Promise<string | null>;
   /** Synchronous read of the in-memory token (null if absent). */
   getToken: () => string | null;
   /**
@@ -149,7 +154,9 @@ export function SiweSessionProvider({ children }: { children: ReactNode }) {
     return null;
   }, []);
 
-  const signIn = useCallback(async (): Promise<string | null> => {
+  const signIn = useCallback(async (
+    chainId: number = SONEIUM_CHAIN_ID,
+  ): Promise<string | null> => {
     // Reuse an in-flight sign-in rather than prompting a second signature.
     if (inFlightRef.current) return inFlightRef.current;
     const signer = addressRef.current;
@@ -165,12 +172,12 @@ export function SiweSessionProvider({ children }: { children: ReactNode }) {
         const issuedAt = new Date();
         const expirationTime = new Date(issuedAt.getTime() + SIWE_TTL_MS);
         const message = createSiweMessage({
-          domain: SIWE_DOMAIN,
+          domain: window.location.host,
           address: signer as `0x${string}`,
           statement: "Sign in to Kami Merge",
           uri: window.location.origin,
           version: "1",
-          chainId: SONEIUM_CHAIN_ID,
+          chainId,
           nonce: generateSiweNonce(),
           issuedAt,
           expirationTime,
@@ -223,11 +230,15 @@ export function SiweSessionProvider({ children }: { children: ReactNode }) {
     return run;
   }, [signMessageAsync]);
 
-  const ensureSession = useCallback(async (): Promise<string | null> => {
+  const ensureSession = useCallback(async (
+    chainId?: number,
+  ): Promise<string | null> => {
     const valid = readValidToken();
     if (valid) return valid;
-    // signIn() itself returns any in-flight sign-in (dedupe).
-    return signIn();
+    // signIn() itself returns any in-flight sign-in (dedupe). The session
+    // JWT is chain-agnostic (sub = address), so reuse doesn't care which
+    // chain it was signed on.
+    return signIn(chainId);
   }, [readValidToken, signIn]);
 
   const getToken = useCallback(() => tokenRef.current, []);

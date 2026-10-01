@@ -45,6 +45,7 @@ import { useDevSkipWallet } from "@/hooks/useDevSkipWallet";
 import { useActualChainId } from "@/hooks/useActualChainId";
 import { saveTrack, type BgmTrackId } from "@/game/bgmTracks";
 import { useSiweSession } from "@/hooks/useSiweSession";
+import { useTargetChain } from "@/hooks/useTargetChain";
 import { useMiniAppContext } from "@/hooks/useMiniAppContext";
 import Leaderboard from "@/components/Leaderboard";
 
@@ -107,7 +108,11 @@ export default function GameCanvas() {
   // run's numbers) are mirrored into refs — same stale-closure workaround
   // as reachedRef.
   const walletRef = useRef<string | undefined>(undefined);
-  const ensureSessionRef = useRef<(() => Promise<string | null>) | null>(null);
+  const ensureSessionRef = useRef<
+    ((chainId?: number) => Promise<string | null>) | null
+  >(null);
+  // Chain the SIWE message is signed on (= the chain this player mints on).
+  const targetChainRef = useRef<number | undefined>(undefined);
   const getValidTokenRef = useRef<(() => string | null) | null>(null);
   const lastRunRef = useRef<{ score: number; mergeCount: number } | null>(null);
   // Submit response, surfaced to the leaderboard UI: seeds the player's
@@ -204,6 +209,8 @@ export default function GameCanvas() {
   // into refs so the mount-captured onGameOver closure can reach them.
   const { ensureSession, getValidToken, status: siweStatus } =
     useSiweSession();
+  // Sign-in chain: mini-app → Base; browser → the wallet's supported chain.
+  const { targetChainId } = useTargetChain();
   // True when a finished run couldn't be saved because there's no SIWE
   // session yet (e.g. the signature was rejected) → game-over shows a
   // "Sign in to save your score" retry button.
@@ -455,6 +462,9 @@ export default function GameCanvas() {
     ensureSessionRef.current = ensureSession;
   }, [ensureSession]);
   useEffect(() => {
+    targetChainRef.current = targetChainId;
+  }, [targetChainId]);
+  useEffect(() => {
     getValidTokenRef.current = getValidToken;
   }, [getValidToken]);
 
@@ -486,6 +496,9 @@ export default function GameCanvas() {
       score: number,
       mergeCount: number,
       interactive = false,
+      // SIWE chain for an interactive sign-in; defaults to this component's
+      // target chain. The mint flow passes its own (switcher-aware) chain.
+      chainId?: number,
     ): Promise<string | null> => {
       const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       if (!baseUrl) return null;
@@ -509,7 +522,9 @@ export default function GameCanvas() {
       let token: string | null = null;
       try {
         token = interactive
-          ? ((await ensureSessionRef.current?.()) ?? null)
+          ? ((await ensureSessionRef.current?.(
+              chainId ?? targetChainRef.current,
+            )) ?? null)
           : (getValidTokenRef.current?.() ?? null);
       } catch {
         token = null;
@@ -567,12 +582,14 @@ export default function GameCanvas() {
   // Idempotent — reuses an already-saved scoreId; never re-submits the same
   // run (the same clientNonce would 409). Returns the scoreId, or null if
   // there's no run / the SIWE signature was rejected. May prompt one sign.
-  const ensureScoreSaved = useCallback(async (): Promise<string | null> => {
+  const ensureScoreSaved = useCallback(async (
+    chainId?: number,
+  ): Promise<string | null> => {
     const existing = submitResultRef.current?.scoreId;
     if (existing) return existing;
     const run = lastRunRef.current;
     if (!run) return null;
-    return submitScore(run.score, run.mergeCount, true);
+    return submitScore(run.score, run.mergeCount, true, chainId);
   }, [submitScore]);
 
   const handleRestart = () => {
