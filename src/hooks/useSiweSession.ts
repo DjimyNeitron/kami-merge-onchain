@@ -11,7 +11,7 @@
 //      required domain + a short 5-min expiry →
 //   3. the wallet signs it (wagmi useSignMessage) →
 //   4. POST { message, signature } to the `siwe-verify` edge function →
-//   5. store the returned session JWT IN MEMORY (React state) and send it as
+//   5. store the returned session JWT IN MEMORY (refs + React state) and send it as
 //      `Authorization: Bearer <token>` on submit-score / confirm-mint.
 //
 // The token lives in memory only — NOT localStorage/sessionStorage, which
@@ -78,41 +78,86 @@ export function SiweSessionProvider({ children }: { children: ReactNode }) {
   const { address } = useAccount();
   const { signMessageAsync } = useSignMessage();
 
+  // React state is for RENDERING only (status, and token/address for
+  // consumers that display them). Every read that decides whether to sign
+  // goes through the refs below, which are updated synchronously. Reading
+  // state from a callback's closure is what produced a second signature in
+  // the mint flow: ensureScoreSaved() signed, then ensureSession() from the
+  // same render's closure still saw token === null and signed again.
   const [token, setToken] = useState<string | null>(null);
   const [sessionAddress, setSessionAddress] = useState<string | null>(null);
   const [status, setStatus] = useState<SiweStatus>("idle");
+  const tokenRef = useRef<string | null>(null);
+  const sessionAddressRef = useRef<string | null>(null);
   // ms-epoch when the current token stops being valid.
   const expiresAtRef = useRef(0);
-  // De-dupes concurrent signIn() calls so we only ever prompt one signature.
+  // Latest connected address, so callbacks never act on a stale one.
+  const addressRef = useRef<string | undefined>(address);
+  // De-dupes concurrent sign-ins so we only ever prompt one signature.
   const inFlightRef = useRef<Promise<string | null> | null>(null);
+  // Bumped by reset(); a sign-in that started before a reset must not
+  // resurrect the dropped session when it settles.
+  const generationRef = useRef(0);
+
+  useEffect(() => {
+    addressRef.current = address;
+  }, [address]);
 
   const reset = useCallback(() => {
+    generationRef.current += 1;
+    tokenRef.current = null;
+    sessionAddressRef.current = null;
+    expiresAtRef.current = 0;
     setToken(null);
     setSessionAddress(null);
     setStatus("idle");
-    expiresAtRef.current = 0;
-    inFlightRef.current = null;
+    // inFlightRef is deliberately NOT cleared: an in-flight sign-in settles
+    // on its own (its finally clears the ref) and, thanks to the generation
+    // check, does not store its token. Clearing it here would let a second
+    // caller start a parallel sign-in → a second wallet popup.
   }, []);
 
   // A SIWE token is bound to the address that signed it. Drop a stale
   // session when the wallet disconnects or switches accounts.
   useEffect(() => {
+    const current = sessionAddressRef.current;
     if (!address) {
-      if (token || sessionAddress) reset();
+      if (tokenRef.current || current) reset();
       return;
     }
-    if (sessionAddress && address.toLowerCase() !== sessionAddress.toLowerCase()) {
+    if (current && address.toLowerCase() !== current.toLowerCase()) {
       reset();
     }
   }, [address, sessionAddress, token, reset]);
 
+  // Valid-or-null read from the refs. A token counts as valid only if it was
+  // issued for the currently-connected address and is still within its
+  // expiry (minus a small skew margin).
+  const readValidToken = useCallback((): string | null => {
+    const t = tokenRef.current;
+    const sa = sessionAddressRef.current;
+    const a = addressRef.current;
+    if (
+      t &&
+      sa &&
+      a &&
+      sa.toLowerCase() === a.toLowerCase() &&
+      Date.now() < expiresAtRef.current - EXPIRY_SKEW_MS
+    ) {
+      return t;
+    }
+    return null;
+  }, []);
+
   const signIn = useCallback(async (): Promise<string | null> => {
-    if (!address) {
+    // Reuse an in-flight sign-in rather than prompting a second signature.
+    if (inFlightRef.current) return inFlightRef.current;
+    const signer = addressRef.current;
+    if (!signer) {
       setStatus("error");
       return null;
     }
-    // Reuse an in-flight sign-in rather than prompting a second signature.
-    if (inFlightRef.current) return inFlightRef.current;
+    const generation = generationRef.current;
 
     const run = (async (): Promise<string | null> => {
       setStatus("signing");
@@ -121,7 +166,7 @@ export function SiweSessionProvider({ children }: { children: ReactNode }) {
         const expirationTime = new Date(issuedAt.getTime() + SIWE_TTL_MS);
         const message = createSiweMessage({
           domain: SIWE_DOMAIN,
-          address,
+          address: signer as `0x${string}`,
           statement: "Sign in to Kami Merge",
           uri: window.location.origin,
           version: "1",
@@ -148,18 +193,26 @@ export function SiweSessionProvider({ children }: { children: ReactNode }) {
           throw new Error("siwe-verify: malformed response");
         }
 
+        // Session was reset (disconnect / account switch) mid-sign: don't
+        // store a token for a session that no longer exists.
+        if (generation !== generationRef.current) return null;
+
         const ttlMs =
           typeof json.expiresIn === "number" && json.expiresIn > 0
             ? json.expiresIn * 1000
             : SIWE_TTL_MS;
+        // Refs first, synchronously — any caller awaiting this promise (or
+        // calling ensureSession right after) sees the session immediately.
+        tokenRef.current = json.token;
+        sessionAddressRef.current = signer;
         expiresAtRef.current = Date.now() + ttlMs;
         setToken(json.token);
-        setSessionAddress(address);
+        setSessionAddress(signer);
         setStatus("ready");
         return json.token as string;
       } catch (e) {
         console.warn("[siwe] sign-in failed", e);
-        setStatus("error");
+        if (generation === generationRef.current) setStatus("error");
         return null;
       } finally {
         inFlightRef.current = null;
@@ -168,38 +221,22 @@ export function SiweSessionProvider({ children }: { children: ReactNode }) {
 
     inFlightRef.current = run;
     return run;
-  }, [address, signMessageAsync]);
+  }, [signMessageAsync]);
 
   const ensureSession = useCallback(async (): Promise<string | null> => {
-    if (
-      token &&
-      sessionAddress &&
-      address &&
-      sessionAddress.toLowerCase() === address.toLowerCase() &&
-      Date.now() < expiresAtRef.current - EXPIRY_SKEW_MS
-    ) {
-      return token;
-    }
+    const valid = readValidToken();
+    if (valid) return valid;
+    // signIn() itself returns any in-flight sign-in (dedupe).
     return signIn();
-  }, [token, sessionAddress, address, signIn]);
+  }, [readValidToken, signIn]);
 
-  const getToken = useCallback(() => token, [token]);
+  const getToken = useCallback(() => tokenRef.current, []);
 
-  // Valid-or-null read with NO side effects — never signs. A token counts as
-  // valid only if it was issued for the currently-connected address and is
-  // still within its expiry (minus a small skew margin).
-  const getValidToken = useCallback((): string | null => {
-    if (
-      token &&
-      sessionAddress &&
-      address &&
-      sessionAddress.toLowerCase() === address.toLowerCase() &&
-      Date.now() < expiresAtRef.current - EXPIRY_SKEW_MS
-    ) {
-      return token;
-    }
-    return null;
-  }, [token, sessionAddress, address]);
+  // Valid-or-null read with NO side effects — never signs.
+  const getValidToken = useCallback(
+    (): string | null => readValidToken(),
+    [readValidToken],
+  );
 
   // NOTE: sign-in is fully lazy / user-initiated — there is intentionally NO
   // auto-sign-on-connect effect here. A signature is only ever requested when
