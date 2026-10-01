@@ -53,6 +53,7 @@ import {
   chainName,
   SUPPORTED_CHAIN_IDS,
   BASE_CHAIN_ID,
+  isSupportedChainId,
 } from "@/config/chains";
 import { useTargetChain } from "@/hooks/useTargetChain";
 import { walletConnectConnectorId } from "@/lib/wagmi";
@@ -114,7 +115,8 @@ const MINTED_ABI = [
 
 // Best-effort off-chain record of the mint (links the NFT to the player's
 // personal best). Never blocks the ceremony — the NFT is minted on-chain
-// regardless of whether this POST lands.
+// regardless of whether this POST lands. Resolves true only on a 2xx, so the
+// success copy can say "Recorded" honestly; never throws.
 async function recordMint(
   body: {
     tokenId: number;
@@ -126,13 +128,13 @@ async function recordMint(
     chainId: number;
   },
   token: string,
-): Promise<void> {
+): Promise<boolean> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    if (!baseUrl) return;
+    if (!baseUrl) return false;
     // Auth is the SIWE session JWT (Bearer) — NOT Quick Auth — so the mint
     // records from any browser / the Startale App, not only a Farcaster host.
-    await fetch(`${baseUrl}/functions/v1/confirm-mint`, {
+    const res = await fetch(`${baseUrl}/functions/v1/confirm-mint`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -140,11 +142,23 @@ async function recordMint(
       },
       body: JSON.stringify(body),
     });
+    if (!res.ok) {
+      // Status + response body only (confirm-mint returns an error code,
+      // e.g. {"error":"score_mismatch"}) — never the token.
+      const detail = (await res.text().catch(() => "")).slice(0, 200);
+      console.warn(
+        `[mint] confirm-mint ${res.status} (NFT minted on-chain regardless)`,
+        detail,
+      );
+      return false;
+    }
+    return true;
   } catch (e) {
     console.warn(
       "[mint] confirm-mint record failed (NFT minted on-chain regardless)",
       e,
     );
+    return false;
   }
 }
 
@@ -171,7 +185,7 @@ interface MintCeremonyProps {
    *  idempotent. The mint flow calls this BEFORE minting so confirm-mint
    *  always has a scoreId and the run reaches the leaderboard. Provided by
    *  GameCanvas; may prompt one SIWE signature. */
-  ensureScoreSaved?: () => Promise<string | null>;
+  ensureScoreSaved?: (chainId?: number) => Promise<string | null>;
   onMintComplete?: (nft: InventoryNFT) => void;
   onClose?: () => void;
   /** "Visit the Shrine" (success screen). Falls back to onClose if absent. */
@@ -438,7 +452,13 @@ export default function MintCeremony({
   // advances the ceremony to "success". Shared by the in-host path and the
   // external-wallet path (the connected account differs; everything else is
   // identical — the wallet that signs need not be the Farcaster identity).
-  const executeMint = useCallback(async () => {
+  // `host` (external-wallet path, B6): the scoreId + session token captured
+  // with the HOST wallet before the connector switched. When present, they
+  // are used as-is — no score save or sign-in happens with the external
+  // wallet, whose address doesn't own the run's score row.
+  const executeMint = useCallback(async (
+    host?: { scoreId: string | null; recordToken: string | null },
+  ) => {
     setPhase("minting");
 
     // 0. Save the run's score FIRST (idempotent) so confirm-mint has the
@@ -448,10 +468,10 @@ export default function MintCeremony({
     //    session used for the confirm-mint record, so the player signs at
     //    most once. If the save is rejected we still mint on-chain; the
     //    record is just skipped (unrecorded).
-    let mintScoreId: string | null = scoreId ?? null;
-    if (!mintScoreId && ensureScoreSaved) {
+    let mintScoreId: string | null = host ? host.scoreId : (scoreId ?? null);
+    if (!host && !mintScoreId && ensureScoreSaved) {
       try {
-        mintScoreId = await ensureScoreSaved();
+        mintScoreId = await ensureScoreSaved(targetChainId);
       } catch {
         mintScoreId = null;
       }
@@ -508,16 +528,18 @@ export default function MintCeremony({
     //    same session's cached token (no extra signature). Fire-and-forget —
     //    confirm-mint re-verifies on-chain (can take a few seconds), so we
     //    never block the success screen on it.
-    let recordToken: string | null = null;
-    if (tokenId !== null && mintScoreId) {
+    let recordToken: string | null = host ? host.recordToken : null;
+    if (!host && tokenId !== null && mintScoreId) {
       try {
-        recordToken = await ensureSession();
+        recordToken = await ensureSession(targetChainId);
       } catch {
         recordToken = null;
       }
     }
     if (tokenId !== null && mintScoreId && recordToken) {
       setUnrecorded(false);
+      // Fire-and-forget; if confirm-mint answers non-2xx, flip the success
+      // copy to the neutral "it will appear shortly" instead of "Recorded".
       void recordMint(
         {
           tokenId: Number(tokenId),
@@ -527,7 +549,9 @@ export default function MintCeremony({
           chainId: targetChainId,
         },
         recordToken,
-      );
+      ).then((ok) => {
+        if (!ok) setUnrecorded(true);
+      });
     } else {
       // No scoreId (the score save was rejected) or no session → can't record
       // now. The NFT is on-chain regardless; the success copy stays neutral.
@@ -598,16 +622,44 @@ export default function MintCeremony({
     executeMint,
   ]);
 
-  // External-wallet path: connect a Soneium-capable wallet over
-  // WalletConnect (QR / mobile deep-link), then run the same mint. Quick
-  // Auth identity still comes from the Farcaster host — only the tx signer
-  // changes (confirm-mint already binds by fid/scoreId, not tx sender).
+  // External-wallet path: connect a wallet that can reach the target chain
+  // over WalletConnect (QR / mobile deep-link), then run the same mint. The
+  // run's score + SIWE session stay with the HOST wallet (captured below).
+  // Known limit: the NFT lands in the EXTERNAL wallet, and confirm-mint v5.1
+  // (F2) requires Minted.to == the session's address, so this record is
+  // rejected and the success copy honestly shows "unrecorded".
   const connectExternalWallet = useCallback(async () => {
     setMintError(null);
     const wc = connectors.find((c) => c.id === walletConnectConnectorId);
     if (!wc) {
       setMintError("No external wallet available.");
       return;
+    }
+    // B6: the run's score row and the SIWE session belong to the HOST wallet.
+    // Capture both BEFORE switching connectors — afterwards the session
+    // resets to the external address, whose JWT sub would not match
+    // scores.wallet_address. ensureScoreSaved + ensureSession share one
+    // session, so this is at most one signature. A rejection doesn't block
+    // the mint; it just leaves it unrecorded.
+    // The host wallet couldn't switch to the target chain (that's why we're
+    // here), so it signs on the chain it's actually on when that's
+    // supported — a smart wallet's contract only exists there.
+    const hostChainId = isSupportedChainId(walletChainId)
+      ? walletChainId
+      : targetChainId;
+    let hostScoreId: string | null = scoreId ?? null;
+    if (!hostScoreId && ensureScoreSaved) {
+      try {
+        hostScoreId = await ensureScoreSaved(hostChainId);
+      } catch {
+        hostScoreId = null;
+      }
+    }
+    let hostToken: string | null = null;
+    try {
+      hostToken = await ensureSession(hostChainId);
+    } catch {
+      hostToken = null;
     }
     try {
       await connectAsync({ connector: wc, chainId: targetChainId });
@@ -616,8 +668,17 @@ export default function MintCeremony({
       return;
     }
     setAwaitingExternalWallet(false);
-    await executeMint();
-  }, [connectors, connectAsync, targetChainId, executeMint]);
+    await executeMint({ scoreId: hostScoreId, recordToken: hostToken });
+  }, [
+    connectors,
+    connectAsync,
+    targetChainId,
+    walletChainId,
+    executeMint,
+    scoreId,
+    ensureScoreSaved,
+    ensureSession,
+  ]);
 
   const handleButton = () => {
     if (phase === "success") (onVisitShrine ?? onClose)?.();

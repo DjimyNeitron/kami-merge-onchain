@@ -8,22 +8,28 @@
 // client.
 //
 // Flow:
-//   1. Frontend (on connect) builds a SIWE message with:
-//        domain         = kami-merge.vercel.app
+//   1. Frontend (on sign-in) builds a SIWE message with:
+//        domain         = the page host (window.location.host)
+//        chainId        = the chain the player mints on (1868 | 8453)
 //        address        = the connected wallet
 //        nonce          = random alphanumeric (viem generateSiweNonce)
 //        issuedAt       = now
 //        expirationTime = now + ~5 min   (bounds replay; stateless)
 //      and signs it (wagmi useSignMessage).
 //   2. POST { message, signature } here.
-//   3. We parse the message, enforce domain + a short expiry window,
-//      and verify the signature with viem verifyMessage — which
-//      supports EOA *and* ERC-1271 / ERC-6492 smart accounts (Startale
-//      AA wallets) when given a public client.
+//   3. We parse the message, enforce the domain allow-list, a supported
+//      chainId and a short expiry window, and verify the signature with
+//      viem verifyMessage against THAT chain's public client — EOA *and*
+//      ERC-1271 / ERC-6492 smart accounts (Startale AA wallets on Soneium,
+//      Coinbase Smart Wallet in the Base app). A smart account usually
+//      exists on one chain only, so verifying every message against
+//      Soneium failed for Base smart wallets.
 //   4. On success we mint a session JWT (HS256, SIWE_JWT_SECRET):
 //        { sub: <lowercased address>, aud: kami-merge.vercel.app,
 //          iss: kami-merge, iat, exp: +24h }
-//      which submit-score v5 / confirm-mint v3 verify.
+//      which submit-score v5 / confirm-mint v5 verify. The audience is
+//      ALWAYS the production host, whatever domain was signed — those
+//      functions pin it.
 //
 // Nonce model (decision): stateless. We do NOT store nonces; replay is
 // bounded by the message's short expirationTime (rejected if absent or
@@ -41,7 +47,7 @@
 
 import { createPublicClient, http } from "npm:viem";
 import { parseSiweMessage } from "npm:viem/siwe";
-import { soneium } from "npm:viem/chains";
+import { soneium, base } from "npm:viem/chains";
 import { SignJWT } from "npm:jose";
 
 const corsHeaders = {
@@ -50,8 +56,24 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const ALLOWED_ORIGIN = "kami-merge.vercel.app"; // SIWE domain + JWT audience
-const RPC_URL = "https://rpc.soneium.org/";
+// JWT audience — fixed; submit-score / confirm-mint pin it.
+const JWT_AUDIENCE = "kami-merge.vercel.app";
+
+// SIWE domains we issue sessions for: production, local dev, and this
+// project's Vercel previews. Previews are pinned to OUR team suffix — a bare
+// "kami-merge-*.vercel.app" would also match a same-named project in any
+// other Vercel account, letting a look-alike page obtain sessions.
+const ALLOWED_DOMAINS = new Set(["kami-merge.vercel.app", "localhost:3000"]);
+const PREVIEW_DOMAIN_RE = /^kami-merge-[a-z0-9-]+-djimyneitrons-projects\.vercel\.app$/;
+const isAllowedDomain = (d: string): boolean =>
+  ALLOWED_DOMAINS.has(d) || PREVIEW_DOMAIN_RE.test(d);
+
+// Server-authoritative chain registry (mirrors confirm-mint v5). The
+// message's chainId may only pick a key; the RPC is never client-supplied.
+const CHAINS: Record<number, { chain: any; rpc: string }> = {
+  1868: { chain: soneium, rpc: "https://rpc.soneium.org/" },
+  8453: { chain: base, rpc: "https://mainnet.base.org" },
+};
 const JWT_TTL_SECONDS = 60 * 60 * 24; // 24h session
 const MAX_SIWE_AGE_MS = 10 * 60 * 1000; // message must expire within 10 min
 const ADDR_RE = /^0x[0-9a-f]{40}$/;
@@ -91,7 +113,11 @@ Deno.serve(async (req) => {
   if (!claimedAddress || !ADDR_RE.test(claimedAddress)) {
     return json({ error: "invalid_siwe_message" }, 400);
   }
-  if (fields.domain !== ALLOWED_ORIGIN) return json({ error: "bad_domain" }, 403);
+  if (typeof fields.domain !== "string" || !isAllowedDomain(fields.domain)) {
+    return json({ error: "bad_domain" }, 403);
+  }
+  const chainCfg = Number.isInteger(fields.chainId) ? CHAINS[fields.chainId as number] : undefined;
+  if (!chainCfg) return json({ error: "unsupported_chain" }, 400);
   if (!fields.expirationTime) return json({ error: "missing_expiry" }, 400);
   const exp = new Date(fields.expirationTime).getTime();
   const now = Date.now();
@@ -99,8 +125,9 @@ Deno.serve(async (req) => {
     return json({ error: "bad_expiry" }, 400);
   }
 
-  // Verify signature: EOA via ecrecover, smart accounts via ERC-1271/6492.
-  const client = createPublicClient({ chain: soneium, transport: http(RPC_URL) });
+  // Verify signature on the message's chain: EOA via ecrecover, smart
+  // accounts via ERC-1271/6492 against that chain's deployment.
+  const client = createPublicClient({ chain: chainCfg.chain, transport: http(chainCfg.rpc) });
   let valid = false;
   try {
     valid = await client.verifyMessage({
@@ -117,7 +144,7 @@ Deno.serve(async (req) => {
   const token = await new SignJWT({})
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(claimedAddress)
-    .setAudience(ALLOWED_ORIGIN)
+    .setAudience(JWT_AUDIENCE)
     .setIssuer("kami-merge")
     .setIssuedAt()
     // "24h" (relative span) — unambiguous across jose versions; a raw
