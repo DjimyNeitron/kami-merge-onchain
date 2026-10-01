@@ -488,6 +488,9 @@ export class GameEngine {
   }
 
   private handleCollisions(event: Matter.IEventCollision<Matter.Engine>) {
+    // Settled bodies keep colliding after game-over; merges then would
+    // bump score / highScore / localStorage past the final score.
+    if (this.gameOver) return;
     for (const pair of event.pairs) {
       const a = pair.bodyA as TaggedBody;
       const b = pair.bodyB as TaggedBody;
