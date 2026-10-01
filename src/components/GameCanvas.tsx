@@ -193,9 +193,9 @@ export default function GameCanvas() {
   // wrong-chain detection. See src/hooks/useActualChainId.ts and the
   // matching write-up in SplashScreen.tsx for the full story.
   const { isConnected: walletConnected, address } = useAccount();
-  // Farcaster identity (fid/username/pfp) — used only for the leaderboard
-  // own-row highlight now; identity for the submit is the SIWE address.
-  const { user: fcUser, isMiniApp } = useMiniAppContext();
+  // Mini-app host detection. Player identity (submit, leaderboard own row)
+  // is the wallet address, not the Farcaster fid.
+  const { isMiniApp } = useMiniAppContext();
   // SIWE session — auth for the score submit (Bearer token). The auto
   // game-over submit uses getValidToken() (a valid cached token, or null —
   // NEVER signs), so a finished run only auto-saves when the player is
@@ -1025,7 +1025,7 @@ export default function GameCanvas() {
                   </div>
 
                   <Leaderboard
-                    fid={fcUser?.fid ?? null}
+                    address={address?.toLowerCase()}
                     seededBest={submitResult?.personalBest ?? null}
                     isNewPersonalBest={submitResult?.isNewPersonalBest}
                   />
@@ -1191,7 +1191,7 @@ export default function GameCanvas() {
                 番付
               </div>
               <div className="h-px bg-gradient-to-r from-transparent via-(--gold-700)/50 to-transparent mb-3" />
-              <Leaderboard fid={fcUser?.fid ?? null} />
+              <Leaderboard address={address?.toLowerCase()} />
             </div>
             <div className="wooden-rod absolute -bottom-1 left-3 right-3 h-3 rounded-full pointer-events-none" />
           </div>

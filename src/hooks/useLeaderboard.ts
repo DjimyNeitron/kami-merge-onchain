@@ -17,12 +17,14 @@ const TOP_N = 50;
 
 export type LeaderboardEntry = {
   rank: number; // 1-based position in the top-N list
-  fid: number | null; // null for address-only (SIWE) entries
+  fid: number | null; // display only (Farcaster name/pfp); null for SIWE rows
   score: number;
   username: string | null;
   displayName: string | null;
   pfpUrl: string | null;
-  address: string | null; // wallet address — shown when there's no username
+  // Lowercased wallet address — the player's identity (own-row match) and
+  // the display fallback when there's no Farcaster username.
+  address: string | null;
 };
 
 export type UseLeaderboardResult = {
@@ -45,16 +47,19 @@ type EmbeddedScore = {
 };
 
 /**
- * @param fid        the viewer's Farcaster id (for own-row highlight + rank
- *                   fallback). null/undefined in standalone web → no rank.
+ * @param address    the viewer's wallet address (any case; lowercased here)
+ *                   for the own-row highlight + rank. Identity is the wallet:
+ *                   submit-score v5 no longer writes fid, so fid can't match.
+ *                   undefined (no wallet) → no own row / rank.
  * @param seededBest the player's personal best straight from the submit
  *                   response, so we can show their rank without a round-trip
  *                   to fetch their own row. Falls back to a fetch if absent.
  */
 export function useLeaderboard(
-  fid: number | null | undefined,
+  address: string | null | undefined,
   seededBest: number | null | undefined,
 ): UseLeaderboardResult {
+  const viewer = address ? address.toLowerCase() : null;
   const [topN, setTopN] = useState<LeaderboardEntry[]>([]);
   const [myRank, setMyRank] = useState<number | null>(null);
   const [myBest, setMyBest] = useState<number | null>(seededBest ?? null);
@@ -67,13 +72,12 @@ export function useLeaderboard(
     try {
       // 1 — Top-N. Both embeds are LEFT joins (no `!inner`), so address-only
       // rows (fid null, no users match) are KEPT — they just come back with
-      // `users: null`. The wallet address is read from the linked score
-      // (personal_bests.score_id → scores.wallet_address) so we can show an
-      // address when there's no Farcaster username.
+      // `users: null`. The address is personal_bests.wallet_address, with the
+      // linked score's wallet_address (score_id → scores) as a fallback.
       const { data, error: topErr } = await supabase
         .from("personal_bests")
         .select(
-          "score, fid, users(username, display_name, pfp_url), scores(wallet_address)",
+          "score, fid, wallet_address, users(username, display_name, pfp_url), scores(wallet_address)",
         )
         .order("score", { ascending: false })
         .limit(TOP_N);
@@ -93,19 +97,20 @@ export function useLeaderboard(
           username: u?.username ?? null,
           displayName: u?.display_name ?? null,
           pfpUrl: u?.pfp_url ?? null,
-          address: s?.wallet_address ?? null,
+          address:
+            (r.wallet_address ?? s?.wallet_address)?.toLowerCase() ?? null,
         };
       });
       setTopN(rows);
 
       // 2 — The player's best: prefer the seed from the submit response,
-      // else fetch their own row. Skip entirely without an fid.
+      // else fetch their own row by wallet. Skip entirely without a wallet.
       let best = seededBest ?? null;
-      if (best == null && fid != null) {
+      if (best == null && viewer) {
         const { data: mine, error: mineErr } = await supabase
           .from("personal_bests")
           .select("score")
-          .eq("fid", fid)
+          .eq("wallet_address", viewer)
           .maybeSingle();
         if (mineErr) throw mineErr;
         best = mine?.score ?? null;
@@ -129,7 +134,7 @@ export function useLeaderboard(
     } finally {
       setLoading(false);
     }
-  }, [fid, seededBest]);
+  }, [viewer, seededBest]);
 
   useEffect(() => {
     load();

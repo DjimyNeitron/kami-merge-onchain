@@ -69,8 +69,9 @@ function Avatar({
 }
 
 type LeaderboardProps = {
-  /** Viewer's Farcaster id — own-row highlight + rank. null in web. */
-  fid: number | null;
+  /** Viewer's wallet address — own-row highlight + rank. undefined when no
+   *  wallet is connected. Farcaster fid is display-only (users embed). */
+  address?: string;
   /** Player's personal best seeded from the submit response (game-over). */
   seededBest?: number | null;
   /** Show the "new personal best" flourish (game-over only). */
@@ -78,12 +79,13 @@ type LeaderboardProps = {
 };
 
 export default function Leaderboard({
-  fid,
+  address,
   seededBest = null,
   isNewPersonalBest = false,
 }: LeaderboardProps) {
+  const viewer = address ? address.toLowerCase() : null;
   const { topN, myRank, myBest, loading, error } = useLeaderboard(
-    fid,
+    viewer,
     seededBest,
   );
 
@@ -126,7 +128,7 @@ export default function Leaderboard({
       )}
       <div className="max-h-40 overflow-y-auto pr-1 flex flex-col gap-0.5">
         {topN.map((entry) => {
-          const isMe = fid != null && entry.fid === fid;
+          const isMe = viewer != null && entry.address === viewer;
           const shortAddr = entry.address
             ? `${entry.address.slice(0, 6)}…${entry.address.slice(-4)}`
             : null;
