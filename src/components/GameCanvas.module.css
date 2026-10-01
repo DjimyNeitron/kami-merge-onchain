@@ -11,9 +11,9 @@
 .ceremonyOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  /* No backdrop-filter: blurring the live game canvas every frame is
+   * expensive on mobile. A denser #0F1626 scrim keeps it legible. */
+  background: rgba(15, 22, 38, 0.82);
   display: flex;
   align-items: center;
   justify-content: center;

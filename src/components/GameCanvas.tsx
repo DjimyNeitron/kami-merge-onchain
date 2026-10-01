@@ -578,6 +578,11 @@ export default function GameCanvas() {
   const handleRestart = () => {
     console.log("[GameCanvas] restart clicked");
     engineRef.current?.restart();
+    // A new run must not inherit the previous run's sign-in retry prompt or
+    // its stashed numbers (the retry button would resubmit the old score).
+    setNeedsSignIn(false);
+    lastRunRef.current = null;
+    setSubmitResult(null);
     beginRun();
     setGameOver(false);
     setFinalScore(0);
@@ -627,6 +632,11 @@ export default function GameCanvas() {
       );
       wasValidRef.current = false;
       engineRef.current?.restart();
+      // Bounce may land while an overlay had paused the engine.
+      engineRef.current?.resume();
+      setNeedsSignIn(false);
+      lastRunRef.current = null;
+      setSubmitResult(null);
       setGameOver(false);
       setFinalScore(0);
       setShowSplash(true);
@@ -752,6 +762,11 @@ export default function GameCanvas() {
     // Anchor the first run's telemetry (start time + replay nonce) the
     // moment gameplay becomes active.
     beginRun();
+    // Always resume: overlays opened from the splash (e.g. Settings) pause
+    // the engine, and their close handlers skip resume while the splash is
+    // up — so without this, splash → Settings → close → Tap to Start froze.
+    // resume() is idempotent.
+    eng?.resume();
     setShowSplash(false);
   };
 
@@ -972,7 +987,7 @@ export default function GameCanvas() {
           {gameOver && (!ceremonyRun || ceremonyDismissed) && (
             <div
               data-game-overlay
-              className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+              className="absolute inset-0 flex items-center justify-center bg-[rgba(15,22,38,0.82)]"
               style={{ zIndex: 20, pointerEvents: "auto" }}
             >
               <div className="relative mx-4 w-[min(300px,90%)]">
@@ -1151,7 +1166,7 @@ export default function GameCanvas() {
         <div
           data-game-overlay
           onClick={closeLeaderboard}
-          className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          className="absolute inset-0 z-30 flex items-center justify-center bg-[rgba(15,22,38,0.82)]"
           style={{ pointerEvents: "auto" }}
         >
           <div

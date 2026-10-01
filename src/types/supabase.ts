@@ -39,36 +39,93 @@ export type Database = {
   }
   public: {
     Tables: {
+      mints: {
+        Row: {
+          chain_id: number
+          fid: number | null
+          id: string
+          minted_at: string
+          minter_address: string
+          score_id: string
+          token_id: number
+          tx_hash: string
+          type_id: number
+        }
+        Insert: {
+          chain_id?: number
+          fid?: number | null
+          id?: string
+          minted_at?: string
+          minter_address: string
+          score_id: string
+          token_id: number
+          tx_hash: string
+          type_id: number
+        }
+        Update: {
+          chain_id?: number
+          fid?: number | null
+          id?: string
+          minted_at?: string
+          minter_address?: string
+          score_id?: string
+          token_id?: number
+          tx_hash?: string
+          type_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mints_fid_fkey"
+            columns: ["fid"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["fid"]
+          },
+          {
+            foreignKeyName: "mints_score_id_fkey"
+            columns: ["score_id"]
+            isOneToOne: false
+            referencedRelation: "scores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       personal_bests: {
         Row: {
-          fid: number
+          fid: number | null
+          nft_chain_id: number | null
           nft_minted_at: string | null
           nft_token_id: number | null
           score: number
           score_id: string
           updated_at: string
+          wallet_address: string | null
         }
         Insert: {
-          fid: number
+          fid?: number | null
+          nft_chain_id?: number | null
           nft_minted_at?: string | null
           nft_token_id?: number | null
           score: number
           score_id: string
           updated_at?: string
+          wallet_address?: string | null
         }
         Update: {
-          fid?: number
+          fid?: number | null
+          nft_chain_id?: number | null
           nft_minted_at?: string | null
           nft_token_id?: number | null
           score?: number
           score_id?: string
           updated_at?: string
+          wallet_address?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "personal_bests_fid_fkey"
             columns: ["fid"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["fid"]
           },
@@ -84,7 +141,7 @@ export type Database = {
       scores: {
         Row: {
           client_nonce: string
-          fid: number
+          fid: number | null
           highest_yokai: number
           id: string
           merge_count: number
@@ -96,7 +153,7 @@ export type Database = {
         }
         Insert: {
           client_nonce: string
-          fid: number
+          fid?: number | null
           highest_yokai: number
           id?: string
           merge_count: number
@@ -108,7 +165,7 @@ export type Database = {
         }
         Update: {
           client_nonce?: string
-          fid?: number
+          fid?: number | null
           highest_yokai?: number
           id?: string
           merge_count?: number
@@ -160,23 +217,7 @@ export type Database = {
       }
     }
     Views: {
-      weekly_leaderboard: {
-        Row: {
-          best_score: number | null
-          fid: number | null
-          runs: number | null
-          week_start: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "scores_fid_fkey"
-            columns: ["fid"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["fid"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
       [_ in never]: never
