@@ -972,7 +972,7 @@ export default function GameCanvas() {
           {gameOver && (!ceremonyRun || ceremonyDismissed) && (
             <div
               data-game-overlay
-              className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+              className="absolute inset-0 flex items-center justify-center bg-[rgba(15,22,38,0.82)]"
               style={{ zIndex: 20, pointerEvents: "auto" }}
             >
               <div className="relative mx-4 w-[min(300px,90%)]">
@@ -1151,7 +1151,7 @@ export default function GameCanvas() {
         <div
           data-game-overlay
           onClick={closeLeaderboard}
-          className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          className="absolute inset-0 z-30 flex items-center justify-center bg-[rgba(15,22,38,0.82)]"
           style={{ pointerEvents: "auto" }}
         >
           <div

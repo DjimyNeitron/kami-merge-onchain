@@ -82,12 +82,11 @@
   left: 50%;
   transform: translate(-50%, -50%);
   aspect-ratio: 5 / 7;
-  /* 3.5e: frosted glass — was rgba(10,8,22,0.92) near-opaque, which
-   * blocked the lotus pond. Now translucent + backdrop blur so the
-   * pond reads softly behind the cycling tier kanji. */
-  background: rgba(10, 8, 22, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  /* Translucent so the pond still reads behind the cycling tier kanji
+   * (3.5e: 0.92 near-opaque blocked it). No backdrop-filter — blurring
+   * every frame is costly on mobile — so the #0F1626 fill is denser
+   * than the old blurred 0.55 to stay legible. */
+  background: rgba(15, 22, 38, 0.78);
   border: 2px solid var(--tier-current, var(--gold-700));
   border-radius: 8px;
   display: flex;

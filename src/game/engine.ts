@@ -160,6 +160,15 @@ export class GameEngine {
   // performance.now() at the moment pause() ran, or null when running.
   // Used by resume() to rebase wall-clock timers past the paused gap.
   private pausedAt: number | null = null;
+  // Whether Matter's two rAF loops are live. Matter 0.20's Render.run /
+  // Runner.run start a NEW loop on every call (and overwrite the stored
+  // frame id, orphaning the old loop), so pause()/resume() must only stop
+  // or start each loop when its state actually changes.
+  private renderRunning = true;
+  private runnerRunning = true;
+  // Freezes the scene shortly after game-over so the render loop doesn't
+  // keep drawing at 60fps under the game-over panel / ceremony.
+  private gameOverPauseTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Sprite cache — preloaded PNG images keyed by yokai id
   private spriteCache = new Map<number, HTMLImageElement>();
@@ -592,6 +601,12 @@ export class GameEngine {
     this.gameOver = true;
     this.audio.playGameOver();
     this.callbacks.onGameOver?.(this.score, this.mergeCount);
+    // Let the final settle / VFX play out, then stop both loops. restart()
+    // (or destroy()) clears this timer.
+    this.gameOverPauseTimer = setTimeout(() => {
+      this.gameOverPauseTimer = null;
+      if (this.gameOver) this.pause();
+    }, 1200);
   }
 
   private updateVfx(dt: number) {
@@ -644,6 +659,8 @@ export class GameEngine {
   }
 
   private drawOverlays() {
+    // A frame already queued when Render.stop() ran must not redraw.
+    if (!this.renderRunning) return;
     const now = performance.now();
     const dt =
       this.lastFrameTime > 0 ? Math.min(100, now - this.lastFrameTime) : 16;
@@ -879,6 +896,13 @@ export class GameEngine {
   }
 
   restart() {
+    if (this.gameOverPauseTimer !== null) {
+      clearTimeout(this.gameOverPauseTimer);
+      this.gameOverPauseTimer = null;
+    }
+    // Leave the game-over state first so resume() restarts both loops.
+    this.gameOver = false;
+    this.resume();
     const bodies = Matter.Composite.allBodies(this.world) as TaggedBody[];
     for (const body of bodies) {
       if (body.yokaiId) Matter.World.remove(this.world, body);
@@ -973,12 +997,24 @@ export class GameEngine {
     return this.audio.isBgmMuted();
   }
 
+  /** Stop physics AND rendering. Idempotent. */
   pause() {
     if (this.pausedAt === null) this.pausedAt = performance.now();
-    Matter.Runner.stop(this.runner);
+    if (this.runnerRunning) {
+      Matter.Runner.stop(this.runner);
+      this.runnerRunning = false;
+    }
+    if (this.renderRunning) {
+      Matter.Render.stop(this.render);
+      this.renderRunning = false;
+    }
   }
 
+  /** Restart rendering + physics. Idempotent. A finished game stays
+   *  frozen: only restart() (which clears gameOver first) resumes it, so
+   *  closing an overlay over the game-over panel doesn't re-arm the loops. */
   resume() {
+    if (this.gameOver) return;
     if (this.pausedAt !== null) {
       const elapsed = performance.now() - this.pausedAt;
       this.pausedAt = null;
@@ -993,7 +1029,14 @@ export class GameEngine {
         this.dangerSince.set(id, t + elapsed);
       }
     }
-    Matter.Runner.run(this.runner, this.engine);
+    if (!this.renderRunning) {
+      Matter.Render.run(this.render);
+      this.renderRunning = true;
+    }
+    if (!this.runnerRunning) {
+      Matter.Runner.run(this.runner, this.engine);
+      this.runnerRunning = true;
+    }
   }
 
   // ─────────────────────────────── Dev-mode helpers ───────────────
@@ -1040,6 +1083,10 @@ export class GameEngine {
   }
 
   destroy() {
+    if (this.gameOverPauseTimer !== null) {
+      clearTimeout(this.gameOverPauseTimer);
+      this.gameOverPauseTimer = null;
+    }
     this.audio.stopBGM();
     Matter.Render.stop(this.render);
     Matter.Runner.stop(this.runner);
